@@ -49,12 +49,17 @@ právneho subjektu.
 
 Pred zverejnením repozitára treba `docs/` rozdeliť:
 
-- **verejné** → normatívne časti kapitol 5 (formát `symlic/1`), 7 (floating protokol)
-  a testovacie vektory sa prepíšu do `spec/` pod CC BY 4.0,
-- **interné** → kapitoly 1, 12, 13, 14 zostávajú v privátnom repozitári alebo sa
-  odstránia.
+- ✅ **verejné** → normatívne časti kapitol 5 (formát `symlic/1`) a 7 (floating protokol)
+  sú prepísané do [`spec/`](spec/README.md) pod CC BY 4.0. **Hotové.**
+- ⬜ **testovacie vektory** → `spec/vectors/` zatiaľ neexistuje.
+- ⬜ **interné** → kapitoly 1, 12, 13, 14 zostávajú v privátnom repozitári alebo sa
+  pred zverejnením odstránia. **Neurobené.**
 
-Do vykonania tohto rozdelenia je `docs/` **All rights reserved**.
+Do vykonania zvyšku je `docs/` **All rights reserved**.
+
+> *Poznámka:* prepis do `spec/` je **nový text**, nie kópia — argumentácia, zamietnuté
+> varianty a obchodný kontext sa doň zámerne nepreniesli. `spec/` je preto pod CC BY 4.0
+> bez toho, aby sa tým čokoľvek z interného materiálu licencovalo verejne.
 
 ---
 

@@ -84,6 +84,27 @@ Dokument je napísaný ako reťaz štyroch rolí: **architekt** (4–7), **progr
 
 Index kapitol je aj v [`docs/`](docs/README.md).
 
+## Špecifikácia
+
+Normatívne časti kapitol 5 a 7 sú prepísané do **[`spec/`](spec/README.md)** ako otvorená
+špecifikácia pod [CC BY 4.0](spec/LICENSE) — formáty artefaktov a protokol tak vie
+implementovať ktokoľvek, nezávisle od referenčnej implementácie.
+
+| # | Dokument | Obsah |
+|---|---|---|
+| 1 | [Artefakty](spec/01-artefakty.md) | Päť artefaktov a prečo sú oddelené |
+| 2 | [License Key](spec/02-license-key.md) | Formát kľúča, abeceda, kontrolný súčet |
+| 3 | [`symlic/1`](spec/03-symlic-1.md) | Licenčný súbor a **pravidlá validácie** |
+| 4 | [Lease Token](spec/04-lease-token.md) | Krátkodobý dôkaz o držaní sedadla |
+| 5 | [Seat Grant](spec/05-seat-grant.md) | Delegovaná kapacita pre relay |
+| 6 | [Revocation List](spec/06-revocation-list.md) | Revokácia licencií, strojov a kľúčov |
+| 7 | [Floating protokol](spec/07-floating-protokol.md) | Životný cyklus sedadla, checkout, borrow, air-gapped |
+| 8 | [Fingerprint](spec/08-fingerprint.md) | Node-locking, matching, kontajnery |
+
+172 očíslovaných požiadaviek s RFC 2119 kľúčovými slovami. Pri rozpore medzi `spec/`
+a `docs/` platí `spec/`. Známe medzery drafu sú vymenované
+[v úvode špecifikácie](spec/README.md#známe-medzery).
+
 ## Fázy
 
 | Fáza | Obsah | Odhad |
