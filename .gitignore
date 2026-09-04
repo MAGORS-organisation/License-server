@@ -1,0 +1,35 @@
+## .NET
+bin/
+obj/
+[Dd]ebug/
+[Rr]elease/
+artifacts/
+*.user
+*.suo
+*.userprefs
+project.lock.json
+TestResults/
+[Cc]overage*/
+*.coverage
+*.trx
+
+## Nástroje a IDE
+.vs/
+.vscode/
+.idea/
+*.swp
+
+## OS
+.DS_Store
+Thumbs.db
+
+## Tajomstvá a lokálna konfigurácia — nikdy necommitovať
+*.pfx
+*.p12
+*.key
+# pozn.: *.pem sa zámerne NEignoruje — licenčný formát (.symlic) je PEM-armored
+# a testovacie vektory sa commitujú.
+appsettings.*.Local.json
+.env
+.env.*
+secrets/
