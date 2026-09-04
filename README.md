@@ -10,7 +10,7 @@ ktoré rozhoduje o tom, či a v akom rozsahu sa kód vôbec bude písať.
 | **Autor / vlastník** | Matej Langsfeld — PRAESTAR / MATPEX s.r.o. |
 | **Stav** | Návrh na rozhodnutie (**nie schválené zadanie**) |
 | **Cieľová platforma** | .NET 10 LTS (podpora do 14. 11. 2028), C# 14 |
-| **Navrhovaná licencia** | Apache-2.0 (SDK, špecifikácie) + AGPL-3.0-only s CLA (server) |
+| **Licencovanie** | **Rozhodnuté** podľa ADR-006 — viď [LICENSING.md](LICENSING.md) |
 
 ---
 
@@ -100,10 +100,26 @@ Index kapitol je aj v [`docs/`](docs/README.md).
 3. **Nie je fakturačný systém.** Integruje sa cez webhooky, nenahrádza.
 4. **Nerobí parity s FlexNet.** Options file syntax, `lmgrd` protokol a `.lic` kompatibilita sú mimo rozsahu.
 
+## Licencovanie
+
+Rozdelené podľa [ADR-006](docs/06-architektura.md). Záväzná mapa je v **[LICENSING.md](LICENSING.md)**.
+
+| Časť | Licencia |
+|---|---|
+| koreň repozitára (default) — server, control plane, relay, CLI | [`AGPL-3.0-only`](LICENSE) |
+| `src/Symbolon.{Format,Crypto,Client,Protocol}` — SDK do produktov ISV | [`Apache-2.0`](LICENSES/Apache-2.0.txt) |
+| [`spec/`](spec/) — formát, protokol, testovacie vektory | [`CC-BY-4.0`](spec/LICENSE) |
+| `docs/` — zadanie (obsahuje interný obchodný materiál) | All rights reserved, viď [LICENSING.md](LICENSING.md) |
+
+Serverová časť je AGPL + CLA zámerne: [CLA zatiaľ neexistuje](LICENSING.md#prispievanie-a-cla),
+takže **externé príspevky do `src/` zatiaľ neprijímaj** — inak sa komerčná dual-licencia
+zablokuje natrvalo.
+
 ## Ďalší krok
 
 Zodpovedať otázky **Q1–Q7** v kapitole [14](docs/14-otvorene-otazky.md). Bez nich sa zadanie
-nedá schváliť — najmä Q1 (validácia vs. rovno stavať) a Q3 (AGPL vs. Apache).
+nedá schváliť — najmä Q1 (validácia vs. rovno stavať) a Q4 (PRAESTAR vs. MATPEX ako držiteľ
+autorských práv, blokuje CLA). Q3 (AGPL vs. Apache) je rozhodnutá v prospech ADR-006.
 
 ---
 
