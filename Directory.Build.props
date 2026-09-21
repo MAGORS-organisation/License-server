@@ -9,5 +9,11 @@
     <AnalysisLevel>latest-all</AnalysisLevel>
     <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
     <Deterministic>true</Deterministic>
+    <ContinuousIntegrationBuild Condition="'$(GITHUB_ACTIONS)' == 'true'">true</ContinuousIntegrationBuild>
+    <Company>Symbolon Project</Company>
+    <Product>Symbolon Enterprise Floating License Server</Product>
+    <Authors>Symbolon Team</Authors>
+    <RepositoryUrl>https://github.com/MAGORS-organisation/License-server</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
   </PropertyGroup>
 </Project>

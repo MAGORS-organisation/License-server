@@ -40,6 +40,8 @@ internal static class Program
                 "DOCTOR" => await HandleDoctorAsync(args[1..]).ConfigureAwait(false),
                 "IMPORT" => await Commands.MigrationCommands.HandleImportAsync(args[1..]).ConfigureAwait(false),
                 "EXPORT" => await Commands.MigrationCommands.HandleExportAsync(args[1..]).ConfigureAwait(false),
+                "SBOM" => await Commands.ComplianceCommands.HandleSbomAsync(args[1..]).ConfigureAwait(false),
+                "VERIFY-ARTIFACT" or "VERIFY" => await Commands.ComplianceCommands.HandleVerifyArtifactAsync(args[1..]).ConfigureAwait(false),
                 _ => UnknownCommand(args[0])
             };
         }
@@ -410,6 +412,8 @@ internal static class Program
               doctor [--server <url>]
               import --file <cesta> --policy <policy-id> [--format <keygen|csv>] [--dry-run]
               export --out <cesta> [--format <json|csv>]
+              sbom [--out <cesta>]                      Vygeneruje CycloneDX v1.6 SBOM v JSON formáte
+              verify-artifact <cesta> [--checksum <sha256>]  Vypočíta a overí integritu súboru (SHA-256/512)
             """);
     }
 }

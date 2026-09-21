@@ -149,6 +149,7 @@ app.UseRateLimiter();
 app.MapPublicEndpoints().RequireRateLimiting("public-leases");
 app.MapEntitlementEndpoints().RequireRateLimiting("public-leases");
 app.MapTransparencyEndpoints().RequireRateLimiting("public-leases");
+app.MapComplianceEndpoints().RequireRateLimiting("public-leases");
 app.MapAdminEndpoints().RequireAuthorization().RequireRateLimiting("admin");
 app.MapApiKeyEndpoints().RequireAuthorization("SuperAdminOnly").RequireRateLimiting("admin");
 app.MapWebhookEndpoints().RequireAuthorization().RequireRateLimiting("admin");

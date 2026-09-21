@@ -208,6 +208,34 @@ public sealed record VerifyTransparencyProofResponseDto(
     [property: JsonPropertyName("isValid")] bool IsValid,
     [property: JsonPropertyName("message")] string Message);
 
+public sealed record CraComplianceReportDto(
+    [property: JsonPropertyName("productName")] string ProductName,
+    [property: JsonPropertyName("version")] string Version,
+    [property: JsonPropertyName("manufacturer")] string Manufacturer,
+    [property: JsonPropertyName("complianceStatus")] string ComplianceStatus,
+    [property: JsonPropertyName("standards")] IReadOnlyList<string> Standards,
+    [property: JsonPropertyName("vulnerabilityReportingUrl")] Uri VulnerabilityReportingUri,
+    [property: JsonPropertyName("securityContact")] string SecurityContact,
+    [property: JsonPropertyName("patchSupportUntil")] DateTimeOffset PatchSupportUntil,
+    [property: JsonPropertyName("sbomEndpoint")] string SbomEndpoint,
+    [property: JsonPropertyName("generatedAt")] DateTimeOffset GeneratedAt);
+
+public sealed record SbomComponentDto(
+    [property: JsonPropertyName("name")] string Name,
+    [property: JsonPropertyName("version")] string Version,
+    [property: JsonPropertyName("type")] string Type,
+    [property: JsonPropertyName("purl")] string Purl,
+    [property: JsonPropertyName("licenses")] IReadOnlyList<string> Licenses,
+    [property: JsonPropertyName("hashes")] IReadOnlyDictionary<string, string> Hashes);
+
+public sealed record CycloneDxSbomDto(
+    [property: JsonPropertyName("bomFormat")] string BomFormat,
+    [property: JsonPropertyName("specVersion")] string SpecVersion,
+    [property: JsonPropertyName("serialNumber")] string SerialNumber,
+    [property: JsonPropertyName("version")] int Version,
+    [property: JsonPropertyName("metadata")] object Metadata,
+    [property: JsonPropertyName("components")] IReadOnlyList<SbomComponentDto> Components);
+
 public static class ProblemTypes
 {
     public const string LicenseNotFound = "https://symbolon.dev/errors/license-not-found";

@@ -36,6 +36,12 @@ jobs:
       - name: Run Automated Test Suite
         run: dotnet test Symbolon.slnx --configuration Release --no-build --verbosity normal
 
+      - name: Generate and Validate CycloneDX SBOM
+        run: dotnet run --project src/Symbolon.Cli/Symbolon.Cli.csproj -- sbom --out cyclonedx-sbom.json
+
+      - name: Verify Artifact Checksum
+        run: dotnet run --project src/Symbolon.Cli/Symbolon.Cli.csproj -- verify-artifact cyclonedx-sbom.json
+
   python-sdk-tests:
     name: Python SDK Verification
     runs-on: ubuntu-latest

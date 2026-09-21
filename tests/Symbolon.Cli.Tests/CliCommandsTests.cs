@@ -47,4 +47,41 @@ public sealed class CliCommandsTests
             if (File.Exists(licenseFile)) try { File.Delete(licenseFile); } catch { /* ignore */ }
         }
     }
+
+    [Fact]
+    public async Task Sbom_And_VerifyArtifact_Workflow_Succeeds()
+    {
+        string tempSbom = Path.Combine(Path.GetTempPath(), $"sbom_{Guid.NewGuid():N}.json");
+
+        try
+        {
+            // 1. Generate CycloneDX SBOM
+            int sbomCode = await Program.Main(["sbom", "--out", tempSbom]);
+            sbomCode.Should().Be(0);
+            File.Exists(tempSbom).Should().BeTrue();
+
+            string json = await File.ReadAllTextAsync(tempSbom);
+            json.Should().Contain("CycloneDX");
+            json.Should().Contain("Symbolon.ControlPlane");
+
+            // 2. Verify artifact
+            int verifyCode = await Program.Main(["verify-artifact", tempSbom]);
+            verifyCode.Should().Be(0);
+
+            // 3. Verify with checksum
+            byte[] bytes = await File.ReadAllBytesAsync(tempSbom);
+            string sha256 = Convert.ToHexStringLower(System.Security.Cryptography.SHA256.HashData(bytes));
+
+            int checksumCode = await Program.Main(["verify-artifact", tempSbom, "--checksum", sha256]);
+            checksumCode.Should().Be(0);
+
+            // 4. Verify with invalid checksum returns non-zero
+            int failCode = await Program.Main(["verify-artifact", tempSbom, "--checksum", "0000000000000000000000000000000000000000000000000000000000000000"]);
+            failCode.Should().Be(2);
+        }
+        finally
+        {
+            if (File.Exists(tempSbom)) try { File.Delete(tempSbom); } catch { /* ignore */ }
+        }
+    }
 }
