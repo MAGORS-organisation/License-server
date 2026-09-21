@@ -1,4 +1,5 @@
 using System.Net;
+using System.Net.Http.Json;
 using Xunit;
 
 namespace Symbolon.ControlPlane.Tests;
@@ -57,5 +58,21 @@ public sealed class WebUiTests : IClassFixture<ControlPlaneFactory>
 
         string content = await response.Content.ReadAsStringAsync();
         Assert.Contains("Symbolon Control Plane", content, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task System_Telemetry_Endpoint_Returns_Valid_Resource_Metrics()
+    {
+        var response = await _client.GetAsync("/v1/system/telemetry");
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var telemetry = await response.Content.ReadFromJsonAsync(
+            Symbolon.Protocol.SymbolonProtocolJsonContext.Default.ServerTelemetryDto);
+
+        Assert.NotNull(telemetry);
+        Assert.True(telemetry.CpuPercent >= 0.0);
+        Assert.True(telemetry.MemoryMb > 0.0);
+        Assert.NotNull(telemetry.ServerIp);
+        Assert.False(string.IsNullOrWhiteSpace(telemetry.CurrentUser));
     }
 }

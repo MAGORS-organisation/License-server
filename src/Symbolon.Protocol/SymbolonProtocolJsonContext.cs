@@ -17,6 +17,7 @@ namespace Symbolon.Protocol;
 [JsonSerializable(typeof(ReleaseRequestDto))]
 [JsonSerializable(typeof(ReleaseResponseDto))]
 [JsonSerializable(typeof(QueuedResponseDto))]
+[JsonSerializable(typeof(ServerTelemetryDto))]
 public sealed partial class SymbolonProtocolJsonContext : JsonSerializerContext
 {
 }

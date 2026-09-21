@@ -2,7 +2,7 @@
 
 [![Platform](https://img.shields.io/badge/.NET-10.0%20LTS-512BD4?logo=dotnet)](https://dotnet.microsoft.com/)
 [![Language](https://img.shields.io/badge/C%23-14.0-239120?logo=csharp)](https://learn.microsoft.com/dotnet/csharp/)
-[![Tests](https://img.shields.io/badge/tests-98%20passed%20(+2%20Python)-brightgreen)](#výsledky-testovania)
+[![Tests](https://img.shields.io/badge/tests-99%20passed%20(+2%20Python)-brightgreen)](#výsledky-testovania)
 [![License: AGPL-3.0](https://img.shields.io/badge/license-AGPL--3.0-blue.svg)](LICENSE)
 [![License: Apache-2.0](https://img.shields.io/badge/client%20SDK-Apache--2.0-blue.svg)](LICENSES/Apache-2.0.txt)
 [![CRA Compliant](https://img.shields.io/badge/CRA%20Compliance-EU%202024%2F2847-success)](SECURITY.md)
@@ -284,9 +284,9 @@ Passed!  - Failed: 0, Passed:  7, Skipped: 0, Total:  7 - Symbolon.Relay.Tests.d
 Passed!  - Failed: 0, Passed:  4, Skipped: 0, Total:  4 - Symbolon.Client.Tests.dll
 Passed!  - Failed: 0, Passed:  7, Skipped: 0, Total:  7 - Symbolon.Cli.Tests.dll
 Passed!  - Failed: 0, Passed:  5, Skipped: 0, Total:  5 - Symbolon.Data.Tests.dll
-Passed!  - Failed: 0, Passed: 28, Skipped: 0, Total: 28 - Symbolon.ControlPlane.Tests.dll
+Passed!  - Failed: 0, Passed: 29, Skipped: 0, Total: 29 - Symbolon.ControlPlane.Tests.dll
 
-Celkovo: 98 úspešných testov v .NET (+ 2 unit testy v Pythone), 0 zlyhaní, 0 chýb. Trvanie: ~6 sekúnd.
+Celkovo: 99 úspešných testov v .NET (+ 2 unit testy v Pythone), 0 zlyhaní, 0 chýb. Trvanie: ~6 sekúnd.
 ```
 
 ---

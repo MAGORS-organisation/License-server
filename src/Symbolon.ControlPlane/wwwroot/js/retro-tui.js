@@ -153,35 +153,61 @@
             document.body.appendChild(workspace);
         }
 
-        // 3. Spodná funkčná lišta F1 - F10
+        // 3. Spodná dvojriadková lišta: F1-F10 a živá info lišta systémových zdrojov
         const bottomBar = document.createElement('footer');
         bottomBar.className = 'retro-bottom-bar';
         bottomBar.innerHTML = `
-            <button class="fkey-btn" onclick="openHelpModal()"><span class="fkey-badge">F1</span> Pomoc</button>
-            <button class="fkey-btn" onclick="switchRetroView('view-overview')"><span class="fkey-badge">F2</span> Prehľad</button>
-            <button class="fkey-btn" onclick="switchRetroView('view-licenses')"><span class="fkey-badge">F3</span> Licencie</button>
-            <button class="fkey-btn" onclick="switchRetroView('view-keys')"><span class="fkey-badge">F4</span> Kľúče</button>
-            <button class="fkey-btn" onclick="switchRetroView('view-relays')"><span class="fkey-badge">F5</span> Relaye</button>
-            <button class="fkey-btn" onclick="switchRetroView('view-audit')"><span class="fkey-badge">F6</span> Audit</button>
-            <button class="fkey-btn" onclick="switchRetroView('view-airgap')"><span class="fkey-badge">F7</span> AirGap</button>
-            <button class="fkey-btn" onclick="switchRetroView('view-webhooks')"><span class="fkey-badge">F8</span> Webhook</button>
-            <button class="fkey-btn" onclick="switchRetroView('view-system')"><span class="fkey-badge">F9</span> Súlad</button>
-            <button class="fkey-btn" onclick="toggleMainMenu()"><span class="fkey-badge">F10</span> Menu</button>
-            <button class="fkey-btn" onclick="handleEscKey()"><span class="fkey-badge">ESC</span> Späť</button>
+            <div class="retro-fkey-row">
+                <button class="fkey-btn" onclick="openHelpModal()"><span class="fkey-badge">F1</span> Pomoc</button>
+                <button class="fkey-btn" onclick="switchRetroView('view-overview')"><span class="fkey-badge">F2</span> Prehľad</button>
+                <button class="fkey-btn" onclick="switchRetroView('view-licenses')"><span class="fkey-badge">F3</span> Licencie</button>
+                <button class="fkey-btn" onclick="switchRetroView('view-keys')"><span class="fkey-badge">F4</span> Kľúče</button>
+                <button class="fkey-btn" onclick="switchRetroView('view-relays')"><span class="fkey-badge">F5</span> Relaye</button>
+                <button class="fkey-btn" onclick="switchRetroView('view-audit')"><span class="fkey-badge">F6</span> Audit</button>
+                <button class="fkey-btn" onclick="switchRetroView('view-airgap')"><span class="fkey-badge">F7</span> AirGap</button>
+                <button class="fkey-btn" onclick="switchRetroView('view-webhooks')"><span class="fkey-badge">F8</span> Webhook</button>
+                <button class="fkey-btn" onclick="switchRetroView('view-system')"><span class="fkey-badge">F9</span> Súlad</button>
+                <button class="fkey-btn" onclick="toggleMainMenu()"><span class="fkey-badge">F10</span> Menu</button>
+                <button class="fkey-btn" onclick="handleEscKey()"><span class="fkey-badge">ESC</span> Späť</button>
+            </div>
+            <div class="retro-telemetry-row">
+                <div class="retro-telemetry-segment">
+                    <span class="retro-telemetry-label">CPU:</span>
+                    <span class="retro-telemetry-val" id="telemetry-cpu">0.0%</span>
+                </div>
+                <div class="retro-telemetry-segment">
+                    <span class="retro-telemetry-label">RAM:</span>
+                    <span class="retro-telemetry-val" id="telemetry-ram">0.0 MB</span>
+                </div>
+                <div class="retro-telemetry-segment">
+                    <span class="retro-telemetry-label">DISK:</span>
+                    <span class="retro-telemetry-val" id="telemetry-disk">0.0 MB</span>
+                </div>
+                <div class="retro-telemetry-segment">
+                    <span class="retro-telemetry-label">INTERNET:</span>
+                    <span class="retro-telemetry-val" id="telemetry-net">0.0 KB/s</span>
+                </div>
+                <div class="retro-telemetry-segment">
+                    <span class="retro-telemetry-label">IP:</span>
+                    <span class="retro-telemetry-val" id="telemetry-ip">127.0.0.1:8080</span>
+                </div>
+                <div class="retro-telemetry-segment">
+                    <span class="retro-telemetry-label">POUŽÍVATEĽ:</span>
+                    <span class="retro-telemetry-val" id="telemetry-user" style="color: #00ffff;">admin:super</span>
+                </div>
+                <div class="retro-telemetry-segment" style="border-right: none; margin-left: auto;">
+                    <span class="retro-telemetry-label">ČAS:</span>
+                    <span class="retro-telemetry-val" id="retro-server-clock" style="color: #ffffff;">--:--:--</span>
+                </div>
+            </div>
         `;
         document.body.appendChild(bottomBar);
 
         // 4. Dialógové okno Pomocníka klávesových skratiek (F1)
         createHelpModal();
 
-        // 5. Hodiny v hornej lište
-        setInterval(() => {
-            const now = new Date();
-            const clockEl = document.getElementById('retro-server-clock');
-            if (clockEl) {
-                clockEl.textContent = now.toLocaleTimeString();
-            }
-        }, 1000);
+        // 5. Spustenie zberu živých systémových metrík z /v1/system/telemetry
+        initTelemetryPolling();
     }
 
     /**
@@ -574,10 +600,60 @@
     };
 
     /**
-     * Priame stiahnutie CycloneDX SBOM
+     * Inicializácia a periodický zber živých telemetrických metrík (CPU, RAM, DISK, NET, IP, Používateľ)
+     */
+    function initTelemetryPolling() {
+        async function fetchTelemetry() {
+            try {
+                const res = await fetch('/v1/system/telemetry');
+                if (res.ok) {
+                    const data = await res.json();
+                    const cpuEl = document.getElementById('telemetry-cpu');
+                    const ramEl = document.getElementById('telemetry-ram');
+                    const diskEl = document.getElementById('telemetry-disk');
+                    const netEl = document.getElementById('telemetry-net');
+                    const ipEl = document.getElementById('telemetry-ip');
+                    const userEl = document.getElementById('telemetry-user');
+
+                    if (cpuEl) {
+                        cpuEl.textContent = `${data.cpuPercent}%`;
+                        cpuEl.style.color = data.cpuPercent > 80 ? '#ff5555' : (data.cpuPercent > 50 ? '#ffaa00' : '#ffff00');
+                    }
+                    if (ramEl) ramEl.textContent = `${data.memoryMb} MB`;
+                    if (diskEl) diskEl.textContent = `${data.diskMb} MB`;
+                    if (netEl) netEl.textContent = data.networkActivity || '0 KB/s';
+                    if (ipEl) ipEl.textContent = data.serverIp || '127.0.0.1:8080';
+                    if (userEl) userEl.textContent = data.currentUser || 'admin:super';
+                }
+            } catch {
+                // Tichý failover pri reštarte servera
+            }
+        }
+
+        // Aktualizácia hodín každú sekundu
+        setInterval(() => {
+            const now = new Date();
+            const clockEl = document.getElementById('retro-server-clock');
+            if (clockEl) {
+                clockEl.textContent = now.toLocaleTimeString();
+            }
+        }, 1000);
+
+        // Okamžité načítanie a následné periodické obnovovanie každé 2 sekundy
+        fetchTelemetry();
+        setInterval(fetchTelemetry, 2000);
+    }
+
+    /**
+     * Bezpečné stiahnutie CycloneDX SBOM priamo v tom istom okne bez otvárania nových záložiek
      */
     window.downloadSbomDirect = function () {
-        window.open('/v1/compliance/sbom', '_blank');
+        const link = document.createElement('a');
+        link.href = '/v1/compliance/sbom';
+        link.download = 'symbolon-cyclonedx-sbom.json';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
     };
 
     // Export do window

@@ -236,6 +236,17 @@ public sealed record CycloneDxSbomDto(
     [property: JsonPropertyName("metadata")] object Metadata,
     [property: JsonPropertyName("components")] IReadOnlyList<SbomComponentDto> Components);
 
+public sealed record ServerTelemetryDto(
+    [property: JsonPropertyName("cpuPercent")] double CpuPercent,
+    [property: JsonPropertyName("memoryMb")] double MemoryMb,
+    [property: JsonPropertyName("diskMb")] double DiskMb,
+    [property: JsonPropertyName("networkActivity")] string NetworkActivity,
+    [property: JsonPropertyName("serverIp")] string ServerIp,
+    [property: JsonPropertyName("serverPort")] int ServerPort,
+    [property: JsonPropertyName("currentUser")] string CurrentUser,
+    [property: JsonPropertyName("uptimeSeconds")] long UptimeSeconds,
+    [property: JsonPropertyName("activeSeats")] long ActiveSeats);
+
 public static class ProblemTypes
 {
     public const string LicenseNotFound = "https://symbolon.dev/errors/license-not-found";

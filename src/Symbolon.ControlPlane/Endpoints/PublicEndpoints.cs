@@ -68,6 +68,10 @@ public static class PublicEndpoints
             .WithName("CancelQueue")
             .WithSummary("Zruší požiadavku vo fronte na sedadlo.");
 
+        group.MapGet("/system/telemetry", GetTelemetry)
+            .WithName("GetSystemTelemetry")
+            .WithSummary("Vráti živé systémové metriky servera (CPU, RAM, DISK, NET, IP, User).");
+
         return group;
     }
 
@@ -545,5 +549,13 @@ public static class PublicEndpoints
         return cancelled
             ? TypedResults.Ok(new { message = $"Queue ticket {ticket} cancelled.", ticket })
             : TypedResults.NotFound();
+    }
+
+    private static IResult GetTelemetry(
+        HttpContext context,
+        Observability.SymbolonMetrics metrics)
+    {
+        var telemetry = Observability.TelemetryCollector.Collect(context, metrics.ActiveSeats);
+        return TypedResults.Ok(telemetry);
     }
 }

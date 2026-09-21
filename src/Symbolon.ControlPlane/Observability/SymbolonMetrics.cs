@@ -51,6 +51,8 @@ public sealed class SymbolonMetrics : IDisposable
             description: "Total number of clock skew anomalies detected.");
     }
 
+    public long ActiveSeats => Volatile.Read(ref _activeSeats);
+
     public void RecordSeatAcquired(int quantity = 1)
     {
         Interlocked.Add(ref _activeSeats, quantity);
