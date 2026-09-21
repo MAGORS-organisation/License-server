@@ -1,0 +1,16 @@
+[package]
+name = "symbolon-client"
+version = "1.0.0"
+edition = "2021"
+authors = ["Symbolon Authors <dev@symbolon.org>"]
+description = "Official Rust client SDK for the Symbolon Floating & Enterprise License Server"
+license = "Apache-2.0"
+repository = "https://github.com/MAGORS-organisation/License-server"
+keywords = ["licensing", "floating", "concurrent", "enterprise", "drm"]
+
+[dependencies]
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+sha2 = "0.10"
+hex = "0.4"
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"], optional = true }

@@ -133,6 +133,7 @@ app.UseRateLimiter();
 app.MapPublicEndpoints().RequireRateLimiting("public-leases");
 app.MapAdminEndpoints().RequireRateLimiting("admin");
 app.MapRelaySyncEndpoints().RequireRateLimiting("relay");
+app.MapOfflineEndpoints();
 
 // SPA Fallback
 app.MapFallbackToFile("index.html");

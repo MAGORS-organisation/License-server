@@ -2,7 +2,7 @@
 
 [![Platform](https://img.shields.io/badge/.NET-10.0%20LTS-512BD4?logo=dotnet)](https://dotnet.microsoft.com/)
 [![Language](https://img.shields.io/badge/C%23-14.0-239120?logo=csharp)](https://learn.microsoft.com/dotnet/csharp/)
-[![Tests](https://img.shields.io/badge/tests-84%20passed-brightgreen)](#výsledky-testovania)
+[![Tests](https://img.shields.io/badge/tests-86%20passed-brightgreen)](#výsledky-testovania)
 [![License: AGPL-3.0](https://img.shields.io/badge/license-AGPL--3.0-blue.svg)](LICENSE)
 [![License: Apache-2.0](https://img.shields.io/badge/client%20SDK-Apache--2.0-blue.svg)](LICENSES/Apache-2.0.txt)
 [![Crypto](https://img.shields.io/badge/cryptography-ES256%20%2B%20ML--DSA--65%20(PQC)-orange)](#kryptografia)
@@ -38,6 +38,12 @@ Rieši to, čo dnešné cloud-first platformy ponúkajú iba ako obmedzený dopl
 8. **Vstavaný Web UI Dashboard (Admin & ISV Konzola)**
    - Priamo integrovaný moderný webový portál na `http://localhost:8080/` (alebo `/dashboard`) pre sledovanie obsadenosti plávajúcich sedadiel v reálnom čase.
    - Vizuálna správa licencií (vystavenie novej licencie a stiahnutie `.symlic` súboru), interaktívna rotácia kľúčov, JWKS prehliadač a auditný denník bez potreby inštalácie externých závislostí.
+9. **Air-Gap Offline Portál & Scenáre**
+   - Plnohodnotná podpora pre striktne izolované priemyselné závody a bezsieťové prostredia.
+   - Výmena `.symreq` → `.symgrant` cez USB alebo Web UI s povinným hash-chain uzlom `usageDigest` zabraňujúcim neoprávnenému generovaniu offline grantov bez evidencie spotreby.
+   - Offline node-lock aktivácie viazané na hardvérový fingerprint stanice.
+10. **Viacjazyčné Klientske SDK (Python, C/C++, Rust)**
+   - Oficiálne, odľahčené klientske knižnice pre ISV v Python, C/C++ a Rust (v priečinku `sdk/`) s automatickým vláknom pre heartbeat, adaptívnym jitterom ±10% a RAII/kontextovým manažérom.
 
 ---
 
@@ -70,6 +76,10 @@ Symbolon.slnx
 │   ├── helm/symbolon/                        - Kubernetes Helm Chart (Deployment, Service, Ingress, HPA, Secret)
 │   └── systemd/
 │       └── symbolon-relay.service            - Bezpečný tvrdený systemd unit pre Linux distribúciu
+├── sdk/
+│   ├── python/symbolon/                      - Python SDK (pip installable, context manager, daemon heartbeat)
+│   ├── c_cpp/                                - C99/C++17 single-header knižnica (ScopedLease RAII)
+│   └── rust/symbolon/                        - Idiomatický Rust crate (Drop trait auto-release)
 └── tests/
     ├── Symbolon.Crypto.Tests                 - Testy kryptografických primitív a hybridných podpisov
     ├── Symbolon.Format.Tests                 - Validácia formátu symlic/1, Crockford Base32 a PEM obálky
@@ -100,7 +110,7 @@ cd License-server
 # Zostavenie celého solution
 dotnet build Symbolon.slnx
 
-# Spustenie všetkých 84 unit a integračných testov
+# Spustenie všetkých 86 unit a integračných testov
 dotnet test Symbolon.slnx
 ```
 
@@ -240,6 +250,10 @@ Endpointy sú zabezpečené autentifikáciou cez hlavičku `X-Relay-Api-Key` a v
 - `POST /relay/v1/grants:request` — delegovanie kapacity sedadiel (`SeatGrant`) lokálnemu serveru.
 - `POST /relay/v1/usage` — dávkový príjem auditných a telemetrických záznamov z relayov.
 
+### Offline & Air-Gap API (`/v1/offline`)
+- `POST /v1/offline/grants` — spracovanie offline `.symreq` požiadavky, validácia `usageDigest` v auditnom ledgeri a vystavenie `.symgrant`.
+- `POST /v1/offline/activations` — generovanie offline node-lock `.symlic` licenčného súboru viazaného na HW fingerprint.
+
 ### Observabilita & Zdravie
 - `GET /metrics` — Prometheus formát metrík (v0.0.4).
 - `GET /health` — základná odozva služby.
@@ -294,9 +308,9 @@ Passed!  - Failed: 0, Passed:  7, Skipped: 0, Total:  7 - Symbolon.Relay.Tests.d
 Passed!  - Failed: 0, Passed:  4, Skipped: 0, Total:  4 - Symbolon.Client.Tests.dll
 Passed!  - Failed: 0, Passed:  6, Skipped: 0, Total:  6 - Symbolon.Cli.Tests.dll
 Passed!  - Failed: 0, Passed:  5, Skipped: 0, Total:  5 - Symbolon.Data.Tests.dll
-Passed!  - Failed: 0, Passed: 15, Skipped: 0, Total: 15 - Symbolon.ControlPlane.Tests.dll
+Passed!  - Failed: 0, Passed: 17, Skipped: 0, Total: 17 - Symbolon.ControlPlane.Tests.dll
 
-Celkovo: 84 úspešných testov, 0 zlyhaní, 0 chýb. Trvanie: ~6 sekúnd.
+Celkovo: 86 úspešných testov v .NET (+ 2 unit testy v Pythone), 0 zlyhaní, 0 chýb. Trvanie: ~6 sekúnd.
 ```
 
 ---

@@ -50,6 +50,12 @@
                 </a>
             </li>
             <li class="nav-item">
+                <a class="nav-link" data-view="view-airgap">
+                    <span class="nav-icon">🛰️</span>
+                    <span>Air-Gap Portál</span>
+                </a>
+            </li>
+            <li class="nav-item">
                 <a class="nav-link" data-view="view-system">
                     <span class="nav-icon">⚡</span>
                     <span>API & Diagnostika</span>
@@ -257,6 +263,63 @@
                             </tr>
                         </tbody>
                     </table>
+                </div>
+            </section>
+
+            <!-- VIEW: Air-Gap Portal -->
+            <section id="view-airgap" class="view-section">
+                <div class="charts-grid">
+                    <div class="chart-card">
+                        <div class="chart-header">
+                            <div class="chart-title">🛰️ Delegovaný Offline Seat Grant (.symreq → .symgrant)</div>
+                        </div>
+                        <p style="color: var(--text-secondary); font-size: 13px; margin-bottom: 16px;">
+                            Pre on-premise relay servery v striktne izolovaných sieťach bez internetu. Na základe <code>usageDigest</code> server overí kontinuitu využitia a vygeneruje podpísaný <code>.symgrant</code> súbor na USB prenos.
+                        </p>
+                        <form id="form-airgap-grant">
+                            <div class="form-group">
+                                <label class="form-label" for="ag-relay-id">Relay ID</label>
+                                <input type="text" class="form-control" id="ag-relay-id" required placeholder="napr. rly_plant_kosice_01">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label" for="ag-license-key">Licenčný Kľúč (Crockford Base32)</label>
+                                <input type="text" class="form-control" id="ag-license-key" required placeholder="SYM-XXXX-XXXX-XXXX-XXXX-XXXX">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label" for="ag-seats">Požadovaný Počet Sedadiel</label>
+                                <input type="number" class="form-control" id="ag-seats" required min="1" max="500" value="5">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label" for="ag-usage-digest">Audit Usage Digest (Hash lokálneho auditu)</label>
+                                <input type="text" class="form-control" id="ag-usage-digest" required placeholder="sha256:4a5b6c..." value="sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855">
+                            </div>
+                            <button type="submit" class="btn btn-primary">Vystaviť &amp; Stiahnuť .symgrant</button>
+                        </form>
+                    </div>
+
+                    <div class="chart-card">
+                        <div class="chart-header">
+                            <div class="chart-title">💻 Offline Node-Lock Aktivácia (.symlic)</div>
+                        </div>
+                        <p style="color: var(--text-secondary); font-size: 13px; margin-bottom: 16px;">
+                            Pre jednotlivé priemyselné PC a CAD stanice viazané na hardvérový odtlačok (fingerprint) bez pripojenia do siete.
+                        </p>
+                        <form id="form-airgap-activation">
+                            <div class="form-group">
+                                <label class="form-label" for="act-license-key">Licenčný Kľúč</label>
+                                <input type="text" class="form-control" id="act-license-key" required placeholder="SYM-XXXX-XXXX-XXXX-XXXX-XXXX">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label" for="act-fingerprint">Hardvérový Fingerprint (SHA-256)</label>
+                                <input type="text" class="form-control" id="act-fingerprint" required placeholder="sha256:7f83b1657ff1fc53b92dc18148a1d65dfc2d4b1fa3d677284addd200126d9069">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label" for="act-machine-name">Názov Stanice / Zariadenia</label>
+                                <input type="text" class="form-control" id="act-machine-name" placeholder="CNC-Operator-Station-04" value="CNC-Operator-Station-04">
+                            </div>
+                            <button type="submit" class="btn btn-primary" style="margin-top: 12px;">Aktivovať &amp; Stiahnuť .symlic</button>
+                        </form>
+                    </div>
                 </div>
             </section>
 

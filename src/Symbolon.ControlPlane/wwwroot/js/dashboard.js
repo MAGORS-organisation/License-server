@@ -398,6 +398,63 @@ function initModals() {
             showToast("Sieťová chyba pri rotácii", "error");
         }
     });
+
+    // Form Submit: Air-Gap Grant (.symreq -> .symgrant)
+    document.getElementById("form-airgap-grant")?.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const relayId = document.getElementById("ag-relay-id").value.trim();
+        const licenseKey = document.getElementById("ag-license-key").value.trim();
+        const requestedSeats = parseInt(document.getElementById("ag-seats").value, 10);
+        const usageDigest = document.getElementById("ag-usage-digest").value.trim();
+
+        try {
+            const res = await fetch("/v1/offline/grants", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ relayId, licenseKey, requestedSeats, usageDigest, lastSeq: 1 })
+            });
+
+            if (res.ok) {
+                const data = await res.json();
+                downloadTextFile(`grant-${data.grantId}.symgrant`, data.symgrantPem);
+                showToast("Delegovaný offline grant .symgrant úspešne vygenerovaný a stiahnutý!", "success");
+                refreshAllData();
+            } else {
+                const err = await res.text();
+                showToast("Chyba pri generovaní grantu: " + err, "error");
+            }
+        } catch {
+            showToast("Sieťová chyba pri generovaní grantu", "error");
+        }
+    });
+
+    // Form Submit: Air-Gap Node-Lock Activation
+    document.getElementById("form-airgap-activation")?.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const licenseKey = document.getElementById("act-license-key").value.trim();
+        const fingerprint = document.getElementById("act-fingerprint").value.trim();
+        const machineName = document.getElementById("act-machine-name").value.trim();
+
+        try {
+            const res = await fetch("/v1/offline/activations", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ licenseKey, fingerprint, machineName })
+            });
+
+            if (res.ok) {
+                const data = await res.json();
+                downloadTextFile(`license-${data.activationId}.symlic`, data.symlicPem);
+                showToast("Offline aktivačný súbor .symlic úspešne stiahnutý!", "success");
+                refreshAllData();
+            } else {
+                const err = await res.text();
+                showToast("Chyba pri aktivácii: " + err, "error");
+            }
+        } catch {
+            showToast("Sieťová chyba pri aktivácii", "error");
+        }
+    });
 }
 
 function openModal(id) {
@@ -406,6 +463,18 @@ function openModal(id) {
 
 function closeModal(id) {
     document.getElementById(id)?.classList.remove("active");
+}
+
+function downloadTextFile(filename, text) {
+    const blob = new Blob([text], { type: "text/plain;charset=utf-8" });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    window.URL.revokeObjectURL(url);
 }
 
 // Download .symlic file
