@@ -1,5 +1,7 @@
 <Solution>
   <Folder Name="/src/">
+    <Project Path="src/Symbolon.Cli/Symbolon.Cli.csproj" />
+    <Project Path="src/Symbolon.Client/Symbolon.Client.csproj" />
     <Project Path="src/Symbolon.Crypto/Symbolon.Crypto.csproj" />
     <Project Path="src/Symbolon.Domain/Symbolon.Domain.csproj" />
     <Project Path="src/Symbolon.Format/Symbolon.Format.csproj" />
@@ -7,6 +9,8 @@
     <Project Path="src/Symbolon.Relay/Symbolon.Relay.csproj" />
   </Folder>
   <Folder Name="/tests/">
+    <Project Path="tests/Symbolon.Cli.Tests/Symbolon.Cli.Tests.csproj" />
+    <Project Path="tests/Symbolon.Client.Tests/Symbolon.Client.Tests.csproj" />
     <Project Path="tests/Symbolon.Crypto.Tests/Symbolon.Crypto.Tests.csproj" />
     <Project Path="tests/Symbolon.Domain.Tests/Symbolon.Domain.Tests.csproj" />
     <Project Path="tests/Symbolon.Format.Tests/Symbolon.Format.Tests.csproj" />

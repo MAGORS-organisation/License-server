@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <RootNamespace>Symbolon.Cli</RootNamespace>
+    <!-- Suppress SYSLIB5006 for experimental ML-DSA in CLI -->
+    <NoWarn>$(NoWarn);SYSLIB5006;CA1303;CA1849;CA1308</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Symbolon.Cli.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Symbolon.Crypto\Symbolon.Crypto.csproj" />
+    <ProjectReference Include="..\Symbolon.Format\Symbolon.Format.csproj" />
+    <ProjectReference Include="..\Symbolon.Protocol\Symbolon.Protocol.csproj" />
+    <ProjectReference Include="..\Symbolon.Client\Symbolon.Client.csproj" />
+  </ItemGroup>
+
+</Project>

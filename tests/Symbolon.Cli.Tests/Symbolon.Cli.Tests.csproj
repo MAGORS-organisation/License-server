@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <RootNamespace>Symbolon.Cli.Tests</RootNamespace>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+    <NoWarn>$(NoWarn);SYSLIB5006</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="xunit" />
+    <PackageReference Include="xunit.runner.visualstudio" />
+    <PackageReference Include="FluentAssertions" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Symbolon.Crypto\Symbolon.Crypto.csproj" />
+    <ProjectReference Include="..\..\src\Symbolon.Format\Symbolon.Format.csproj" />
+    <ProjectReference Include="..\..\src\Symbolon.Protocol\Symbolon.Protocol.csproj" />
+    <ProjectReference Include="..\..\src\Symbolon.Client\Symbolon.Client.csproj" />
+    <ProjectReference Include="..\..\src\Symbolon.Cli\Symbolon.Cli.csproj" />
+  </ItemGroup>
+
+</Project>
