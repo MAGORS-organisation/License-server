@@ -37,6 +37,16 @@ public sealed class WebUiTests : IClassFixture<ControlPlaneFactory>
         Assert.Equal(HttpStatusCode.OK, jsResponse.StatusCode);
         string js = await jsResponse.Content.ReadAsStringAsync();
         Assert.Contains("refreshAllData", js, StringComparison.Ordinal);
+
+        var retroCss = await _client.GetAsync("/css/retro-tui.css");
+        Assert.Equal(HttpStatusCode.OK, retroCss.StatusCode);
+        string retroCssContent = await retroCss.Content.ReadAsStringAsync();
+        Assert.Contains("--retro-desktop", retroCssContent, StringComparison.Ordinal);
+
+        var retroJs = await _client.GetAsync("/js/retro-tui.js");
+        Assert.Equal(HttpStatusCode.OK, retroJs.StatusCode);
+        string retroJsContent = await retroJs.Content.ReadAsStringAsync();
+        Assert.Contains("bindKeyboardListeners", retroJsContent, StringComparison.Ordinal);
     }
 
     [Fact]

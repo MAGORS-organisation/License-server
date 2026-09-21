@@ -1,0 +1,71 @@
+{
+  "$schema": "https://symbolon.org/schemas/v1/policy.json",
+  "policyCode": "pol-cad-enterprise-migration",
+  "name": "CAD Pro Enterprise Policy (Migrácia z FlexNet mysw.opt)",
+  "description": "Priamy ekvivalent pravidiel z FlexNet mysw.opt zahŕňajúci rezervácie, kvóty a borrow limity",
+  "leaseParameters": {
+    "defaultLeaseTtlSeconds": 900,
+    "maxLeaseTtlSeconds": 1200,
+    "heartbeatIntervalSeconds": 30,
+    "heartbeatJitterPercent": 10,
+    "gracePeriodSeconds": 60,
+    "clockSkewToleranceSeconds": 120,
+    "resurrectionWindowSeconds": 300
+  },
+  "borrowing": {
+    "enabled": true,
+    "maxBorrowDurationDays": 7,
+    "minAvailableSeatsForBorrow": 3,
+    "allowEarlyReturn": true
+  },
+  "groups": [
+    {
+      "name": "engineering",
+      "members": ["jan.novak", "peter.kovac", "maria.horvathova"]
+    },
+    {
+      "name": "contractors",
+      "members": ["externista1", "externista2"]
+    },
+    {
+      "name": "cad_labs",
+      "hostFingerprints": ["lab-pc01", "lab-pc02", "lab-pc03", "lab-pc04", "lab-pc05"]
+    }
+  ],
+  "seatAllocations": [
+    {
+      "featureCode": "CAD_PRO",
+      "groupName": "engineering",
+      "type": "Reservation",
+      "guaranteedSeats": 5,
+      "comment": "Ekvivalent: RESERVE 5 CAD_PRO GROUP engineering"
+    },
+    {
+      "featureCode": "CAD_PRO",
+      "groupName": "contractors",
+      "type": "Limit",
+      "maxSeats": 2,
+      "comment": "Ekvivalent: MAX 2 CAD_PRO GROUP contractors"
+    }
+  ],
+  "accessControl": [
+    {
+      "featureCode": "SIMULATION",
+      "action": "Allow",
+      "requiredGroup": "cad_labs",
+      "comment": "Ekvivalent: INCLUDE SIMULATION HOST_GROUP cad_labs"
+    },
+    {
+      "featureCode": "CAD_PRO",
+      "action": "Deny",
+      "ipSubnetBlock": "192.168.100.0/24",
+      "comment": "Ekvivalent: EXCLUDE CAD_PRO INTERNET 192.168.100.*"
+    }
+  ],
+  "auditAndTelemetry": {
+    "cryptographicLedgerEnabled": true,
+    "auditEventRetentionDays": 365,
+    "prometheusMetricsEnabled": true,
+    "comment": "Ekvivalent: REPORTLOG a DEBUGLOG"
+  }
+}

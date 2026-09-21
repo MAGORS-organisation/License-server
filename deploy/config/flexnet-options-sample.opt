@@ -1,0 +1,38 @@
+# ==============================================================================
+# FlexNet Publisher (FLEXlm) Options File Example
+# Súbor: mysw.opt
+# Používa sa na konfiguráciu pravidiel prístupu, rezervácie licencií a časových limitov.
+# ==============================================================================
+
+# 1. Definícia používateľských skupín a hostiteľov
+GROUP engineering jan.novak peter.kovac maria.horvathova
+GROUP contractors externista1 externista2
+HOST_GROUP cad_labs lab-pc01 lab-pc02 lab-pc03 lab-pc04 lab-pc05
+
+# 2. Rezervácia licencií pre kľúčový tím (garancia dostupnosti)
+# Zabezpečuje, že 5 licencií CAD_PRO je vždy k dispozícii pre inžiniersky tím
+RESERVE 5 CAD_PRO GROUP engineering
+
+# 3. Obmedzenie maximálneho počtu súbežných licencií
+# Zamedzuje externistom odčerpať viac než 2 licencie naraz
+MAX 2 CAD_PRO GROUP contractors
+
+# 4. Prístupové práva (Whitelist & Blacklist)
+# Len zamestnanci z CAD laboratórií a schválení používatelia môžu pristupovať k modulu SIMULATION
+INCLUDE SIMULATION HOST_GROUP cad_labs
+EXCLUDE CAD_PRO INTERNET 192.168.100.*
+
+# 5. Pravidlá pre vypožičiavanie licencií (License Borrowing)
+# Minimálna rezerva: Ak na serveri zostane menej ako 3 licencie, borrow nie je povolený
+BORROW_LOWWATER CAD_PRO 3
+# Maximálna dĺžka vypožičania v hodinách (168 hodín = 7 dní)
+MAX_BORROW_HOURS CAD_PRO 168
+
+# 6. Časové limity nečinnosti (Inactivity Timeout)
+# Uvoľnenie licencie pri nečinnosti klienta po 900 sekundách (15 minút)
+TIMEOUT CAD_PRO 900
+TIMEOUTALL 1200
+
+# 7. Auditovanie a logovanie
+REPORTLOG +/var/log/flexnet/report.log
+DEBUGLOG +/var/log/flexnet/debug.log

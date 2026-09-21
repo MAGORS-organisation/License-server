@@ -1,0 +1,591 @@
+/**
+ * ==============================================================================
+ * Symbolon Retro FoxPro / DOS TUI Keyboard Engine & UI Controller
+ * Kompletná podpora navigácie z klávesnice (šípky, Enter, Esc, hotkeys, F1-F10)
+ * ==============================================================================
+ */
+
+(function () {
+    'use strict';
+
+    // Stav klávesnicového manažéra
+    const state = {
+        activeContext: 'menu', // 'menu', 'submenu', 'content', 'modal'
+        mainMenuIndex: 0,
+        submenuIndex: 0,
+        contentRowIndex: 0,
+        isSubmenuOpen: false,
+        activeModalId: null
+    };
+
+    // Položky hlavného kaskádového menu (presne podľa FoxPro rozvrhnutia)
+    const mainMenuItems = [
+        { id: 'vstupy', label: 'Vstupy (Prehľad)', hotkey: 'V', view: 'view-overview', hasSub: false },
+        { id: 'licencie', label: 'Licencie', hotkey: 'L', view: 'view-licenses', hasSub: false },
+        { id: 'kluce', label: 'Kľúče & PQC', hotkey: 'K', view: 'view-keys', hasSub: false },
+        { id: 'ciselniky', label: 'Číselníky', hotkey: 'Č', view: null, hasSub: true },
+        { isSeparator: true },
+        { id: 'relaye', label: 'Relay uzly', hotkey: 'R', view: 'view-relays', hasSub: false },
+        { id: 'audit', label: 'Auditný denník', hotkey: 'A', view: 'view-audit', hasSub: false },
+        { id: 'airgap', label: 'Air-Gap portál', hotkey: 'G', view: 'view-airgap', hasSub: false },
+        { id: 'webhooky', label: 'Webhooky', hotkey: 'W', view: 'view-webhooks', hasSub: false },
+        { isSeparator: true },
+        { id: 'sulad', label: 'Súlad & CRA / SBOM', hotkey: 'S', view: 'view-system', hasSub: false },
+        { id: 'apikeys', label: 'API Kľúče & Merkle', hotkey: 'M', view: 'view-apikeys', hasSub: false },
+        { id: 'konfiguracia', label: 'Konfigurácia', hotkey: 'O', action: 'open-config', hasSub: false },
+        { id: 'pomoc', label: 'Pomoc (F1)', hotkey: 'P', action: 'open-help', hasSub: false }
+    ];
+
+    // Položky kaskádového podmenu "Číselníky" (ako na screenshotu)
+    const submenuItems = [
+        { id: 'sub-tenants', label: 'Adresár zákazníkov', hotkey: 'A', action: () => alert('Adresár zákazníkov ISV') },
+        { id: 'sub-products', label: 'Katalóg produktov', hotkey: 'K', action: () => alert('Katalóg chránených aplikácií') },
+        { id: 'sub-policies', label: 'Licenčné politiky', hotkey: 'P', action: () => alert('Šablóny licenčných politík') },
+        { id: 'sub-jwks', label: 'Verejné kľúče (JWKS)', hotkey: 'V', action: () => { if (typeof openJwksModal === 'function') openJwksModal(); } },
+        { id: 'sub-rates', label: 'Sadzby & zaokrúhľovanie', hotkey: 'S', action: () => alert('Nastavenie sadzieb vyťaženia') },
+        { id: 'sub-nodes', label: 'Hardvérové odtlačky', hotkey: 'H', action: () => alert('Zoznam autorizovaných HW fingerprintov') }
+    ];
+
+    // Inicializácia po načítaní DOM
+    document.addEventListener('DOMContentLoaded', () => {
+        initRetroDOM();
+        bindKeyboardListeners();
+        updateMenuHighlights();
+    });
+
+    /**
+     * Zostaví HTML štruktúru pre retro FoxPro lišty a kaskádové menu
+     */
+    function initRetroDOM() {
+        // 1. Horná lišta
+        const topBar = document.createElement('header');
+        topBar.className = 'retro-top-bar';
+        topBar.innerHTML = `
+            <ul class="retro-menu-bar">
+                <li class="retro-menu-item" onclick="toggleMainMenu()" tabindex="0">≡ <span class="hotkey">S</span>ymbolon</li>
+                <li class="retro-menu-item" onclick="switchRetroView('view-overview')" tabindex="0"><span class="hotkey">P</span>rehľad</li>
+                <li class="retro-menu-item" onclick="switchRetroView('view-licenses')" tabindex="0"><span class="hotkey">L</span>icencie</li>
+                <li class="retro-menu-item" onclick="switchRetroView('view-keys')" tabindex="0"><span class="hotkey">K</span>ľúče</li>
+                <li class="retro-menu-item" onclick="switchRetroView('view-relays')" tabindex="0"><span class="hotkey">R</span>elaye</li>
+                <li class="retro-menu-item" onclick="switchRetroView('view-audit')" tabindex="0"><span class="hotkey">A</span>udit</li>
+                <li class="retro-menu-item" onclick="switchRetroView('view-airgap')" tabindex="0">Air-<span class="hotkey">G</span>ap</li>
+                <li class="retro-menu-item" onclick="switchRetroView('view-system')" tabindex="0"><span class="hotkey">S</span>úlad CRA</li>
+                <li class="retro-menu-item" onclick="openModal('modal-auth-config')" tabindex="0">K<span class="hotkey">o</span>nfigurácia</li>
+            </ul>
+            <div style="font-size: 11px; color: #444; font-weight: bold;">
+                <span id="retro-server-clock">--:--:--</span> | <span id="retro-conn-status" style="color: green;">● ONLINE</span>
+            </div>
+        `;
+        document.body.insertBefore(topBar, document.body.firstChild);
+
+        // 2. Hlavný retro workspace obalujúci obsah
+        const mainWrapper = document.querySelector('.main-wrapper');
+        if (mainWrapper) {
+            const workspace = document.createElement('div');
+            workspace.className = 'retro-workspace';
+
+            // Ľavé okno menu
+            const leftMenuWindow = document.createElement('aside');
+            leftMenuWindow.className = 'retro-window-menu';
+            leftMenuWindow.id = 'retro-left-menu';
+
+            let menuListHtml = '<div class="retro-window-header">HLAVNÉ MENU (F10)</div><ul class="retro-menu-list" id="retro-main-list">';
+            mainMenuItems.forEach((item, idx) => {
+                if (item.isSeparator) {
+                    menuListHtml += '<li class="retro-separator"></li>';
+                } else {
+                    const hotkeyLetter = item.hotkey;
+                    const labelFormatted = item.label.replace(hotkeyLetter, `<span class="hotkey">${hotkeyLetter}</span>`);
+                    const arrow = item.hasSub ? '►' : '';
+                    menuListHtml += `
+                        <li class="retro-list-item" data-index="${idx}" onclick="handleMainMenuItemClick(${idx})">
+                            <span>${labelFormatted}</span>
+                            <span>${arrow}</span>
+                        </li>
+                    `;
+                }
+            });
+            menuListHtml += '</ul>';
+            leftMenuWindow.innerHTML = menuListHtml;
+
+            // Kaskádové podmenu (Navy popup)
+            const popupSubmenu = document.createElement('div');
+            popupSubmenu.className = 'retro-cascading-popup';
+            popupSubmenu.id = 'retro-popup-sub';
+            let subListHtml = '';
+            submenuItems.forEach((sub, sIdx) => {
+                const hotkeyLetter = sub.hotkey;
+                const labelFormatted = sub.label.replace(hotkeyLetter, `<span class="hotkey">${hotkeyLetter}</span>`);
+                subListHtml += `
+                    <div class="retro-popup-item" data-subindex="${sIdx}" onclick="handleSubmenuItemClick(${sIdx})">
+                        ${labelFormatted}
+                    </div>
+                `;
+            });
+            popupSubmenu.innerHTML = subListHtml;
+            leftMenuWindow.appendChild(popupSubmenu);
+
+            // Presun existujúceho obsahu do retro-content-window
+            const contentWindow = document.createElement('main');
+            contentWindow.className = 'retro-content-window';
+            contentWindow.id = 'retro-content-win';
+
+            const titleBar = document.createElement('div');
+            titleBar.className = 'retro-content-titlebar';
+            titleBar.innerHTML = `
+                <span id="retro-window-title">PREHĽAD LICENČNÉHO SERVERA</span>
+                <div>
+                    <button class="retro-btn retro-btn-primary" onclick="openModal('modal-issue-license')">+ Vystaviť [V]</button>
+                    <button class="retro-btn" onclick="openHelpModal()">Pomoc [F1]</button>
+                </div>
+            `;
+            contentWindow.appendChild(titleBar);
+
+            const contentArea = document.querySelector('.content-area');
+            if (contentArea) {
+                contentArea.classList.add('retro-view-body');
+                contentWindow.appendChild(contentArea);
+            }
+
+            workspace.appendChild(leftMenuWindow);
+            workspace.appendChild(contentWindow);
+
+            document.body.appendChild(workspace);
+        }
+
+        // 3. Spodná funkčná lišta F1 - F10
+        const bottomBar = document.createElement('footer');
+        bottomBar.className = 'retro-bottom-bar';
+        bottomBar.innerHTML = `
+            <button class="fkey-btn" onclick="openHelpModal()"><span class="fkey-badge">F1</span> Pomoc</button>
+            <button class="fkey-btn" onclick="switchRetroView('view-overview')"><span class="fkey-badge">F2</span> Prehľad</button>
+            <button class="fkey-btn" onclick="switchRetroView('view-licenses')"><span class="fkey-badge">F3</span> Licencie</button>
+            <button class="fkey-btn" onclick="switchRetroView('view-keys')"><span class="fkey-badge">F4</span> Kľúče</button>
+            <button class="fkey-btn" onclick="switchRetroView('view-relays')"><span class="fkey-badge">F5</span> Relaye</button>
+            <button class="fkey-btn" onclick="switchRetroView('view-audit')"><span class="fkey-badge">F6</span> Audit</button>
+            <button class="fkey-btn" onclick="switchRetroView('view-airgap')"><span class="fkey-badge">F7</span> AirGap</button>
+            <button class="fkey-btn" onclick="switchRetroView('view-webhooks')"><span class="fkey-badge">F8</span> Webhook</button>
+            <button class="fkey-btn" onclick="switchRetroView('view-system')"><span class="fkey-badge">F9</span> Súlad</button>
+            <button class="fkey-btn" onclick="toggleMainMenu()"><span class="fkey-badge">F10</span> Menu</button>
+            <button class="fkey-btn" onclick="handleEscKey()"><span class="fkey-badge">ESC</span> Späť</button>
+        `;
+        document.body.appendChild(bottomBar);
+
+        // 4. Dialógové okno Pomocníka klávesových skratiek (F1)
+        createHelpModal();
+
+        // 5. Hodiny v hornej lište
+        setInterval(() => {
+            const now = new Date();
+            const clockEl = document.getElementById('retro-server-clock');
+            if (clockEl) {
+                clockEl.textContent = now.toLocaleTimeString();
+            }
+        }, 1000);
+    }
+
+    /**
+     * Vytvorí retro nápovedu s prehľadom všetkých klávesových skratiek
+     */
+    function createHelpModal() {
+        const modal = document.createElement('div');
+        modal.className = 'retro-modal-overlay';
+        modal.id = 'modal-retro-help';
+        modal.style.display = 'none';
+        modal.innerHTML = `
+            <div class="retro-modal-box">
+                <div class="retro-modal-titlebar">
+                    <span>NÁPOVEDA KLÁVESOVÉHO OVLÁDANIA (F1)</span>
+                    <button class="retro-btn" onclick="closeModal('modal-retro-help')">✕</button>
+                </div>
+                <div class="retro-modal-content" style="font-size: 13px; line-height: 1.6;">
+                    <p style="margin-bottom: 8px;"><strong>Systém je 100% ovládateľný bez použitia myši:</strong></p>
+                    <table class="retro-table" style="margin-bottom: 12px;">
+                        <tr><th style="width: 35%;">Kláves</th><th>Funkcia</th></tr>
+                        <tr><td><code>↑ / ↓</code></td><td>Pohyb v menu, podmenu a riadkoch tabuliek</td></tr>
+                        <tr><td><code>→ / Enter</code></td><td>Otvorenie kaskádového podmenu / potvrdenie výberu</td></tr>
+                        <tr><td><code>← / Escape</code></td><td>Návrat z podmenu / zatvorenie okna / zrušenie</td></tr>
+                        <tr><td><code>F1 – F9</code></td><td>Priamy skok na obrazovky (F2 Prehľad, F3 Licencie...)</td></tr>
+                        <tr><td><code>F10 / Alt</code></td><td>Aktivácia a fokus hlavného kaskádového menu</td></tr>
+                        <tr><td><code>V</code></td><td>Okamžité otvorenie dialógu pre vystavenie licencie</td></tr>
+                        <tr><td><code>D</code></td><td>Priame stiahnutie CycloneDX SBOM (JSON)</td></tr>
+                        <tr><td><code>O / C</code></td><td>Nastavenie administrátorského API kľúča</td></tr>
+                        <tr><td><code>Tab / Shift+Tab</code></td><td>Prepínanie prvkov vo formulároch</td></tr>
+                    </table>
+                    <p style="font-size: 12px; color: #555;">Žlté a jantárové podčiarknuté písmená sú akcelerátory – ich stlačením priamo aktivujete danú voľbu.</p>
+                </div>
+                <div class="retro-modal-footer">
+                    <button class="retro-btn retro-btn-primary" onclick="closeModal('modal-retro-help')">[ Pokračovať (Enter) ]</button>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(modal);
+    }
+
+    /**
+     * Globálny odchytávač klávesnice pre 100% keyboard control
+     */
+    function bindKeyboardListeners() {
+        window.addEventListener('keydown', (e) => {
+            // Ak používateľ píše do inputu alebo textarea, neblokujeme bežné písanie,
+            // okrem Escape a Enter
+            const isInputFocused = ['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement?.tagName);
+
+            if (isInputFocused) {
+                if (e.key === 'Escape') {
+                    handleEscKey();
+                    e.preventDefault();
+                } else if (e.key === 'Enter' && document.activeElement?.tagName !== 'TEXTAREA') {
+                    // Odoslanie formulára
+                }
+                return;
+            }
+
+            // Funkčné klávesy F1 až F10
+            switch (e.key) {
+                case 'F1':
+                    e.preventDefault();
+                    openHelpModal();
+                    return;
+                case 'F2':
+                    e.preventDefault();
+                    switchRetroView('view-overview');
+                    return;
+                case 'F3':
+                    e.preventDefault();
+                    switchRetroView('view-licenses');
+                    return;
+                case 'F4':
+                    e.preventDefault();
+                    switchRetroView('view-keys');
+                    return;
+                case 'F5':
+                    e.preventDefault();
+                    switchRetroView('view-relays');
+                    return;
+                case 'F6':
+                    e.preventDefault();
+                    switchRetroView('view-audit');
+                    return;
+                case 'F7':
+                    e.preventDefault();
+                    switchRetroView('view-airgap');
+                    return;
+                case 'F8':
+                    e.preventDefault();
+                    switchRetroView('view-webhooks');
+                    return;
+                case 'F9':
+                    e.preventDefault();
+                    switchRetroView('view-system');
+                    return;
+                case 'F10':
+                case 'Alt':
+                    e.preventDefault();
+                    toggleMainMenu();
+                    return;
+                case 'Escape':
+                    e.preventDefault();
+                    handleEscKey();
+                    return;
+            }
+
+            // Šípka hore / dole
+            if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                moveCursor(1);
+                return;
+            } else if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                moveCursor(-1);
+                return;
+            }
+
+            // Šípka vpravo (vstup do podmenu)
+            if (e.key === 'ArrowRight') {
+                e.preventDefault();
+                if (state.activeContext === 'menu') {
+                    const currentItem = mainMenuItems[state.mainMenuIndex];
+                    if (currentItem?.hasSub) {
+                        openSubmenu();
+                    }
+                }
+                return;
+            }
+
+            // Šípka vľavo (návrat z podmenu)
+            if (e.key === 'ArrowLeft') {
+                e.preventDefault();
+                if (state.activeContext === 'submenu') {
+                    closeSubmenu();
+                }
+                return;
+            }
+
+            // Enter (potvrdenie / spustenie)
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                executeCurrentSelection();
+                return;
+            }
+
+            // Akcelerátory (priame horúce klávesy)
+            const keyUpper = e.key.toUpperCase();
+
+            // Globálne skratky
+            if (keyUpper === 'V') {
+                e.preventDefault();
+                openModal('modal-issue-license');
+                return;
+            } else if (keyUpper === 'D') {
+                e.preventDefault();
+                downloadSbomDirect();
+                return;
+            } else if (keyUpper === 'O' || keyUpper === 'C') {
+                e.preventDefault();
+                openModal('modal-auth-config');
+                return;
+            } else if (keyUpper === 'P') {
+                e.preventDefault();
+                switchRetroView('view-overview');
+                return;
+            } else if (keyUpper === 'L') {
+                e.preventDefault();
+                switchRetroView('view-licenses');
+                return;
+            } else if (keyUpper === 'K') {
+                e.preventDefault();
+                switchRetroView('view-keys');
+                return;
+            } else if (keyUpper === 'R') {
+                e.preventDefault();
+                switchRetroView('view-relays');
+                return;
+            } else if (keyUpper === 'A') {
+                e.preventDefault();
+                switchRetroView('view-audit');
+                return;
+            } else if (keyUpper === 'G') {
+                e.preventDefault();
+                switchRetroView('view-airgap');
+                return;
+            } else if (keyUpper === 'W') {
+                e.preventDefault();
+                switchRetroView('view-webhooks');
+                return;
+            } else if (keyUpper === 'S') {
+                e.preventDefault();
+                switchRetroView('view-system');
+                return;
+            }
+        });
+    }
+
+    /**
+     * Pohyb kurzora v menu alebo podmenu
+     */
+    function moveCursor(direction) {
+        if (state.activeContext === 'submenu') {
+            state.submenuIndex = (state.submenuIndex + direction + submenuItems.length) % submenuItems.length;
+            updateSubmenuHighlights();
+        } else {
+            // Pohyb v hlavnom menu (preskakujeme oddeľovače)
+            let nextIndex = state.mainMenuIndex;
+            do {
+                nextIndex = (nextIndex + direction + mainMenuItems.length) % mainMenuItems.length;
+            } while (mainMenuItems[nextIndex]?.isSeparator);
+
+            state.mainMenuIndex = nextIndex;
+            updateMenuHighlights();
+        }
+    }
+
+    /**
+     * Spustenie aktuálne vybratej položky klávesom Enter
+     */
+    function executeCurrentSelection() {
+        if (state.activeContext === 'submenu') {
+            const item = submenuItems[state.submenuIndex];
+            if (item && typeof item.action === 'function') {
+                item.action();
+                closeSubmenu();
+            }
+        } else {
+            const item = mainMenuItems[state.mainMenuIndex];
+            if (item) {
+                if (item.hasSub) {
+                    openSubmenu();
+                } else if (item.view) {
+                    switchRetroView(item.view);
+                } else if (item.action === 'open-config') {
+                    openModal('modal-auth-config');
+                } else if (item.action === 'open-help') {
+                    openHelpModal();
+                }
+            }
+        }
+    }
+
+    /**
+     * Otvorenie kaskádového podmenu
+     */
+    function openSubmenu() {
+        state.isSubmenuOpen = true;
+        state.activeContext = 'submenu';
+        state.submenuIndex = 0;
+        const sub = document.getElementById('retro-popup-sub');
+        if (sub) {
+            sub.classList.add('open');
+        }
+        updateSubmenuHighlights();
+    }
+
+    /**
+     * Zatvorenie kaskádového podmenu
+     */
+    function closeSubmenu() {
+        state.isSubmenuOpen = false;
+        state.activeContext = 'menu';
+        const sub = document.getElementById('retro-popup-sub');
+        if (sub) {
+            sub.classList.remove('open');
+        }
+    }
+
+    /**
+     * Obsluha klávesu Escape
+     */
+    function handleEscKey() {
+        // 1. Ak je otvorený modal, zatvor ho
+        const openModals = document.querySelectorAll('.retro-modal-overlay:not([style*="display: none"]), .modal-overlay.active');
+        if (openModals.length > 0) {
+            openModals.forEach(m => {
+                m.style.display = 'none';
+                m.classList.remove('active');
+            });
+            return;
+        }
+
+        // 2. Ak je otvorené kaskádové podmenu, zatvor ho
+        if (state.isSubmenuOpen) {
+            closeSubmenu();
+            return;
+        }
+    }
+
+    /**
+     * Prepínanie fokusu na hlavné menu
+     */
+    function toggleMainMenu() {
+        state.activeContext = 'menu';
+        updateMenuHighlights();
+    }
+
+    /**
+     * Vizuálne zvýraznenie vybratej položky v hlavnom menu (azúrový/námornícky pás)
+     */
+    function updateMenuHighlights() {
+        const items = document.querySelectorAll('#retro-main-list .retro-list-item');
+        items.forEach(el => {
+            const idx = parseInt(el.getAttribute('data-index'), 10);
+            if (idx === state.mainMenuIndex) {
+                el.classList.add('selected');
+                el.scrollIntoView({ block: 'nearest' });
+            } else {
+                el.classList.remove('selected');
+            }
+        });
+    }
+
+    /**
+     * Vizuálne zvýraznenie vybratej položky v kaskádovom podmenu (žiarivý azúrový pás ako na screenshotu!)
+     */
+    function updateSubmenuHighlights() {
+        const items = document.querySelectorAll('#retro-popup-sub .retro-popup-item');
+        items.forEach(el => {
+            const idx = parseInt(el.getAttribute('data-subindex'), 10);
+            if (idx === state.submenuIndex) {
+                el.classList.add('active');
+            } else {
+                el.classList.remove('active');
+            }
+        });
+    }
+
+    /**
+     * Prepnutie obrazovky
+     */
+    window.switchRetroView = function (viewId) {
+        // Volanie existujúceho switchView z dashboard.js ak je k dispozícii
+        if (typeof window.switchView === 'function') {
+            window.switchView(viewId);
+        } else {
+            document.querySelectorAll('.view-section').forEach(sec => sec.classList.remove('active'));
+            const target = document.getElementById(viewId);
+            if (target) target.classList.add('active');
+        }
+
+        // Aktualizácia titulku okna
+        const titleMap = {
+            'view-overview': 'PREHĽAD LICENČNÉHO SERVERA',
+            'view-licenses': 'EVIDOVANÉ LICENCIE & SÚBEŽNÉ SEDADLÁ',
+            'view-keys': 'KRYPTOGRAFICKÉ KĽÚČE & POST-KVANTOVÁ KRYPTOGRAFIA (PQC)',
+            'view-relays': 'ON-PREMISE RELAY UZLY S DELEGOVANOU KAPACITOU',
+            'view-audit': 'KRYPTOGRAFICKY REŤAZENÝ AUDITNÝ DENNÍK (LEDGER)',
+            'view-airgap': 'AIR-GAP & OFFLINE LICENČNÝ PORTÁL',
+            'view-webhooks': 'WEBHOOK NOTIFIKÁCIE & HISTÓRIA DORUČENIA',
+            'view-system': 'CYBER RESILIENCE ACT (CRA) & CYCLONEDX SBOM',
+            'view-apikeys': 'SPRÁVA API KĽÚČOV & MERKLE STROM INTEGRITA'
+        };
+
+        const titleEl = document.getElementById('retro-window-title');
+        if (titleEl && titleMap[viewId]) {
+            titleEl.textContent = titleMap[viewId];
+        }
+
+        // Zatvorenie podmenu pri prepnutí
+        closeSubmenu();
+    };
+
+    /**
+     * Kliknutie na položku hlavného menu
+     */
+    window.handleMainMenuItemClick = function (index) {
+        state.mainMenuIndex = index;
+        updateMenuHighlights();
+        executeCurrentSelection();
+    };
+
+    /**
+     * Kliknutie na položku podmenu
+     */
+    window.handleSubmenuItemClick = function (subIndex) {
+        state.submenuIndex = subIndex;
+        updateSubmenuHighlights();
+        executeCurrentSelection();
+    };
+
+    /**
+     * Otvorenie pomocníka klávesnice
+     */
+    window.openHelpModal = function () {
+        const modal = document.getElementById('modal-retro-help');
+        if (modal) modal.style.display = 'flex';
+    };
+
+    /**
+     * Priame stiahnutie CycloneDX SBOM
+     */
+    window.downloadSbomDirect = function () {
+        window.open('/v1/compliance/sbom', '_blank');
+    };
+
+    // Export do window
+    window.retroTui = {
+        state,
+        switchView: window.switchRetroView,
+        openHelp: window.openHelpModal,
+        closeSubmenu
+    };
+
+})();

@@ -1,0 +1,16 @@
+# ==============================================================================
+# Tradičný FlexNet Publisher (FLEXlm) Licenčný Súbor
+# Súbor: license.dat / license.lic
+# ==============================================================================
+SERVER lic-srv01.corp.internal 001A2B3C4D5E 27000
+DAEMON mysw_vd /opt/flexnet/bin/mysw_vd /etc/flexnet/mysw.opt 27001
+
+# Hlavný produkt CAD PRO - 20 súbežných plávajúcich licencií
+FEATURE CAD_PRO mysw_vd 2026.0 31-dec-2026 20 \
+  SIGN="4F12 89BC 3341 00FA 7789 2210 BC45 1109" \
+  vendor_info="Enterprise Pack"
+
+# Doplnkový modul SIMULATION - 5 súbežných plávajúcich licencií
+INCREMENT SIMULATION mysw_vd 2026.0 31-dec-2026 5 \
+  SIGN="99AA 1204 FC21 4455 0102 BBCC 9988 3311" \
+  BORROW=168

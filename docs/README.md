@@ -21,6 +21,8 @@ Prehľad projektu a manažérske zhrnutie nájdeš v [koreňovom README](../READ
 | 13 | [Roadmapa, odhad úsilia a riziká](13-roadmapa-a-rizika.md) | Prevádzka / biznis |
 | 14 | [Otvorené otázky — rozhodnutia, ktoré musíš urobiť ty](14-otvorene-otazky.md) | Prevádzka / biznis |
 | 15 | [Zdroje](15-zdroje.md) | Prevádzka / biznis |
+| 16 | [Integration Quickstart Guide (C#, Python, Rust, C/C++)](quickstart-guide.md) | Vývojár / ISV |
+| 17 | [Návod na migráciu z FlexNet Publisher](migracia-z-flexnetu.md) | Architekt / DevOps |
 
 ---
 

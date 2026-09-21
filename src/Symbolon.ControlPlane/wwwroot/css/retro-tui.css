@@ -1,0 +1,477 @@
+/* ==============================================================================
+ * Symbolon Retro FoxPro / Turbo Vision / DOS TUI Stylesheet
+ * Verná replika používateľského rozhrania FoxPro 2.6 / DOS (1990s)
+ * ============================================================================== */
+
+@charset "UTF-8";
+
+:root {
+  --retro-desktop: #627584;        /* Bridlicovo sivé pozadie plochy (Slate Gray) */
+  --retro-panel-bg: #e0dcd4;       /* Krémový podklad okien a dialógov */
+  --retro-panel-border: #222222;   /* Tmavý obvodový rámček okna */
+  --retro-navy-bg: #00396b;        /* Sýta námornícka modrá pre kaskádové menu */
+  --retro-text-dark: #000000;      /* Čierny text na krémovom pozadí */
+  --retro-text-light: #ffffff;     /* Biely text na modrom pozadí */
+  --retro-hotkey-light: #9a4000;   /* Zlatohnedý/jantárový akcelerátor na svetlom */
+  --retro-hotkey-navy: #ffff00;    /* Žiarivý žltý akcelerátor na tmavomodrom */
+  --retro-select-bg: #00a8a8;      /* Azúrové pravítko výberu (Teal / Cyan) */
+  --retro-select-text: #000000;    /* Čierny text na azúrovom výbere */
+  --retro-shadow: 12px 12px 0px #000000; /* Ostrý pravouhlý čierny blokový tieň */
+  --retro-shadow-sm: 6px 6px 0px #000000;
+  --retro-font: 'Consolas', 'Courier New', 'Lucida Console', Monaco, monospace;
+}
+
+/* Reset a základné nastavenia plochy */
+body {
+  font-family: var(--retro-font) !important;
+  background-color: var(--retro-desktop) !important;
+  color: var(--retro-text-dark) !important;
+  margin: 0;
+  padding: 0;
+  height: 100vh;
+  overflow: hidden;
+  user-select: none;
+  -webkit-font-smoothing: none;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Horná lišta FoxPro Menu */
+.retro-top-bar {
+  background-color: var(--retro-panel-bg);
+  border-bottom: 2px solid var(--retro-panel-border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 8px;
+  height: 28px;
+  font-size: 13px;
+  font-weight: bold;
+  z-index: 1000;
+  position: relative;
+}
+
+.retro-menu-bar {
+  display: flex;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  gap: 2px;
+}
+
+.retro-menu-item {
+  padding: 3px 8px;
+  cursor: pointer;
+  color: var(--retro-text-dark);
+  text-decoration: none;
+  position: relative;
+  display: inline-block;
+}
+
+.retro-menu-item:hover,
+.retro-menu-item.active,
+.retro-menu-item:focus {
+  background-color: var(--retro-navy-bg);
+  color: var(--retro-text-light);
+  outline: none;
+}
+
+.retro-menu-item:hover .hotkey,
+.retro-menu-item.active .hotkey {
+  color: var(--retro-hotkey-navy);
+}
+
+/* Klávesové skratky / Akcelerátory (Hotkeys) */
+.hotkey {
+  font-weight: bold;
+  text-decoration: underline;
+  color: var(--retro-hotkey-light);
+}
+
+.retro-navy .hotkey,
+.retro-submenu .hotkey,
+.retro-menu-item:hover .hotkey,
+.retro-cascading-popup .hotkey {
+  color: var(--retro-hotkey-navy) !important;
+}
+
+/* Spodná stavová lišta s funkčnými klávesmi F1 - F10 */
+.retro-bottom-bar {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 26px;
+  background-color: var(--retro-panel-bg);
+  border-top: 2px solid var(--retro-panel-border);
+  display: flex;
+  align-items: center;
+  justify-content: space-around;
+  padding: 0 4px;
+  font-size: 12px;
+  font-weight: 600;
+  z-index: 1000;
+}
+
+.fkey-btn {
+  background: none;
+  border: none;
+  padding: 2px 6px;
+  cursor: pointer;
+  font-family: var(--retro-font);
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  color: var(--retro-text-dark);
+}
+
+.fkey-btn:hover,
+.fkey-btn:focus {
+  background-color: var(--retro-select-bg);
+  color: var(--retro-select-text);
+  outline: none;
+}
+
+.fkey-badge {
+  background-color: #333333;
+  color: #ffff00;
+  padding: 1px 4px;
+  border-radius: 2px;
+  font-weight: bold;
+  font-size: 11px;
+}
+
+/* Hlavný aplikačný layout */
+.retro-workspace {
+  display: flex;
+  height: calc(100vh - 54px);
+  position: relative;
+  overflow: hidden;
+  padding: 14px;
+  gap: 16px;
+  box-sizing: border-box;
+}
+
+/* Kaskádové ľavé menu okno */
+.retro-window-menu {
+  width: 230px;
+  background-color: var(--retro-panel-bg);
+  border: 2px solid var(--retro-panel-border);
+  box-shadow: var(--retro-shadow);
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  z-index: 100;
+  user-select: none;
+}
+
+.retro-window-header {
+  background-color: #b0aaa0;
+  border-bottom: 2px solid var(--retro-panel-border);
+  padding: 4px 8px;
+  font-size: 13px;
+  font-weight: bold;
+  text-align: center;
+  letter-spacing: 0.5px;
+}
+
+.retro-menu-list {
+  list-style: none;
+  margin: 0;
+  padding: 6px 0;
+}
+
+.retro-list-item {
+  padding: 5px 12px;
+  font-size: 13px;
+  cursor: pointer;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  color: var(--retro-text-dark);
+}
+
+.retro-list-item:hover,
+.retro-list-item.selected,
+.retro-list-item:focus {
+  background-color: var(--retro-navy-bg);
+  color: var(--retro-text-light);
+  outline: none;
+}
+
+.retro-list-item:hover .hotkey,
+.retro-list-item.selected .hotkey {
+  color: var(--retro-hotkey-navy);
+}
+
+.retro-separator {
+  height: 1px;
+  background-color: #888888;
+  margin: 4px 6px;
+  border-bottom: 1px solid #ffffff;
+}
+
+/* Kaskádové podmenu (Navy Blue Pop-up presne podľa screenshotu!) */
+.retro-cascading-popup {
+  position: absolute;
+  top: 90px;
+  left: 220px;
+  width: 290px;
+  background-color: var(--retro-navy-bg);
+  color: var(--retro-text-light);
+  border: 2px solid #001a33;
+  box-shadow: var(--retro-shadow);
+  z-index: 300;
+  display: none;
+  padding: 6px 0;
+}
+
+.retro-cascading-popup.open {
+  display: block;
+}
+
+.retro-popup-item {
+  padding: 5px 14px;
+  font-size: 13px;
+  cursor: pointer;
+  display: block;
+  color: var(--retro-text-light);
+  text-decoration: none;
+}
+
+.retro-popup-item:hover,
+.retro-popup-item.active,
+.retro-popup-item:focus {
+  background-color: var(--retro-select-bg) !important;
+  color: var(--retro-select-text) !important;
+  font-weight: bold;
+  outline: none;
+}
+
+.retro-popup-item:hover .hotkey,
+.retro-popup-item.active .hotkey {
+  color: #000000 !important;
+}
+
+/* Hlavné dátové okno vpravo */
+.retro-content-window {
+  flex: 1;
+  background-color: var(--retro-panel-bg);
+  border: 2px solid var(--retro-panel-border);
+  box-shadow: var(--retro-shadow);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  z-index: 50;
+}
+
+.retro-content-titlebar {
+  background-color: #b0aaa0;
+  border-bottom: 2px solid var(--retro-panel-border);
+  padding: 6px 12px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 14px;
+  font-weight: bold;
+}
+
+.retro-view-body {
+  padding: 14px;
+  overflow-y: auto;
+  flex: 1;
+  background-color: #ece8df;
+}
+
+/* Retro Tabuľky (DOS Grid pre všetky tabuľky v aplikácii) */
+table,
+.retro-table {
+  width: 100% !important;
+  border-collapse: collapse !important;
+  font-family: var(--retro-font) !important;
+  font-size: 13px !important;
+  background-color: #f7f5f0 !important;
+  margin-top: 6px !important;
+}
+
+th,
+.retro-table th {
+  background-color: #c8c2b8 !important;
+  color: #000000 !important;
+  border: 1px solid #555555 !important;
+  padding: 6px 10px !important;
+  text-align: left !important;
+  font-weight: bold !important;
+  text-transform: uppercase !important;
+}
+
+td,
+.retro-table td {
+  border: 1px solid #888888 !important;
+  padding: 6px 10px !important;
+  color: #000000 !important;
+}
+
+tr:hover,
+tr.selected,
+.retro-table tr:hover,
+.retro-table tr.selected {
+  background-color: var(--retro-select-bg) !important;
+  color: var(--retro-select-text) !important;
+  font-weight: bold !important;
+}
+
+tr:hover td,
+tr.selected td,
+.retro-table tr:hover td,
+.retro-table tr.selected td {
+  color: #000000 !important;
+}
+
+/* Retro Tlačidlá (FoxPro Bevelled Pushbuttons) */
+.btn,
+.retro-btn {
+  font-family: var(--retro-font) !important;
+  font-size: 12px !important;
+  font-weight: bold !important;
+  padding: 4px 12px !important;
+  background-color: #d0cbc2 !important;
+  border-top: 2px solid #ffffff !important;
+  border-left: 2px solid #ffffff !important;
+  border-right: 2px solid #444444 !important;
+  border-bottom: 2px solid #444444 !important;
+  cursor: pointer !important;
+  color: #000000 !important;
+  border-radius: 0 !important;
+}
+
+.btn:active,
+.retro-btn:active {
+  border-top: 2px solid #444444 !important;
+  border-left: 2px solid #444444 !important;
+  border-right: 2px solid #ffffff !important;
+  border-bottom: 2px solid #ffffff !important;
+  background-color: #b8b2a8 !important;
+}
+
+.btn:focus,
+.retro-btn:focus {
+  outline: 2px dotted #000000 !important;
+  outline-offset: -2px !important;
+}
+
+.btn-primary,
+.retro-btn-primary {
+  background-color: #b0d0e8 !important;
+}
+
+/* Retro Karty (KPI a Panely) */
+.kpi-card,
+.table-card,
+.chart-card {
+  background-color: #f0ece4 !important;
+  border: 2px solid #666666 !important;
+  box-shadow: var(--retro-shadow-sm) !important;
+  color: #000000 !important;
+  border-radius: 0 !important;
+}
+
+.kpi-value {
+  color: #003366 !important;
+  font-family: var(--retro-font) !important;
+  font-weight: bold !important;
+}
+
+.kpi-label,
+.kpi-subtext,
+.table-title,
+.chart-title {
+  color: #222222 !important;
+  font-family: var(--retro-font) !important;
+}
+
+/* Retro Dialógové Okná (Modaly) */
+.modal-overlay,
+.retro-modal-overlay {
+  background-color: rgba(0, 0, 0, 0.45) !important;
+}
+
+.modal-box,
+.retro-modal-box {
+  background-color: var(--retro-panel-bg) !important;
+  border: 3px solid var(--retro-panel-border) !important;
+  box-shadow: var(--retro-shadow) !important;
+  color: #000000 !important;
+  border-radius: 0 !important;
+  font-family: var(--retro-font) !important;
+}
+
+.modal-header,
+.retro-modal-titlebar {
+  background-color: var(--retro-navy-bg) !important;
+  color: var(--retro-text-light) !important;
+  border-bottom: 2px solid #000000 !important;
+  padding: 6px 12px !important;
+}
+
+.modal-title {
+  color: #ffffff !important;
+  font-weight: bold !important;
+  font-size: 14px !important;
+}
+
+.modal-close {
+  color: #ffffff !important;
+  font-size: 18px !important;
+}
+
+.modal-footer,
+.retro-modal-footer {
+  background-color: #c8c2b8 !important;
+  border-top: 1px solid #777777 !important;
+  padding: 8px 12px !important;
+}
+
+/* Retro Vstupné Polia (Form inputs) */
+input, select, textarea,
+.form-control,
+.retro-input {
+  font-family: var(--retro-font) !important;
+  font-size: 13px !important;
+  background-color: #ffffff !important;
+  color: #000000 !important;
+  border: 2px inset #999999 !important;
+  padding: 4px 6px !important;
+  border-radius: 0 !important;
+}
+
+input:focus, select:focus, textarea:focus,
+.form-control:focus,
+.retro-input:focus {
+  outline: 2px solid var(--retro-select-bg) !important;
+  background-color: #fffde8 !important;
+}
+
+.form-label {
+  color: #222222 !important;
+  font-weight: bold !important;
+  font-size: 12px !important;
+}
+
+/* Skrytie predvoleného moderného sidebaru a topbaru v prospech FoxPro layoutu */
+.sidebar,
+.topbar {
+  display: none !important;
+}
+
+.main-wrapper {
+  margin: 0 !important;
+  padding: 0 !important;
+  width: 100vw !important;
+  height: 100vh !important;
+}
+
+.content-area {
+  padding: 0 !important;
+  overflow: hidden !important;
+}
