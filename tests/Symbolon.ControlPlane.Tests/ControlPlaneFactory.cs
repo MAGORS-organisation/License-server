@@ -21,6 +21,9 @@ public sealed class ControlPlaneFactory : WebApplicationFactory<Program>
     {
         ArgumentNullException.ThrowIfNull(builder);
 
+        builder.UseSetting("Security:EnableDevSuperAdminBypass", "true");
+        builder.UseSetting("Security:AllowLocalWebhooks", "true");
+
         builder.ConfigureServices(services =>
         {
             var descriptor = services.SingleOrDefault(d => d.ServiceType == typeof(DbContextOptions<SymbolonDbContext>));

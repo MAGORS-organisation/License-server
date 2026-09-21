@@ -28,13 +28,32 @@ public static class ApiKeyEndpoints
         TimeProvider time,
         CancellationToken ct)
     {
-        string? tenantId = httpContext.Request.Headers["X-Tenant-Id"].FirstOrDefault()
-            ?? httpContext.User.FindFirst("tenant_id")?.Value;
+        bool isSuperAdmin = httpContext.User.IsInRole("admin:super");
+        string? tenantId;
+        if (isSuperAdmin)
+        {
+            tenantId = httpContext.Request.Headers["X-Tenant-Id"].FirstOrDefault()
+                ?? httpContext.User.FindFirst("tenant_id")?.Value;
+        }
+        else
+        {
+            tenantId = httpContext.User.FindFirst("tenant_id")?.Value;
+        }
 
         if (string.IsNullOrWhiteSpace(tenantId))
         {
             var firstTenant = await db.Tenants.FirstOrDefaultAsync(ct).ConfigureAwait(false);
             tenantId = firstTenant?.Id ?? "ten_default";
+        }
+
+        // Privilege escalation check: only super admins can issue admin:super keys
+        string requestedRole = string.IsNullOrWhiteSpace(dto.Role) ? "admin:tenant" : dto.Role.Trim();
+        if (!isSuperAdmin && requestedRole.Equals("admin:super", StringComparison.OrdinalIgnoreCase))
+        {
+            return TypedResults.Problem(
+                statusCode: StatusCodes.Status403Forbidden,
+                title: "Privilege Escalation Prohibited",
+                detail: "Only super administrators can issue API keys with 'admin:super' privileges.");
         }
 
         string prefix = $"sym_adm_{Convert.ToHexStringLower(RandomNumberGenerator.GetBytes(4))}";
@@ -51,7 +70,7 @@ public static class ApiKeyEndpoints
             Name = dto.Name.Trim(),
             Prefix = prefix,
             KeyHash = keyHashHex,
-            Role = string.IsNullOrWhiteSpace(dto.Role) ? "admin:super" : dto.Role.Trim(),
+            Role = requestedRole,
             ExpiresAt = dto.ExpiresAt,
             CreatedAt = time.GetUtcNow()
         };
@@ -75,8 +94,10 @@ public static class ApiKeyEndpoints
         SymbolonDbContext db,
         CancellationToken ct)
     {
-        string? tenantId = httpContext.Request.Headers["X-Tenant-Id"].FirstOrDefault()
-            ?? httpContext.User.FindFirst("tenant_id")?.Value;
+        bool isSuperAdmin = httpContext.User.IsInRole("admin:super");
+        string? tenantId = isSuperAdmin
+            ? httpContext.Request.Headers["X-Tenant-Id"].FirstOrDefault() ?? httpContext.User.FindFirst("tenant_id")?.Value
+            : httpContext.User.FindFirst("tenant_id")?.Value;
 
         var query = db.ApiKeys.AsNoTracking().Where(k => k.RevokedAt == null);
 
@@ -104,11 +125,21 @@ public static class ApiKeyEndpoints
 
     private static async Task<IResult> RevokeApiKeyAsync(
         string id,
+        HttpContext httpContext,
         SymbolonDbContext db,
         TimeProvider time,
         CancellationToken ct)
     {
-        var key = await db.ApiKeys.FirstOrDefaultAsync(k => k.Id == id, ct).ConfigureAwait(false);
+        bool isSuperAdmin = httpContext.User.IsInRole("admin:super");
+        string? tenantId = isSuperAdmin ? null : httpContext.User.FindFirst("tenant_id")?.Value;
+
+        var query = db.ApiKeys.AsQueryable();
+        if (!string.IsNullOrWhiteSpace(tenantId))
+        {
+            query = query.Where(k => k.TenantId == tenantId);
+        }
+
+        var key = await query.FirstOrDefaultAsync(k => k.Id == id, ct).ConfigureAwait(false);
         if (key is null || key.RevokedAt is not null)
         {
             return TypedResults.NotFound();

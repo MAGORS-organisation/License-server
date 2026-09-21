@@ -1,0 +1,71 @@
+syntax = "proto3";
+
+package symbolon.protocol.v1;
+
+option csharp_namespace = "Symbolon.Protocol.Grpc";
+
+// High-performance streaming lease heartbeat protocol (Phase 2.5)
+service LeaseStreamingService {
+  // Bi-directional streaming channel for continuous ultra-low latency lease renewal
+  rpc StreamLeaseHeartbeat (stream LeaseStreamRequest) returns (stream LeaseStreamResponse);
+  
+  // Single-shot RPC check for instant ping
+  rpc PingLease (LeasePingRequest) returns (LeasePingResponse);
+}
+
+message LeaseStreamRequest {
+  string lease_id = 1;
+  string machine_id = 2;
+  string fingerprint_hash = 3;
+  int64 client_timestamp_utc = 4;
+  int64 sequence_number = 5;
+  oneof payload {
+    HeartbeatPing ping = 6;
+    ReleaseNotice release = 7;
+    QuotaClaim quota_claim = 8;
+  }
+}
+
+message HeartbeatPing {
+  int32 cpu_usage_percent = 1;
+  int64 memory_bytes = 2;
+}
+
+message ReleaseNotice {
+  string reason = 1;
+}
+
+message QuotaClaim {
+  string entitlement = 1;
+  int64 units = 2;
+}
+
+message LeaseStreamResponse {
+  string lease_id = 1;
+  int64 server_timestamp_utc = 2;
+  int64 acknowledged_sequence = 3;
+  StreamStatus status = 4;
+  int64 valid_until_utc = 5;
+  int32 grace_period_seconds = 6;
+  string error_message = 7;
+  string new_lease_token = 8;
+}
+
+enum StreamStatus {
+  STREAM_STATUS_UNSPECIFIED = 0;
+  STREAM_STATUS_ACTIVE = 1;
+  STREAM_STATUS_GRACE = 2;
+  STREAM_STATUS_EXPIRED = 3;
+  STREAM_STATUS_REVOKED = 4;
+  STREAM_STATUS_QUOTA_EXCEEDED = 5;
+}
+
+message LeasePingRequest {
+  string lease_id = 1;
+  string client_token = 2;
+}
+
+message LeasePingResponse {
+  bool is_healthy = 1;
+  int64 valid_until_utc = 2;
+}

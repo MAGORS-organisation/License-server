@@ -49,7 +49,14 @@ public sealed class SymbolonMetrics : IDisposable
         _skewDetectedCounter = _meter.CreateCounter<long>(
             "symbolon.clock.skew_detected",
             description: "Total number of clock skew anomalies detected.");
+
+        _alertsTriggeredCounter = _meter.CreateCounter<long>(
+            "symbolon.alerts.triggered",
+            description: "Total number of enterprise security and capacity alerts triggered.");
     }
+
+    private readonly Counter<long> _alertsTriggeredCounter;
+    private long _totalAlerts;
 
     public long ActiveSeats => Volatile.Read(ref _activeSeats);
 
@@ -90,6 +97,12 @@ public sealed class SymbolonMetrics : IDisposable
         _skewDetectedCounter.Add(1);
     }
 
+    public void RecordAlert(string alertType)
+    {
+        Interlocked.Increment(ref _totalAlerts);
+        _alertsTriggeredCounter.Add(1, new KeyValuePair<string, object?>("alert_type", alertType));
+    }
+
     public string GeneratePrometheusMetrics()
     {
         var sb = new StringBuilder(512);
@@ -113,6 +126,10 @@ public sealed class SymbolonMetrics : IDisposable
         sb.AppendLine("# HELP symbolon_clock_skew_detected_total Total number of clock skew anomalies detected.");
         sb.AppendLine("# TYPE symbolon_clock_skew_detected_total counter");
         sb.Append("symbolon_clock_skew_detected_total ").AppendLine(Volatile.Read(ref _totalSkew).ToString(System.Globalization.CultureInfo.InvariantCulture));
+
+        sb.AppendLine("# HELP symbolon_alerts_triggered_total Total number of enterprise security and capacity alerts triggered.");
+        sb.AppendLine("# TYPE symbolon_alerts_triggered_total counter");
+        sb.Append("symbolon_alerts_triggered_total ").AppendLine(Volatile.Read(ref _totalAlerts).ToString(System.Globalization.CultureInfo.InvariantCulture));
 
         return sb.ToString();
     }

@@ -51,13 +51,13 @@ public sealed class ApiKeyAuthenticationHandler : AuthenticationHandler<ApiKeyAu
             }
         }
 
-        bool requireAuth = _configuration.GetValue<bool>("Security:RequireAuth");
+        bool enableDevBypass = _configuration.GetValue<bool>("Security:EnableDevSuperAdminBypass");
 
         if (string.IsNullOrWhiteSpace(rawKey))
         {
-            if (!requireAuth)
+            if (enableDevBypass)
             {
-                // In dev/test mode when auth is not explicitly required, default to super-admin
+                // In explicit test/dev sandbox with bypass enabled, default to super-admin
                 var devClaims = new[]
                 {
                     new Claim(ClaimTypes.NameIdentifier, "usr_dev_admin"),

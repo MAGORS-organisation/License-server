@@ -35,13 +35,17 @@ public static class OfflineEndpoints
         var now = time.GetUtcNow();
 
         // 1. Locate license by KeyLookup or ID
-        byte[] lookup = SHA256.HashData(Encoding.UTF8.GetBytes(dto.LicenseKey.Trim()))[..4];
+        byte[] rawKeyBytes = Encoding.UTF8.GetBytes(dto.LicenseKey.Trim());
+        byte[] lookup = SHA256.HashData(rawKeyBytes)[..4];
+        string fullHashHex = Convert.ToHexString(SHA256.HashData(rawKeyBytes));
+
         var license = await db.Licenses
             .Include(l => l.Policy)
             .FirstOrDefaultAsync(l => l.KeyLookup == lookup || l.Id == dto.LicenseKey.Trim(), ct)
             .ConfigureAwait(false);
 
-        if (license is null || license.State != "active")
+        if (license is null || license.State != "active" ||
+            (license.Id != dto.LicenseKey.Trim() && !string.Equals(license.KeyHash, fullHashHex, StringComparison.OrdinalIgnoreCase)))
         {
             return TypedResults.NotFound($"License for key '{dto.LicenseKey}' not found or inactive.");
         }
@@ -184,14 +188,18 @@ public static class OfflineEndpoints
     {
         var now = time.GetUtcNow();
 
-        byte[] lookup = SHA256.HashData(Encoding.UTF8.GetBytes(dto.LicenseKey.Trim()))[..4];
+        byte[] rawKeyBytes = Encoding.UTF8.GetBytes(dto.LicenseKey.Trim());
+        byte[] lookup = SHA256.HashData(rawKeyBytes)[..4];
+        string fullHashHex = Convert.ToHexString(SHA256.HashData(rawKeyBytes));
+
         var license = await db.Licenses
             .Include(l => l.Policy)
             .Include(l => l.Machines)
             .FirstOrDefaultAsync(l => l.KeyLookup == lookup || l.Id == dto.LicenseKey.Trim(), ct)
             .ConfigureAwait(false);
 
-        if (license is null || license.State != "active")
+        if (license is null || license.State != "active" ||
+            (license.Id != dto.LicenseKey.Trim() && !string.Equals(license.KeyHash, fullHashHex, StringComparison.OrdinalIgnoreCase)))
         {
             return TypedResults.NotFound($"License '{dto.LicenseKey}' not found or inactive.");
         }

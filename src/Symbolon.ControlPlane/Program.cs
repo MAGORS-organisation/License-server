@@ -51,33 +51,48 @@ builder.Services.AddScoped<ILeaseTokenIssuer>(sp =>
 builder.Services.AddHttpClient();
 builder.Services.AddSingleton<Symbolon.ControlPlane.Webhooks.IWebhookDispatcher, Symbolon.ControlPlane.Webhooks.WebhookDispatcher>();
 builder.Services.AddSingleton<Symbolon.ControlPlane.Queuing.IQueueManager, Symbolon.ControlPlane.Queuing.QueueManager>();
+builder.Services.AddScoped<Symbolon.ControlPlane.Alerting.IAlertService, Symbolon.ControlPlane.Alerting.AlertService>();
 builder.Services.AddScoped<LeaseEngine>();
 
-// Rate Limiting (STRIDE T11, T12)
+// Rate Limiting (STRIDE T11, T12, SEC-05: Partitioned by Client IP / Admin Key)
 builder.Services.AddRateLimiter(options =>
 {
     options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
 
-    options.AddFixedWindowLimiter("public-leases", opt =>
+    options.AddPolicy("public-leases", httpContext =>
     {
-        opt.PermitLimit = 100;
-        opt.Window = TimeSpan.FromMinutes(1);
-        opt.QueueLimit = 0;
+        var partitionKey = httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown_client";
+        return RateLimitPartition.GetFixedWindowLimiter(partitionKey, _ => new FixedWindowRateLimiterOptions
+        {
+            PermitLimit = 100,
+            Window = TimeSpan.FromMinutes(1),
+            QueueLimit = 0
+        });
     });
 
-    options.AddSlidingWindowLimiter("admin", opt =>
+    options.AddPolicy("admin", httpContext =>
     {
-        opt.PermitLimit = 200;
-        opt.Window = TimeSpan.FromMinutes(1);
-        opt.SegmentsPerWindow = 4;
-        opt.QueueLimit = 0;
+        var partitionKey = httpContext.User.Identity?.Name
+            ?? httpContext.Connection.RemoteIpAddress?.ToString()
+            ?? "unknown_admin";
+        return RateLimitPartition.GetSlidingWindowLimiter(partitionKey, _ => new SlidingWindowRateLimiterOptions
+        {
+            PermitLimit = 200,
+            Window = TimeSpan.FromMinutes(1),
+            SegmentsPerWindow = 4,
+            QueueLimit = 0
+        });
     });
 
-    options.AddFixedWindowLimiter("relay", opt =>
+    options.AddPolicy("relay", httpContext =>
     {
-        opt.PermitLimit = 120;
-        opt.Window = TimeSpan.FromMinutes(1);
-        opt.QueueLimit = 0;
+        var partitionKey = httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown_relay";
+        return RateLimitPartition.GetFixedWindowLimiter(partitionKey, _ => new FixedWindowRateLimiterOptions
+        {
+            PermitLimit = 120,
+            Window = TimeSpan.FromMinutes(1),
+            QueueLimit = 0
+        });
     });
 });
 
@@ -136,6 +151,21 @@ app.MapGet("/health/ready", async (SymbolonDbContext db, CancellationToken ct) =
         ? Results.Ok(new { status = "ready", database = "connected", timestamp = DateTimeOffset.UtcNow })
         : Results.StatusCode(StatusCodes.Status503ServiceUnavailable);
 }).WithTags("Health");
+
+// Security Headers Middleware (SEC-06)
+app.Use(async (context, next) =>
+{
+    context.Response.Headers.Append("X-Content-Type-Options", "nosniff");
+    context.Response.Headers.Append("X-Frame-Options", "DENY");
+    context.Response.Headers.Append("Referrer-Policy", "strict-origin-when-cross-origin");
+    context.Response.Headers.Append("Content-Security-Policy", "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:; connect-src 'self'");
+    context.Response.Headers.Append("Permissions-Policy", "accelerometer=(), camera=(), geolocation=(), gyroscope=(), magnetometer=(), microphone=(), payment=(), usb=()");
+    if (!app.Environment.IsDevelopment())
+    {
+        context.Response.Headers.Append("Strict-Transport-Security", "max-age=31536000; includeSubDomains");
+    }
+    await next().ConfigureAwait(false);
+});
 
 // Static Files & Web Dashboard
 app.UseDefaultFiles();

@@ -84,17 +84,20 @@ public static class PublicEndpoints
         Webhooks.IWebhookDispatcher webhooks,
         TimeProvider time,
         Observability.SymbolonMetrics metrics,
+        Alerting.IAlertService alertService,
         CancellationToken ct)
     {
         string? idempotencyKey = context.Request.Headers["Idempotency-Key"].FirstOrDefault();
-        byte[] lookup = SHA256.HashData(Encoding.UTF8.GetBytes(dto.LicenseKey.Trim()))[..4];
+        byte[] rawKeyBytes = Encoding.UTF8.GetBytes(dto.LicenseKey.Trim());
+        byte[] lookup = SHA256.HashData(rawKeyBytes)[..4];
+        string fullHashHex = Convert.ToHexString(SHA256.HashData(rawKeyBytes));
 
         var license = await db.Licenses
             .Include(l => l.Policy)
             .FirstOrDefaultAsync(l => l.KeyLookup == lookup, ct)
             .ConfigureAwait(false);
 
-        if (license is null || license.State != "active")
+        if (license is null || license.State != "active" || !string.Equals(license.KeyHash, fullHashHex, StringComparison.OrdinalIgnoreCase))
         {
             return TypedResults.Problem(
                 statusCode: StatusCodes.Status404NotFound,
@@ -155,6 +158,11 @@ public static class PublicEndpoints
         if (result.IsSuccess && result.Allocations is { Count: > 0 } && result.Tokens is { Count: > 0 })
         {
             metrics.RecordSeatAcquired(quantity);
+
+            // Enterprise Alerting (Phase 2.5)
+            int activeSeats = await db.Seats.CountAsync(s => s.LicenseId == license.Id && s.LeaseId != null && s.ExpiresAt > now, ct).ConfigureAwait(false);
+            await alertService.CheckCapacityThresholdAsync(license.Id, activeSeats, license.MaxSeats, license.TenantId, ct).ConfigureAwait(false);
+
             var alloc = result.Allocations[0];
             var entitlements = dto.Features ?? ["core"];
             return TypedResults.Ok(new CheckoutResponseDto
@@ -188,6 +196,7 @@ public static class PublicEndpoints
         }
 
         metrics.RecordCheckoutDenied(license.Id);
+        await alertService.RecordDenialSpikeAsync(license.Id, license.TenantId, result.Reason ?? "seat-pool-exhausted", ct).ConfigureAwait(false);
 
         await webhooks.PublishEventAsync("seat.denied", new
         {
@@ -348,7 +357,9 @@ public static class PublicEndpoints
         TimeProvider time,
         CancellationToken ct)
     {
-        byte[] lookup = SHA256.HashData(Encoding.UTF8.GetBytes(dto.LicenseKey.Trim()))[..4];
+        byte[] rawKeyBytes = Encoding.UTF8.GetBytes(dto.LicenseKey.Trim());
+        byte[] lookup = SHA256.HashData(rawKeyBytes)[..4];
+        string fullHashHex = Convert.ToHexString(SHA256.HashData(rawKeyBytes));
 
         var license = await db.Licenses
             .Include(l => l.Policy)
@@ -356,7 +367,7 @@ public static class PublicEndpoints
             .FirstOrDefaultAsync(l => l.KeyLookup == lookup, ct)
             .ConfigureAwait(false);
 
-        if (license is null || license.State != "active")
+        if (license is null || license.State != "active" || !string.Equals(license.KeyHash, fullHashHex, StringComparison.OrdinalIgnoreCase))
         {
             return TypedResults.Problem(statusCode: 404, title: "License Not Found", type: ProblemTypes.LicenseNotFound);
         }
@@ -444,14 +455,16 @@ public static class PublicEndpoints
         TimeProvider time,
         CancellationToken ct)
     {
-        byte[] lookup = SHA256.HashData(Encoding.UTF8.GetBytes(key.Trim()))[..4];
+        byte[] rawKeyBytes = Encoding.UTF8.GetBytes(key.Trim());
+        byte[] lookup = SHA256.HashData(rawKeyBytes)[..4];
+        string fullHashHex = Convert.ToHexString(SHA256.HashData(rawKeyBytes));
 
         var license = await db.Licenses
             .Include(l => l.Policy)
             .FirstOrDefaultAsync(l => l.KeyLookup == lookup, ct)
             .ConfigureAwait(false);
 
-        if (license is null || license.State != "active")
+        if (license is null || license.State != "active" || !string.Equals(license.KeyHash, fullHashHex, StringComparison.OrdinalIgnoreCase))
         {
             return TypedResults.Problem(statusCode: 404, title: "License Not Found", type: ProblemTypes.LicenseNotFound);
         }

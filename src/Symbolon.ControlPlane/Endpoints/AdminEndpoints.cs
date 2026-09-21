@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
@@ -72,8 +73,41 @@ public static class AdminEndpoints
         return group;
     }
 
-    private static async Task<IResult> CreateTenantAsync(CreateTenantDto dto, SymbolonDbContext db, TimeProvider time, CancellationToken ct)
+    private static string? GetCallerTenantId(HttpContext httpContext)
     {
+        return httpContext.User.FindFirst("tenant_id")?.Value;
+    }
+
+    private static bool IsSuperAdmin(HttpContext httpContext)
+    {
+        return httpContext.User.IsInRole("admin:super");
+    }
+
+    private static string? GetEffectiveTenantFilter(HttpContext httpContext)
+    {
+        if (IsSuperAdmin(httpContext))
+        {
+            return httpContext.Request.Headers["X-Tenant-Id"].FirstOrDefault()
+                ?? GetCallerTenantId(httpContext);
+        }
+        return GetCallerTenantId(httpContext);
+    }
+
+    private static async Task<IResult> CreateTenantAsync(
+        CreateTenantDto dto,
+        HttpContext context,
+        SymbolonDbContext db,
+        TimeProvider time,
+        CancellationToken ct)
+    {
+        if (!IsSuperAdmin(context))
+        {
+            return TypedResults.Problem(
+                statusCode: StatusCodes.Status403Forbidden,
+                title: "Forbidden",
+                detail: "Only super administrators can create new tenants.");
+        }
+
         string id = $"ten_{Guid.NewGuid():N}";
         var tenant = new Tenant
         {
@@ -89,13 +123,27 @@ public static class AdminEndpoints
         return TypedResults.Created($"/admin/v1/tenants/{id}", new TenantDto(tenant.Id, tenant.Slug, tenant.Name, tenant.CreatedAt));
     }
 
-    private static async Task<IResult> GetTenantsAsync(SymbolonDbContext db, CancellationToken ct)
+    private static async Task<IResult> GetTenantsAsync(
+        HttpContext context,
+        SymbolonDbContext db,
+        CancellationToken ct)
     {
-        var list = await db.Tenants
+        if (IsSuperAdmin(context))
+        {
+            var list = await db.Tenants
+                .Select(t => new TenantDto(t.Id, t.Slug, t.Name, t.CreatedAt))
+                .ToListAsync(ct)
+                .ConfigureAwait(false);
+            return TypedResults.Ok(list);
+        }
+
+        string? tenantId = GetCallerTenantId(context);
+        var single = await db.Tenants
+            .Where(t => t.Id == tenantId)
             .Select(t => new TenantDto(t.Id, t.Slug, t.Name, t.CreatedAt))
             .ToListAsync(ct)
             .ConfigureAwait(false);
-        return TypedResults.Ok(list);
+        return TypedResults.Ok(single);
     }
 
     private static async Task<IResult> CreateProductAsync(
@@ -105,9 +153,18 @@ public static class AdminEndpoints
         TimeProvider time,
         CancellationToken ct)
     {
-        string tenantId = context.Request.Headers["X-Tenant-Id"].FirstOrDefault()
-            ?? (await db.Tenants.Select(t => t.Id).FirstOrDefaultAsync(ct).ConfigureAwait(false))
-            ?? "default";
+        string? tenantId;
+        if (IsSuperAdmin(context))
+        {
+            tenantId = context.Request.Headers["X-Tenant-Id"].FirstOrDefault()
+                ?? GetCallerTenantId(context);
+        }
+        else
+        {
+            tenantId = GetCallerTenantId(context);
+        }
+
+        tenantId ??= (await db.Tenants.Select(t => t.Id).FirstOrDefaultAsync(ct).ConfigureAwait(false)) ?? "default";
 
         string id = $"prd_{Guid.NewGuid():N}";
         var product = new Product
@@ -126,9 +183,19 @@ public static class AdminEndpoints
         return TypedResults.Created($"/admin/v1/products/{id}", new ProductDto(product.Id, product.TenantId, product.Code, product.Name, dto.Platforms ?? [], product.CreatedAt));
     }
 
-    private static async Task<IResult> GetProductsAsync(SymbolonDbContext db, CancellationToken ct)
+    private static async Task<IResult> GetProductsAsync(
+        HttpContext context,
+        SymbolonDbContext db,
+        CancellationToken ct)
     {
-        var list = await db.Products
+        string? tenantFilter = GetEffectiveTenantFilter(context);
+        var query = db.Products.AsQueryable();
+        if (!IsSuperAdmin(context) && !string.IsNullOrWhiteSpace(tenantFilter))
+        {
+            query = query.Where(p => p.TenantId == tenantFilter);
+        }
+
+        var list = await query
             .Select(p => new ProductDto(p.Id, p.TenantId, p.Code, p.Name, new List<string>(), p.CreatedAt))
             .ToListAsync(ct)
             .ConfigureAwait(false);
@@ -143,6 +210,11 @@ public static class AdminEndpoints
     {
         var product = await db.Products.FirstOrDefaultAsync(p => p.Id == dto.ProductId, ct).ConfigureAwait(false);
         if (product is null)
+        {
+            return TypedResults.NotFound($"Product '{dto.ProductId}' not found.");
+        }
+
+        if (!IsSuperAdmin(context) && product.TenantId != GetCallerTenantId(context))
         {
             return TypedResults.NotFound($"Product '{dto.ProductId}' not found.");
         }
@@ -178,9 +250,19 @@ public static class AdminEndpoints
         return TypedResults.Created($"/admin/v1/policies/{id}", new PolicyDto(policy.Id, policy.TenantId, policy.ProductId, policy.Code, policy.Name, policy.LicenseModel, policy.MaxSeats, policy.SeatUnit, policy.LeaseTtlSeconds));
     }
 
-    private static async Task<IResult> GetPoliciesAsync(SymbolonDbContext db, CancellationToken ct)
+    private static async Task<IResult> GetPoliciesAsync(
+        HttpContext context,
+        SymbolonDbContext db,
+        CancellationToken ct)
     {
-        var list = await db.Policies
+        string? tenantFilter = GetEffectiveTenantFilter(context);
+        var query = db.Policies.AsQueryable();
+        if (!IsSuperAdmin(context) && !string.IsNullOrWhiteSpace(tenantFilter))
+        {
+            query = query.Where(p => p.TenantId == tenantFilter);
+        }
+
+        var list = await query
             .Select(p => new PolicyDto(p.Id, p.TenantId, p.ProductId, p.Code, p.Name, p.LicenseModel, p.MaxSeats, p.SeatUnit, p.LeaseTtlSeconds))
             .ToListAsync(ct)
             .ConfigureAwait(false);
@@ -189,6 +271,7 @@ public static class AdminEndpoints
 
     private static async Task<IResult> IssueLicenseAsync(
         CreateLicenseDto dto,
+        HttpContext context,
         SymbolonDbContext db,
         IAuditLedger audit,
         Webhooks.IWebhookDispatcher webhooks,
@@ -197,6 +280,11 @@ public static class AdminEndpoints
     {
         var policy = await db.Policies.FirstOrDefaultAsync(p => p.Id == dto.PolicyId, ct).ConfigureAwait(false);
         if (policy is null)
+        {
+            return TypedResults.NotFound($"Policy '{dto.PolicyId}' not found.");
+        }
+
+        if (!IsSuperAdmin(context) && policy.TenantId != GetCallerTenantId(context))
         {
             return TypedResults.NotFound($"Policy '{dto.PolicyId}' not found.");
         }
@@ -266,9 +354,19 @@ public static class AdminEndpoints
             license.ExpiresAt));
     }
 
-    private static async Task<IResult> GetLicensesAsync(SymbolonDbContext db, CancellationToken ct)
+    private static async Task<IResult> GetLicensesAsync(
+        HttpContext context,
+        SymbolonDbContext db,
+        CancellationToken ct)
     {
-        var list = await db.Licenses
+        string? tenantFilter = GetEffectiveTenantFilter(context);
+        var query = db.Licenses.AsQueryable();
+        if (!IsSuperAdmin(context) && !string.IsNullOrWhiteSpace(tenantFilter))
+        {
+            query = query.Where(l => l.TenantId == tenantFilter);
+        }
+
+        var list = await query
             .Select(l => new LicenseResponseDto(
                 l.Id,
                 null,
@@ -285,10 +383,19 @@ public static class AdminEndpoints
         return TypedResults.Ok(list);
     }
 
-    private static async Task<IResult> GetLicenseByIdAsync(string id, SymbolonDbContext db, CancellationToken ct)
+    private static async Task<IResult> GetLicenseByIdAsync(
+        string id,
+        HttpContext context,
+        SymbolonDbContext db,
+        CancellationToken ct)
     {
         var l = await db.Licenses.FirstOrDefaultAsync(x => x.Id == id, ct).ConfigureAwait(false);
         if (l is null) return TypedResults.NotFound();
+
+        if (!IsSuperAdmin(context) && l.TenantId != GetCallerTenantId(context))
+        {
+            return TypedResults.NotFound();
+        }
 
         return TypedResults.Ok(new LicenseResponseDto(
             l.Id,
@@ -305,6 +412,7 @@ public static class AdminEndpoints
     private static async Task<IResult> RevokeLicenseAsync(
         string id,
         RevokeLicenseDto dto,
+        HttpContext context,
         SymbolonDbContext db,
         IAuditLedger audit,
         Webhooks.IWebhookDispatcher webhooks,
@@ -313,6 +421,11 @@ public static class AdminEndpoints
     {
         var license = await db.Licenses.FirstOrDefaultAsync(l => l.Id == id, ct).ConfigureAwait(false);
         if (license is null) return TypedResults.NotFound();
+
+        if (!IsSuperAdmin(context) && license.TenantId != GetCallerTenantId(context))
+        {
+            return TypedResults.NotFound();
+        }
 
         license.State = "revoked";
 
@@ -346,11 +459,22 @@ public static class AdminEndpoints
     private static async Task<IResult> GetAuditEventsAsync(
         string? licenseId,
         int? limit,
+        HttpContext context,
         SymbolonDbContext db,
         CancellationToken ct)
     {
         int max = limit ?? 50;
         var query = db.AuditEvents.AsQueryable();
+
+        if (!IsSuperAdmin(context))
+        {
+            string? callerTenant = GetCallerTenantId(context);
+            if (!string.IsNullOrWhiteSpace(callerTenant))
+            {
+                var tenantLicenseIds = db.Licenses.Where(l => l.TenantId == callerTenant).Select(l => l.Id);
+                query = query.Where(a => a.LicenseId != null && tenantLicenseIds.Contains(a.LicenseId));
+            }
+        }
 
         if (!string.IsNullOrWhiteSpace(licenseId))
         {
@@ -367,13 +491,26 @@ public static class AdminEndpoints
     }
 
     private static async Task<IResult> GetConcurrencyReportAsync(
+        HttpContext context,
         SymbolonDbContext db,
         TimeProvider time,
         CancellationToken ct)
     {
         var now = time.GetUtcNow();
-        int totalSeats = await db.Seats.CountAsync(ct).ConfigureAwait(false);
-        int activeLeases = await db.Seats.CountAsync(s => s.LeaseId != null && s.ExpiresAt > now, ct).ConfigureAwait(false);
+        var seatsQuery = db.Seats.AsQueryable();
+
+        if (!IsSuperAdmin(context))
+        {
+            string? callerTenant = GetCallerTenantId(context);
+            if (!string.IsNullOrWhiteSpace(callerTenant))
+            {
+                var tenantLicenseIds = db.Licenses.Where(l => l.TenantId == callerTenant).Select(l => l.Id);
+                seatsQuery = seatsQuery.Where(s => tenantLicenseIds.Contains(s.LicenseId));
+            }
+        }
+
+        int totalSeats = await seatsQuery.CountAsync(ct).ConfigureAwait(false);
+        int activeLeases = await seatsQuery.CountAsync(s => s.LeaseId != null && s.ExpiresAt > now, ct).ConfigureAwait(false);
         int availableSeats = totalSeats - activeLeases;
         double util = totalSeats > 0 ? (double)activeLeases / totalSeats * 100.0 : 0.0;
 
@@ -389,9 +526,15 @@ public static class AdminEndpoints
     }
 
     private static async Task<IResult> GetKeysAsync(
+        HttpContext context,
         Security.KeyManager keyManager,
         CancellationToken ct)
     {
+        if (!IsSuperAdmin(context))
+        {
+            return TypedResults.Problem(statusCode: StatusCodes.Status403Forbidden, title: "SuperAdmin Required");
+        }
+
         var keys = await keyManager.GetAllKeysAsync(ct).ConfigureAwait(false);
         var dtos = keys.Select(k => new SigningKeyDto(
             k.Id,
@@ -414,6 +557,11 @@ public static class AdminEndpoints
         Webhooks.IWebhookDispatcher webhooks,
         CancellationToken ct)
     {
+        if (!IsSuperAdmin(context))
+        {
+            return TypedResults.Problem(statusCode: StatusCodes.Status403Forbidden, title: "SuperAdmin Required");
+        }
+
         string tenantId = dto.TenantId
             ?? context.Request.Headers["X-Tenant-Id"].FirstOrDefault()
             ?? await db.Tenants.Select(t => t.Id).FirstOrDefaultAsync(ct).ConfigureAwait(false)
@@ -447,9 +595,15 @@ public static class AdminEndpoints
     private static async Task<IResult> RevokeKeyAsync(
         string kid,
         RevokeKeyDto dto,
+        HttpContext context,
         Security.KeyManager keyManager,
         CancellationToken ct)
     {
+        if (!IsSuperAdmin(context))
+        {
+            return TypedResults.Problem(statusCode: StatusCodes.Status403Forbidden, title: "SuperAdmin Required");
+        }
+
         bool revoked = await keyManager.RevokeKeyAsync(kid, dto.Reason, ct).ConfigureAwait(false);
         return revoked
             ? TypedResults.Ok(new { message = $"Key '{kid}' revoked successfully.", kid, reason = dto.Reason })
@@ -459,12 +613,18 @@ public static class AdminEndpoints
     private static async Task<IResult> AssignLicenseUserAsync(
         string id,
         AssignLicenseUserDto dto,
+        HttpContext context,
         SymbolonDbContext db,
         TimeProvider time,
         CancellationToken ct)
     {
         var license = await db.Licenses.FirstOrDefaultAsync(l => l.Id == id, ct).ConfigureAwait(false);
         if (license is null) return TypedResults.NotFound();
+
+        if (!IsSuperAdmin(context) && license.TenantId != GetCallerTenantId(context))
+        {
+            return TypedResults.NotFound();
+        }
 
         string userRecordId = $"usr_{Guid.NewGuid():N}";
         var existing = await db.LicenseUsers.FirstOrDefaultAsync(u => u.LicenseId == id && u.UserId == dto.UserId.Trim(), ct).ConfigureAwait(false);
@@ -493,9 +653,18 @@ public static class AdminEndpoints
 
     private static async Task<IResult> GetLicenseUsersAsync(
         string id,
+        HttpContext context,
         SymbolonDbContext db,
         CancellationToken ct)
     {
+        var license = await db.Licenses.FirstOrDefaultAsync(l => l.Id == id, ct).ConfigureAwait(false);
+        if (license is null) return TypedResults.NotFound();
+
+        if (!IsSuperAdmin(context) && license.TenantId != GetCallerTenantId(context))
+        {
+            return TypedResults.NotFound();
+        }
+
         var users = await db.LicenseUsers
             .Where(u => u.LicenseId == id)
             .OrderBy(u => u.CreatedAt)
@@ -509,9 +678,18 @@ public static class AdminEndpoints
     private static async Task<IResult> RemoveLicenseUserAsync(
         string id,
         string userId,
+        HttpContext context,
         SymbolonDbContext db,
         CancellationToken ct)
     {
+        var license = await db.Licenses.FirstOrDefaultAsync(l => l.Id == id, ct).ConfigureAwait(false);
+        if (license is null) return TypedResults.NotFound();
+
+        if (!IsSuperAdmin(context) && license.TenantId != GetCallerTenantId(context))
+        {
+            return TypedResults.NotFound();
+        }
+
         var user = await db.LicenseUsers.FirstOrDefaultAsync(u => u.LicenseId == id && (u.Id == userId || u.UserId == userId), ct).ConfigureAwait(false);
         if (user is null) return TypedResults.NotFound();
 
@@ -523,12 +701,18 @@ public static class AdminEndpoints
     private static async Task<IResult> SetLicenseQuotaAsync(
         string id,
         SetLicenseQuotaDto dto,
+        HttpContext context,
         SymbolonDbContext db,
         TimeProvider time,
         CancellationToken ct)
     {
         var license = await db.Licenses.FirstOrDefaultAsync(l => l.Id == id, ct).ConfigureAwait(false);
         if (license is null) return TypedResults.NotFound();
+
+        if (!IsSuperAdmin(context) && license.TenantId != GetCallerTenantId(context))
+        {
+            return TypedResults.NotFound();
+        }
 
         var existing = await db.LicenseQuotas.FirstOrDefaultAsync(q => q.LicenseId == id && q.EntitlementCode == dto.EntitlementCode.Trim(), ct).ConfigureAwait(false);
         var now = time.GetUtcNow();
@@ -561,9 +745,18 @@ public static class AdminEndpoints
 
     private static async Task<IResult> GetLicenseQuotasAsync(
         string id,
+        HttpContext context,
         SymbolonDbContext db,
         CancellationToken ct)
     {
+        var license = await db.Licenses.FirstOrDefaultAsync(l => l.Id == id, ct).ConfigureAwait(false);
+        if (license is null) return TypedResults.NotFound();
+
+        if (!IsSuperAdmin(context) && license.TenantId != GetCallerTenantId(context))
+        {
+            return TypedResults.NotFound();
+        }
+
         var quotas = await db.LicenseQuotas
             .Where(q => q.LicenseId == id)
             .OrderBy(q => q.EntitlementCode)

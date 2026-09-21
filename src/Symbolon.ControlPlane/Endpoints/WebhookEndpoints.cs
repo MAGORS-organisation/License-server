@@ -1,7 +1,10 @@
+using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text.Json;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Hosting;
 using Symbolon.ControlPlane.Models;
 using Symbolon.ControlPlane.Webhooks;
 using Symbolon.Data;
@@ -25,20 +28,37 @@ public static class WebhookEndpoints
         return group;
     }
 
+    private static string? GetTenantFilter(HttpContext context)
+    {
+        bool isSuper = context.User.IsInRole("admin:super");
+        if (isSuper)
+        {
+            return context.Request.Headers["X-Tenant-Id"].FirstOrDefault()
+                ?? context.User.FindFirst("tenant_id")?.Value;
+        }
+        return context.User.FindFirst("tenant_id")?.Value;
+    }
+
     private static async Task<IResult> CreateWebhookAsync(
         CreateWebhookDto dto,
         HttpContext context,
         SymbolonDbContext db,
         TimeProvider time,
+        IHostEnvironment env,
+        IConfiguration config,
         CancellationToken ct)
     {
-        if (string.IsNullOrWhiteSpace(dto.Url) || !Uri.TryCreate(dto.Url, UriKind.Absolute, out var parsedUri) ||
-            (parsedUri.Scheme != Uri.UriSchemeHttp && parsedUri.Scheme != Uri.UriSchemeHttps))
+        bool isDev = env.IsDevelopment();
+        bool allowLocal = config.GetValue<bool>("Security:AllowLocalWebhooks");
+
+        if (!WebhookSecurityValidator.IsSafeWebhookUrl(dto.Url, isDev, allowLocal))
         {
-            return TypedResults.BadRequest("A valid HTTP or HTTPS URL is required.");
+            return TypedResults.BadRequest("The webhook target URL is invalid or violates network security policy (SSRF protection).");
         }
 
-        string tenantId = context.Request.Headers["X-Tenant-Id"].FirstOrDefault()
+        bool isSuper = context.User.IsInRole("admin:super");
+        string? tenantId = isSuper ? context.Request.Headers["X-Tenant-Id"].FirstOrDefault() : null;
+        tenantId ??= context.User.FindFirst("tenant_id")?.Value
             ?? (await db.Tenants.Select(t => t.Id).FirstOrDefaultAsync(ct).ConfigureAwait(false))
             ?? "ten_default";
 
@@ -79,7 +99,7 @@ public static class WebhookEndpoints
         SymbolonDbContext db,
         CancellationToken ct)
     {
-        string? tenantId = context.Request.Headers["X-Tenant-Id"].FirstOrDefault();
+        string? tenantId = GetTenantFilter(context);
         var query = db.WebhookSubscriptions.AsQueryable();
         if (!string.IsNullOrWhiteSpace(tenantId))
         {
@@ -113,10 +133,18 @@ public static class WebhookEndpoints
 
     private static async Task<IResult> GetWebhookByIdAsync(
         string id,
+        HttpContext context,
         SymbolonDbContext db,
         CancellationToken ct)
     {
-        var w = await db.WebhookSubscriptions.FirstOrDefaultAsync(x => x.Id == id, ct).ConfigureAwait(false);
+        string? tenantId = GetTenantFilter(context);
+        var query = db.WebhookSubscriptions.AsQueryable();
+        if (!string.IsNullOrWhiteSpace(tenantId) && !context.User.IsInRole("admin:super"))
+        {
+            query = query.Where(x => x.TenantId == tenantId);
+        }
+
+        var w = await query.FirstOrDefaultAsync(x => x.Id == id, ct).ConfigureAwait(false);
         if (w is null) return TypedResults.NotFound();
 
         return TypedResults.Ok(new WebhookSubscriptionDto(
@@ -130,10 +158,18 @@ public static class WebhookEndpoints
 
     private static async Task<IResult> DeleteWebhookAsync(
         string id,
+        HttpContext context,
         SymbolonDbContext db,
         CancellationToken ct)
     {
-        var w = await db.WebhookSubscriptions.FirstOrDefaultAsync(x => x.Id == id, ct).ConfigureAwait(false);
+        string? tenantId = GetTenantFilter(context);
+        var query = db.WebhookSubscriptions.AsQueryable();
+        if (!string.IsNullOrWhiteSpace(tenantId) && !context.User.IsInRole("admin:super"))
+        {
+            query = query.Where(x => x.TenantId == tenantId);
+        }
+
+        var w = await query.FirstOrDefaultAsync(x => x.Id == id, ct).ConfigureAwait(false);
         if (w is null) return TypedResults.NotFound();
 
         db.WebhookSubscriptions.Remove(w);
@@ -144,9 +180,21 @@ public static class WebhookEndpoints
 
     private static async Task<IResult> TestWebhookAsync(
         string id,
+        HttpContext context,
+        SymbolonDbContext db,
         IWebhookDispatcher dispatcher,
         CancellationToken ct)
     {
+        string? tenantId = GetTenantFilter(context);
+        var query = db.WebhookSubscriptions.AsQueryable();
+        if (!string.IsNullOrWhiteSpace(tenantId) && !context.User.IsInRole("admin:super"))
+        {
+            query = query.Where(x => x.TenantId == tenantId);
+        }
+
+        var exists = await query.AnyAsync(x => x.Id == id, ct).ConfigureAwait(false);
+        if (!exists) return TypedResults.NotFound();
+
         var result = await dispatcher.TestPingAsync(id, ct).ConfigureAwait(false);
         return TypedResults.Ok(result);
     }
@@ -154,9 +202,20 @@ public static class WebhookEndpoints
     private static async Task<IResult> GetWebhookDeliveriesAsync(
         string id,
         int? limit,
+        HttpContext context,
         SymbolonDbContext db,
         CancellationToken ct)
     {
+        string? tenantId = GetTenantFilter(context);
+        var query = db.WebhookSubscriptions.AsQueryable();
+        if (!string.IsNullOrWhiteSpace(tenantId) && !context.User.IsInRole("admin:super"))
+        {
+            query = query.Where(x => x.TenantId == tenantId);
+        }
+
+        var exists = await query.AnyAsync(x => x.Id == id, ct).ConfigureAwait(false);
+        if (!exists) return TypedResults.NotFound();
+
         int max = limit ?? 20;
         var deliveries = await db.WebhookDeliveries
             .Where(d => d.SubscriptionId == id)
