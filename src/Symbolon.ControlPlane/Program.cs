@@ -123,12 +123,19 @@ app.MapGet("/health/ready", async (SymbolonDbContext db, CancellationToken ct) =
         : Results.StatusCode(StatusCodes.Status503ServiceUnavailable);
 }).WithTags("Health");
 
+// Static Files & Web Dashboard
+app.UseDefaultFiles();
+app.UseStaticFiles();
+
 app.UseRateLimiter();
 
 // Map Endpoints with Rate Limiting (STRIDE T11, T12)
 app.MapPublicEndpoints().RequireRateLimiting("public-leases");
 app.MapAdminEndpoints().RequireRateLimiting("admin");
 app.MapRelaySyncEndpoints().RequireRateLimiting("relay");
+
+// SPA Fallback
+app.MapFallbackToFile("index.html");
 
 app.Run();
 

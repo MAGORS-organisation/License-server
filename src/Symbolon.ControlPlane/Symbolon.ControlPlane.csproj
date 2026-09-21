@@ -21,4 +21,8 @@
     <ProjectReference Include="..\Symbolon.Crypto\Symbolon.Crypto.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Content Update="wwwroot\**" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
 </Project>

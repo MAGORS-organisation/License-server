@@ -2,7 +2,7 @@
 
 [![Platform](https://img.shields.io/badge/.NET-10.0%20LTS-512BD4?logo=dotnet)](https://dotnet.microsoft.com/)
 [![Language](https://img.shields.io/badge/C%23-14.0-239120?logo=csharp)](https://learn.microsoft.com/dotnet/csharp/)
-[![Tests](https://img.shields.io/badge/tests-81%20passed-brightgreen)](#výsledky-testovania)
+[![Tests](https://img.shields.io/badge/tests-84%20passed-brightgreen)](#výsledky-testovania)
 [![License: AGPL-3.0](https://img.shields.io/badge/license-AGPL--3.0-blue.svg)](LICENSE)
 [![License: Apache-2.0](https://img.shields.io/badge/client%20SDK-Apache--2.0-blue.svg)](LICENSES/Apache-2.0.txt)
 [![Crypto](https://img.shields.io/badge/cryptography-ES256%20%2B%20ML--DSA--65%20(PQC)-orange)](#kryptografia)
@@ -35,6 +35,9 @@ Rieši to, čo dnešné cloud-first platformy ponúkajú iba ako obmedzený dopl
    - Striktná autentifikácia Relay uzlov pomocou API kľúčov a mTLS certifikátov zabraňujúca impersonácii.
    - Vstavaný ASP.NET Core Rate Limiting (Sliding Window & Fixed Window) chrániaci API pred zneužitím.
    - Bezvýpadková rotácia kryptografických kľúčov (`/admin/v1/keys/rotate`), okamžitá revokácia a dynamický JWKS filter garantujúci vylúčenie kompromitovaných kľúčov.
+8. **Vstavaný Web UI Dashboard (Admin & ISV Konzola)**
+   - Priamo integrovaný moderný webový portál na `http://localhost:8080/` (alebo `/dashboard`) pre sledovanie obsadenosti plávajúcich sedadiel v reálnom čase.
+   - Vizuálna správa licencií (vystavenie novej licencie a stiahnutie `.symlic` súboru), interaktívna rotácia kľúčov, JWKS prehliadač a auditný denník bez potreby inštalácie externých závislostí.
 
 ---
 
@@ -97,7 +100,7 @@ cd License-server
 # Zostavenie celého solution
 dotnet build Symbolon.slnx
 
-# Spustenie všetkých 81 unit a integračných testov
+# Spustenie všetkých 84 unit a integračných testov
 dotnet test Symbolon.slnx
 ```
 
@@ -110,7 +113,8 @@ docker compose -f deploy/docker-compose.yml up -d
 ```
 
 Po spustení sú dostupné tieto služby:
-- **Symbolon ControlPlane API:** `http://localhost:8080`
+- **Symbolon Web UI Dashboard & ControlPlane API:** `http://localhost:8080`
+  - Web Konzola pre správu: `http://localhost:8080/`
   - OpenAPI 3.1 dokumentácia: `http://localhost:8080/openapi/v1.json`
   - Health check: `http://localhost:8080/health/ready`
   - Prometheus metriky: `http://localhost:8080/metrics`
@@ -290,9 +294,9 @@ Passed!  - Failed: 0, Passed:  7, Skipped: 0, Total:  7 - Symbolon.Relay.Tests.d
 Passed!  - Failed: 0, Passed:  4, Skipped: 0, Total:  4 - Symbolon.Client.Tests.dll
 Passed!  - Failed: 0, Passed:  6, Skipped: 0, Total:  6 - Symbolon.Cli.Tests.dll
 Passed!  - Failed: 0, Passed:  5, Skipped: 0, Total:  5 - Symbolon.Data.Tests.dll
-Passed!  - Failed: 0, Passed: 12, Skipped: 0, Total: 12 - Symbolon.ControlPlane.Tests.dll
+Passed!  - Failed: 0, Passed: 15, Skipped: 0, Total: 15 - Symbolon.ControlPlane.Tests.dll
 
-Celkovo: 81 úspešných testov, 0 zlyhaní, 0 chýb. Trvanie: ~6 sekúnd.
+Celkovo: 84 úspešných testov, 0 zlyhaní, 0 chýb. Trvanie: ~6 sekúnd.
 ```
 
 ---

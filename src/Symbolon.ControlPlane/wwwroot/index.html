@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+<html lang="sk">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Symbolon Control Plane — Licenčný Server</title>
+    <link rel="stylesheet" href="/css/dashboard.css">
+</head>
+<body>
+
+    <!-- Sidebar -->
+    <aside class="sidebar">
+        <div class="sidebar-header">
+            <div class="brand-icon">Σ</div>
+            <div>
+                <div class="brand-title">Symbolon</div>
+                <div class="brand-subtitle">Control Plane v1.0</div>
+            </div>
+        </div>
+
+        <ul class="nav-menu">
+            <li class="nav-item">
+                <a class="nav-link active" data-view="view-overview">
+                    <span class="nav-icon">📊</span>
+                    <span>Prehľad</span>
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" data-view="view-licenses">
+                    <span class="nav-icon">🔑</span>
+                    <span>Licencie</span>
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" data-view="view-keys">
+                    <span class="nav-icon">🔐</span>
+                    <span>Podpisové Kľúče</span>
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" data-view="view-relays">
+                    <span class="nav-icon">🔄</span>
+                    <span>Relay Uzly</span>
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" data-view="view-audit">
+                    <span class="nav-icon">📜</span>
+                    <span>Auditný Denník</span>
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" data-view="view-system">
+                    <span class="nav-icon">⚡</span>
+                    <span>API & Diagnostika</span>
+                </a>
+            </li>
+        </ul>
+
+        <div class="sidebar-footer">
+            .NET 10 LTS · PQC ML-DSA-65<br>
+            PostgreSQL 17 / SQLite
+        </div>
+    </aside>
+
+    <!-- Main Content -->
+    <div class="main-wrapper">
+        <header class="topbar">
+            <h1 class="page-title" id="page-title">Prehľad</h1>
+            <div class="topbar-actions">
+                <div class="health-badge">
+                    <div class="pulse-dot"></div>
+                    <span id="health-text">Kontrola spojenia...</span>
+                </div>
+                <button class="btn btn-primary btn-sm" id="btn-open-issue-modal">+ Vystaviť Licenciu</button>
+            </div>
+        </header>
+
+        <main class="content-area">
+
+            <!-- VIEW 1: Overview -->
+            <section id="view-overview" class="view-section active">
+                <div class="kpi-grid">
+                    <div class="kpi-card">
+                        <div class="kpi-label">
+                            <span>Floating Sedadlá</span>
+                            <span>💺</span>
+                        </div>
+                        <div class="kpi-value" id="kpi-active-seats">0</div>
+                        <div class="kpi-subtext" id="kpi-total-seats">z celkovo 0 sedadiel</div>
+                    </div>
+                    <div class="kpi-card">
+                        <div class="kpi-label">
+                            <span>Využitie Kapacity</span>
+                            <span>📈</span>
+                        </div>
+                        <div class="kpi-value" id="kpi-utilization">0%</div>
+                        <div class="kpi-subtext">konkurentné sedadlá v reálnom čase</div>
+                    </div>
+                    <div class="kpi-card">
+                        <div class="kpi-label">
+                            <span>Zamietnuté Žiadosti</span>
+                            <span>⚠️</span>
+                        </div>
+                        <div class="kpi-value" id="kpi-denials" style="color: var(--accent-rose);">0</div>
+                        <div class="kpi-subtext">potenciál pre upsell sedadiel</div>
+                    </div>
+                    <div class="kpi-card">
+                        <div class="kpi-label">
+                            <span>Aktívne Licencie</span>
+                            <span>📄</span>
+                        </div>
+                        <div class="kpi-value" id="kpi-total-licenses">0</div>
+                        <div class="kpi-subtext">všetkých zákazníkov</div>
+                    </div>
+                    <div class="kpi-card">
+                        <div class="kpi-label">
+                            <span>Podpisové Kľúče</span>
+                            <span>🛡️</span>
+                        </div>
+                        <div class="kpi-value" id="kpi-active-keys">1</div>
+                        <div class="kpi-subtext">aktívne ES256 / PQC kľúče</div>
+                    </div>
+                </div>
+
+                <div class="charts-grid">
+                    <div class="chart-card">
+                        <div class="chart-header">
+                            <div class="chart-title">Vyťaženie Plávajúcich Sedadiel (Concurrency)</div>
+                            <button class="btn btn-secondary btn-sm" onclick="loadDashboardKPIs()">Obnoviť</button>
+                        </div>
+                        <canvas id="concurrencyCanvas" width="500" height="120" style="width: 100%; height: 120px;"></canvas>
+                    </div>
+
+                    <div class="chart-card">
+                        <div class="chart-header">
+                            <div class="chart-title">Rozdelenie Typov Licencií</div>
+                        </div>
+                        <canvas id="typesCanvas" width="250" height="120" style="width: 100%; height: 120px;"></canvas>
+                    </div>
+                </div>
+            </section>
+
+            <!-- VIEW 2: Licenses -->
+            <section id="view-licenses" class="view-section">
+                <div class="table-card">
+                    <div class="table-header">
+                        <div class="table-title">Všetky Evidované Licencie</div>
+                        <div class="table-actions">
+                            <button class="btn btn-primary btn-sm" onclick="openModal('modal-issue-license')">+ Vystaviť Licenciu</button>
+                        </div>
+                    </div>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Zákazník</th>
+                                <th>Produkt</th>
+                                <th>Typ</th>
+                                <th>Sedadlá</th>
+                                <th>Platnosť Do</th>
+                                <th>Stav</th>
+                                <th>Akcie</th>
+                            </tr>
+                        </thead>
+                        <tbody id="licenses-table-body">
+                            <tr>
+                                <td colspan="7" style="text-align: center; color: var(--text-muted); padding: 24px;">Načítavam...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <!-- VIEW 3: Signing Keys -->
+            <section id="view-keys" class="view-section">
+                <div class="table-card">
+                    <div class="table-header">
+                        <div class="table-title">Kryptografické Podpisové Kľúče & JWKS (RFC 9964)</div>
+                        <div class="table-actions">
+                            <button class="btn btn-secondary btn-sm" id="btn-view-jwks">Zobraziť JWKS</button>
+                            <button class="btn btn-primary btn-sm" id="btn-open-rotate-modal">Rotovať Kľúč</button>
+                        </div>
+                    </div>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Key ID (kid)</th>
+                                <th>Algoritmus</th>
+                                <th>Úloha</th>
+                                <th>Stav</th>
+                                <th>Platnosť</th>
+                                <th>Akcie</th>
+                            </tr>
+                        </thead>
+                        <tbody id="keys-table-body">
+                            <tr>
+                                <td colspan="6" style="text-align: center; color: var(--text-muted); padding: 24px;">Načítavam...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <!-- VIEW 4: Relays -->
+            <section id="view-relays" class="view-section">
+                <div class="table-card">
+                    <div class="table-header">
+                        <div class="table-title">Registrované On-Premise Relay Uzly</div>
+                    </div>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Relay ID</th>
+                                <th>Názov Uzla</th>
+                                <th>Organizácia</th>
+                                <th>Verzia</th>
+                                <th>Posledný Heartbeat</th>
+                                <th>Stav</th>
+                            </tr>
+                        </thead>
+                        <tbody id="relays-table-body">
+                            <tr>
+                                <td><code>rly_corp_hq_01</code></td>
+                                <td>Corporate HQ Relay</td>
+                                <td>default</td>
+                                <td>1.0.0</td>
+                                <td>Pred 2 min</td>
+                                <td><span class="badge badge-active">Online</span></td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <!-- VIEW 5: Audit Trail -->
+            <section id="view-audit" class="view-section">
+                <div class="table-card">
+                    <div class="table-header">
+                        <div class="table-title">Kryptograficky Reťazený Auditný Denník (SHA-256)</div>
+                        <div class="table-actions">
+                            <button class="btn btn-secondary btn-sm" onclick="loadAuditLogs()">Obnoviť</button>
+                        </div>
+                    </div>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Časová Pečiatka</th>
+                                <th>Udalosť</th>
+                                <th>Subjekt</th>
+                                <th>Popis</th>
+                                <th>Kryptografický Hash</th>
+                            </tr>
+                        </thead>
+                        <tbody id="audit-table-body">
+                            <tr>
+                                <td colspan="5" style="text-align: center; color: var(--text-muted); padding: 24px;">Načítavam...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <!-- VIEW 6: API & Diagnostika -->
+            <section id="view-system" class="view-section">
+                <div class="kpi-grid">
+                    <div class="kpi-card">
+                        <div class="kpi-label">OpenAPI 3.1 Kontrakt</div>
+                        <div style="margin-top: 8px;">
+                            <a href="/openapi/v1.json" target="_blank" class="btn btn-secondary btn-sm">Otvoriť JSON Spec</a>
+                        </div>
+                    </div>
+                    <div class="kpi-card">
+                        <div class="kpi-label">Prometheus Exporter</div>
+                        <div style="margin-top: 8px;">
+                            <a href="/metrics" target="_blank" class="btn btn-secondary btn-sm">Otvoriť /metrics</a>
+                        </div>
+                    </div>
+                    <div class="kpi-card">
+                        <div class="kpi-label">Kubernetes Liveness Probe</div>
+                        <div style="margin-top: 8px;">
+                            <a href="/health/live" target="_blank" class="btn btn-secondary btn-sm">Otvoriť /health/live</a>
+                        </div>
+                    </div>
+                    <div class="kpi-card">
+                        <div class="kpi-label">Kubernetes Readiness Probe</div>
+                        <div style="margin-top: 8px;">
+                            <a href="/health/ready" target="_blank" class="btn btn-secondary btn-sm">Otvoriť /health/ready</a>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="table-card">
+                    <div class="table-header">
+                        <div class="table-title">Systémové Parametre a Kvantová Odolnosť</div>
+                    </div>
+                    <div style="padding: 24px;">
+                        <p style="color: var(--text-secondary); line-height: 1.6; margin-bottom: 12px;">
+                            Symbolon Control Plane beží na platforme <strong>.NET 10 LTS</strong> a využíva hybridné podpisovanie kombinujúce priemyselný štandard <strong>NIST P-256 (ES256)</strong> s post-kvantovou schémou <strong>ML-DSA-65 (FIPS 204)</strong>.
+                        </p>
+                        <p style="color: var(--text-secondary); line-height: 1.6;">
+                            Architektúra materializovaných sedadiel v PostgreSQL 17 / SQLite využíva transakčný mechanizmus <code>FOR UPDATE SKIP LOCKED</code> pre deterministické prideľovanie sedadiel bez potreby externej in-memory cache.
+                        </p>
+                    </div>
+                </div>
+            </section>
+
+        </main>
+    </div>
+
+    <!-- Modal: Issue License -->
+    <div class="modal-overlay" id="modal-issue-license">
+        <div class="modal-box">
+            <div class="modal-header">
+                <div class="modal-title">Vystavenie Novej Licencie</div>
+                <button class="modal-close" onclick="closeModal('modal-issue-license')">&times;</button>
+            </div>
+            <form id="form-issue-license">
+                <div class="form-group">
+                    <label class="form-label" for="issue-customer">Názov Zákazníka / Organizácie</label>
+                    <input type="text" class="form-control" id="issue-customer" required placeholder="napr. Acme Corporation">
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="issue-product">Kód Produktu</label>
+                    <input type="text" class="form-control" id="issue-product" required value="cad-pro" placeholder="napr. cad-pro">
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="issue-type">Model Licencie</label>
+                    <select class="form-control" id="issue-type">
+                        <option value="floating">Floating (Plávajúce sedadlá)</option>
+                        <option value="nodelock">Node-Locked (Viazané na HW)</option>
+                        <option value="trial">Trial (Skúšobná)</option>
+                        <option value="perpetual">Perpetual (Trvalá)</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="issue-seats">Počet Sedadiel</label>
+                    <input type="number" class="form-control" id="issue-seats" required min="1" max="1000" value="5">
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="issue-days">Doba Platnosti (dní)</label>
+                    <input type="number" class="form-control" id="issue-days" required min="1" max="3650" value="365">
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" onclick="closeModal('modal-issue-license')">Zrušiť</button>
+                    <button type="submit" class="btn btn-primary">Vystaviť Licenciu</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal: License Success -->
+    <div class="modal-overlay" id="modal-license-success">
+        <div class="modal-box">
+            <div class="modal-header">
+                <div class="modal-title">🎉 Licencia Bola Úspešne Vystavená!</div>
+                <button class="modal-close" onclick="closeModal('modal-license-success')">&times;</button>
+            </div>
+            <p style="color: var(--text-secondary); margin-bottom: 12px; font-size: 13px;">
+                Crockford Base32 licenčný kľúč s integrovaným kontrolným súčtom CRC-32C:
+            </p>
+            <div class="code-box" id="issued-key-display" style="font-size: 15px; font-weight: bold; text-align: center; margin-bottom: 16px;"></div>
+            <input type="hidden" id="issued-license-id">
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="copyToClipboard(document.getElementById('issued-key-display').textContent)">Kopírovať Kľúč</button>
+                <button type="button" class="btn btn-primary" onclick="downloadLicenseFile(document.getElementById('issued-license-id').value)">⬇ Stiahnuť .symlic súbor</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Rotate Key -->
+    <div class="modal-overlay" id="modal-rotate-key">
+        <div class="modal-box">
+            <div class="modal-header">
+                <div class="modal-title">Rotácia Podpisového Kľúča</div>
+                <button class="modal-close" onclick="closeModal('modal-rotate-key')">&times;</button>
+            </div>
+            <form id="form-rotate-key">
+                <p style="color: var(--text-secondary); font-size: 13px; margin-bottom: 16px;">
+                    Rotácia vygeneruje nový aktívny kľúč. Doterajší aktívny kľúč bude označený ako <code>deprecated</code> a zostane v JWKS pre bezvýpadkové overovanie starších tokenov.
+                </p>
+                <div class="form-group">
+                    <label class="form-label" for="rotate-alg">Algoritmus nového kľúča</label>
+                    <select class="form-control" id="rotate-alg">
+                        <option value="ES256">ES256 (NIST P-256, FIPS 186-5)</option>
+                    </select>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" onclick="closeModal('modal-rotate-key')">Zrušiť</button>
+                    <button type="submit" class="btn btn-primary">Rotovať Kľúč</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal: View JWKS -->
+    <div class="modal-overlay" id="modal-view-jwks">
+        <div class="modal-box" style="max-width: 650px;">
+            <div class="modal-header">
+                <div class="modal-title">Verejný JWKS (RFC 9964)</div>
+                <button class="modal-close" onclick="closeModal('modal-view-jwks')">&times;</button>
+            </div>
+            <div class="code-box" id="jwks-code-content"></div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="closeModal('modal-view-jwks')">Zavrieť</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Notifications Container -->
+    <div class="toast-container" id="toast-container"></div>
+
+    <script src="/js/dashboard.js"></script>
+</body>
+</html>
