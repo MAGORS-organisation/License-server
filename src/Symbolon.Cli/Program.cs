@@ -14,7 +14,17 @@ internal static class Program
 {
     public static async Task<int> Main(string[] args)
     {
-        if (args is null || args.Length == 0 || args[0] is "-h" or "--help")
+        if (args is null || args.Length == 0)
+        {
+            if (!Console.IsInputRedirected)
+            {
+                return await Wizard.SetupWizard.RunAsync().ConfigureAwait(false);
+            }
+            PrintHelp();
+            return 0;
+        }
+
+        if (args[0] is "-h" or "--help")
         {
             PrintHelp();
             return 0;
@@ -24,6 +34,7 @@ internal static class Program
         {
             return args[0].ToUpperInvariant() switch
             {
+                "SETUP" or "WIZARD" => await Wizard.SetupWizard.RunAsync().ConfigureAwait(false),
                 "KEYS" => HandleKeys(args[1..]),
                 "LICENSE" => HandleLicense(args[1..]),
                 "DOCTOR" => await HandleDoctorAsync(args[1..]).ConfigureAwait(false),
@@ -385,9 +396,10 @@ internal static class Program
     private static void PrintHelp()
     {
         Console.WriteLine("""
-            Symbolon CLI — nástroj pre správu licencií a kľúčov
+            Symbolon CLI — nástroj pre inštaláciu, správu licencií a kľúčov
 
             Príkazy:
+              setup | wizard                            Spustí interaktívneho inštalačného sprievodcu (TUI)
               keys generate --alg <ES256|ML-DSA-65> --kid <id> [--out file]
               keys export-jwks --keys <file1,file2> [--out file]
               license keygen [--prefix SYM]

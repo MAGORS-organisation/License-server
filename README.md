@@ -2,7 +2,7 @@
 
 [![Platform](https://img.shields.io/badge/.NET-10.0%20LTS-512BD4?logo=dotnet)](https://dotnet.microsoft.com/)
 [![Language](https://img.shields.io/badge/C%23-14.0-239120?logo=csharp)](https://learn.microsoft.com/dotnet/csharp/)
-[![Tests](https://img.shields.io/badge/tests-75%20passed-brightgreen)](#výsledky-testovania)
+[![Tests](https://img.shields.io/badge/tests-78%20passed-brightgreen)](#výsledky-testovania)
 [![License: AGPL-3.0](https://img.shields.io/badge/license-AGPL--3.0-blue.svg)](LICENSE)
 [![License: Apache-2.0](https://img.shields.io/badge/client%20SDK-Apache--2.0-blue.svg)](LICENSES/Apache-2.0.txt)
 [![Crypto](https://img.shields.io/badge/cryptography-ES256%20%2B%20ML--DSA--65%20(PQC)-orange)](#kryptografia)
@@ -132,15 +132,19 @@ dotnet run --project src/Symbolon.Relay
 
 ---
 
-## Ako Používať `Symbolon.Cli`
+## Ako Používať `Symbolon.Cli` a Inštalačný Sprievodca (TUI Wizard)
 
-Nástroj príkazového riadka poskytuje správu kľúčov, vydávanie licencií a ich overovanie:
+Nástroj príkazového riadka poskytuje interaktívneho inštalačného sprievodcu, správu kľúčov, vydávanie licencií a ich overovanie:
 
 ```bash
-# 1. Vygenerovanie nového páru podpisových kľúčov (ES256 alebo hybrid)
+# 1. Spustenie interaktívneho inštalačného sprievodcu (TUI Wizard)
+# (alebo jednoducho spustite `dotnet run --project src/Symbolon.Cli` bez argumentov v termináli)
+dotnet run --project src/Symbolon.Cli -- setup
+
+# 2. Vygenerovanie nového páru podpisových kľúčov (ES256 alebo hybrid)
 dotnet run --project src/Symbolon.Cli -- key gen -a es256 -o ./my-keys
 
-# 2. Vydanie licenčného súboru .symlic
+# 3. Vydanie licenčného súboru .symlic
 dotnet run --project src/Symbolon.Cli -- lic issue \
   --product "cad-pro" \
   --customer "Acme Corporation" \
@@ -149,9 +153,15 @@ dotnet run --project src/Symbolon.Cli -- lic issue \
   --key ./my-keys/private.jwk \
   --out license.symlic
 
-# 3. Diagnostika a validácia licenčného súboru (kontrola podpisov, platnosti a claims)
+# 4. Diagnostika a validácia licenčného súboru (kontrola podpisov, platnosti a claims)
 dotnet run --project src/Symbolon.Cli -- doctor --file license.symlic --key ./my-keys/public.jwk
 ```
+
+### Čo dokáže interaktívny TUI sprievodca (`setup` / `wizard`):
+- **Inštalácia ControlPlane:** Interaktívne nastaví sieťový port, databázový engine (SQLite / PostgreSQL), vygeneruje podpisové kľúče (ES256 + ML-DSA-65), vytvorí `appsettings.json` a pripraví spúšťacie skripty pre Windows (`.cmd`, `.ps1`) a Linux (`.sh`).
+- **Inštalácia On-Premise Relay:** Nakonfiguruje lokálny relay server, perzistentné SQLite úložisko, prepojenie na centrály ControlPlane a vygeneruje Linux `systemd` unit.
+- **Rýchle vystavenie licencie:** Vygeneruje Crockford Base32 kľúč s kontrolným súčtom CRC-32C, podpíše JWS dokument a uloží formátovaný `.symlic` súbor v PEM obálke.
+- **Systémový lekár (Doctor):** Diagnostikuje pripravenosť prostredia, overí podporu pre post-kvantovú kryptografiu (FIPS 204) a vypočíta hardvérový fingerprint stanice.
 
 ---
 
@@ -270,11 +280,11 @@ Passed!  - Failed: 0, Passed:  6, Skipped: 0, Total:  6 - Symbolon.Protocol.Test
 Passed!  - Failed: 0, Passed:  6, Skipped: 0, Total:  6 - Symbolon.Domain.Tests.dll
 Passed!  - Failed: 0, Passed:  7, Skipped: 0, Total:  7 - Symbolon.Relay.Tests.dll
 Passed!  - Failed: 0, Passed:  4, Skipped: 0, Total:  4 - Symbolon.Client.Tests.dll
-Passed!  - Failed: 0, Passed:  3, Skipped: 0, Total:  3 - Symbolon.Cli.Tests.dll
+Passed!  - Failed: 0, Passed:  6, Skipped: 0, Total:  6 - Symbolon.Cli.Tests.dll
 Passed!  - Failed: 0, Passed:  5, Skipped: 0, Total:  5 - Symbolon.Data.Tests.dll
 Passed!  - Failed: 0, Passed:  9, Skipped: 0, Total:  9 - Symbolon.ControlPlane.Tests.dll
 
-Celkovo: 75 úspešných testov, 0 zlyhaní, 0 chýb. Trvanie: ~6 sekúnd.
+Celkovo: 78 úspešných testov, 0 zlyhaní, 0 chýb. Trvanie: ~6 sekúnd.
 ```
 
 ---

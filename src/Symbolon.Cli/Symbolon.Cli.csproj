@@ -3,12 +3,16 @@
   <PropertyGroup>
     <OutputType>Exe</OutputType>
     <RootNamespace>Symbolon.Cli</RootNamespace>
-    <!-- Suppress SYSLIB5006 for experimental ML-DSA in CLI -->
-    <NoWarn>$(NoWarn);SYSLIB5006;CA1303;CA1849;CA1308</NoWarn>
+    <!-- Suppress SYSLIB5006 for experimental ML-DSA in CLI, plus style rules for TUI wizard -->
+    <NoWarn>$(NoWarn);SYSLIB5006;CA1303;CA1849;CA1308;CA1031;CA1515;CA2007;CA1062;CA1056</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>
     <InternalsVisibleTo Include="Symbolon.Cli.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Spectre.Console" />
   </ItemGroup>
 
   <ItemGroup>
