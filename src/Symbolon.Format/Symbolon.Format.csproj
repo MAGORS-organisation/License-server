@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <RootNamespace>Symbolon.Format</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Symbolon.Crypto\Symbolon.Crypto.csproj" />
+  </ItemGroup>
+
+</Project>

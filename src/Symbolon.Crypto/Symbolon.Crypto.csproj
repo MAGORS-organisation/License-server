@@ -1,0 +1,9 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <RootNamespace>Symbolon.Crypto</RootNamespace>
+    <!-- Suppress SYSLIB5006 for experimental ML-DSA in .NET 10 -->
+    <NoWarn>$(NoWarn);SYSLIB5006</NoWarn>
+  </PropertyGroup>
+
+</Project>

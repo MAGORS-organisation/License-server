@@ -1,0 +1,11 @@
+<Project>
+  <Import Project="$([MSBuild]::GetPathOfFileAbove('Directory.Build.props', '$(MSBuildThisFileDirectory)../'))" />
+
+  <PropertyGroup>
+    <IsTestProject>true</IsTestProject>
+    <IsPackable>false</IsPackable>
+    <!-- CA1707: Identifiers should not contain underscores (standard convention in test method names) -->
+    <!-- CA1308: Normalize strings to uppercase (tests explicitly use ToLowerInvariant to test case insensitivity) -->
+    <NoWarn>$(NoWarn);CA1707;CA1308</NoWarn>
+  </PropertyGroup>
+</Project>
