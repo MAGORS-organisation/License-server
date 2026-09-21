@@ -1,0 +1,129 @@
+using System.ComponentModel.DataAnnotations;
+using System.Text.Json.Serialization;
+
+namespace Symbolon.Protocol;
+
+public sealed record CheckoutRequestDto
+{
+    [Required]
+    [JsonPropertyName("licenseKey")]
+    public required string LicenseKey { get; init; }
+
+    [Required]
+    [MinLength(1)]
+    [JsonPropertyName("fingerprintComponents")]
+    public required IReadOnlyDictionary<string, string> FingerprintComponents { get; init; }
+
+    [Range(1, 64)]
+    [JsonPropertyName("quantity")]
+    public int? Quantity { get; init; }
+
+    [JsonPropertyName("features")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public IReadOnlyList<string>? Features { get; init; }
+
+    [JsonPropertyName("allowQueue")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public bool? AllowQueue { get; init; }
+
+    [JsonPropertyName("machineId")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? MachineId { get; init; }
+
+    public string ToFingerprintHash() => FingerprintHelper.ComputeHash(FingerprintComponents);
+}
+
+public sealed record CheckoutResponseDto
+{
+    [JsonPropertyName("leaseId")]
+    public required string LeaseId { get; init; }
+
+    [JsonPropertyName("token")]
+    public required string Token { get; init; }
+
+    [JsonPropertyName("expiresAt")]
+    public required DateTimeOffset ExpiresAt { get; init; }
+
+    [JsonPropertyName("seat")]
+    public required int Seat { get; init; }
+
+    [JsonPropertyName("entitlements")]
+    public required IReadOnlyList<string> Entitlements { get; init; }
+}
+
+public sealed record RenewRequestDto
+{
+    [JsonPropertyName("clientSeq")]
+    public required long ClientSeq { get; init; }
+
+    [JsonPropertyName("fingerprintComponents")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public IReadOnlyDictionary<string, string>? FingerprintComponents { get; init; }
+
+    [JsonPropertyName("fingerprintHash")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? FingerprintHash { get; init; }
+
+    public string? ResolveFingerprintHash()
+    {
+        if (!string.IsNullOrWhiteSpace(FingerprintHash))
+        {
+            return FingerprintHash;
+        }
+
+        if (FingerprintComponents is not null && FingerprintComponents.Count > 0)
+        {
+            return FingerprintHelper.ComputeHash(FingerprintComponents);
+        }
+
+        return null;
+    }
+}
+
+public sealed record RenewResponseDto
+{
+    [JsonPropertyName("token")]
+    public required string Token { get; init; }
+
+    [JsonPropertyName("expiresAt")]
+    public required DateTimeOffset ExpiresAt { get; init; }
+
+    [JsonPropertyName("leaseSeq")]
+    public required long LeaseSeq { get; init; }
+}
+
+public sealed record ReleaseRequestDto
+{
+    [JsonPropertyName("leaseId")]
+    public required string LeaseId { get; init; }
+}
+
+public sealed record ReleaseResponseDto
+{
+    [JsonPropertyName("success")]
+    public required bool Success { get; init; }
+}
+
+public sealed record QueuedResponseDto
+{
+    [JsonPropertyName("ticket")]
+    public required string Ticket { get; init; }
+
+    [JsonPropertyName("position")]
+    public required int Position { get; init; }
+
+    [JsonPropertyName("estimatedWait")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? EstimatedWait { get; init; }
+}
+
+public static class ProblemTypes
+{
+    public const string LicenseNotFound = "https://symbolon.dev/errors/license-not-found";
+    public const string PoolExhausted = "https://symbolon.dev/errors/pool-exhausted";
+    public const string LeaseUnknown = "https://symbolon.dev/errors/lease-unknown";
+    public const string SeatReassigned = "https://symbolon.dev/errors/seat-reassigned";
+    public const string StaleSequence = "https://symbolon.dev/errors/stale-sequence";
+    public const string FingerprintMismatch = "https://symbolon.dev/errors/fingerprint-mismatch";
+    public const string InvalidRequest = "https://symbolon.dev/errors/invalid-request";
+}
