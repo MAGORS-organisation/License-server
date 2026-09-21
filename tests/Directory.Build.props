@@ -9,7 +9,8 @@
     <!-- CA2234: Pass System.Uri objects instead of strings (tests use relative route strings) -->
     <!-- CA2007: ConfigureAwait not needed in unit tests -->
     <!-- CA2000: Disposable objects in unit tests -->
-    <!-- CA1031: Cleanup exceptions in unit tests -->
-    <NoWarn>$(NoWarn);CA1707;CA1308;CA2234;CA2007;CA2000;CA1031</NoWarn>
+    <!-- CA1062: Validate arguments of public methods in test classes -->
+    <!-- CA1515: Consider making types internal -->
+    <NoWarn>$(NoWarn);CA1707;CA1308;CA2234;CA2007;CA2000;CA1031;CA1515;CA1062</NoWarn>
   </PropertyGroup>
 </Project>

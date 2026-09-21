@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <PackageLicenseExpression>AGPL-3.0-only</PackageLicenseExpression>
+    <NoWarn>$(NoWarn);CA1515;CA1819;CA1002;CA2227;CA1716;CA1724;CA1848;CA1303;CA1308;CA2000;CA1859;CA1062</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.OpenApi" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" />
+    <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Symbolon.Data\Symbolon.Data.csproj" />
+    <ProjectReference Include="..\Symbolon.Domain\Symbolon.Domain.csproj" />
+    <ProjectReference Include="..\Symbolon.Protocol\Symbolon.Protocol.csproj" />
+    <ProjectReference Include="..\Symbolon.Format\Symbolon.Format.csproj" />
+    <ProjectReference Include="..\Symbolon.Crypto\Symbolon.Crypto.csproj" />
+  </ItemGroup>
+
+</Project>
