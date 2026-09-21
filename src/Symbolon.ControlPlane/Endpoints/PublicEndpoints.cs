@@ -68,6 +68,7 @@ public static class PublicEndpoints
         HttpContext context,
         SymbolonDbContext db,
         LeaseEngine engine,
+        Webhooks.IWebhookDispatcher webhooks,
         TimeProvider time,
         Observability.SymbolonMetrics metrics,
         CancellationToken ct)
@@ -139,6 +140,18 @@ public static class PublicEndpoints
         }
 
         metrics.RecordCheckoutDenied(license.Id);
+
+        await webhooks.PublishEventAsync("seat.denied", new
+        {
+            licenseId = license.Id,
+            tenantId = license.TenantId,
+            customerRef = license.CustomerRef,
+            fingerprint,
+            reason = result.Reason ?? "seat-pool-exhausted",
+            requestedQuantity = quantity,
+            maxSeats = license.MaxSeats
+        }, license.TenantId, ct).ConfigureAwait(false);
+
         if (result.Reason == "seat-pool-exhausted")
         {
             return TypedResults.Problem(
@@ -274,6 +287,7 @@ public static class PublicEndpoints
         ActivationRequestDto dto,
         SymbolonDbContext db,
         IAuditLedger audit,
+        Webhooks.IWebhookDispatcher webhooks,
         TimeProvider time,
         CancellationToken ct)
     {
@@ -324,6 +338,15 @@ public static class PublicEndpoints
 
         await audit.AppendAsync(new AuditEvent("activate", license.Id, null, fp, now, $"Node-lock machine activated: {dto.MachineId}"), ct).ConfigureAwait(false);
 
+        await webhooks.PublishEventAsync("machine.activated", new
+        {
+            activationId = machine.Id,
+            licenseId = license.Id,
+            tenantId = license.TenantId,
+            fingerprint = fp,
+            machineId = dto.MachineId
+        }, license.TenantId, ct).ConfigureAwait(false);
+
         return TypedResults.Ok(new ActivationResponseDto(machine.Id, license.Id, fp, "active", now));
     }
 
@@ -331,6 +354,7 @@ public static class PublicEndpoints
         string id,
         SymbolonDbContext db,
         IAuditLedger audit,
+        Webhooks.IWebhookDispatcher webhooks,
         TimeProvider time,
         CancellationToken ct)
     {
@@ -345,6 +369,13 @@ public static class PublicEndpoints
 
         var now = time.GetUtcNow();
         await audit.AppendAsync(new AuditEvent("deactivate", machine.LicenseId, null, machine.Fingerprint, now, "Machine deactivated"), ct).ConfigureAwait(false);
+
+        await webhooks.PublishEventAsync("machine.deactivated", new
+        {
+            activationId = machine.Id,
+            licenseId = machine.LicenseId,
+            fingerprint = machine.Fingerprint
+        }, null, ct).ConfigureAwait(false);
 
         return TypedResults.NoContent();
     }

@@ -39,7 +39,8 @@ async function refreshAllData() {
         loadDashboardKPIs(),
         loadLicenses(),
         loadSigningKeys(),
-        loadAuditLogs()
+        loadAuditLogs(),
+        loadWebhooks()
     ]);
 }
 
@@ -579,3 +580,179 @@ function escapeHtml(str) {
         .replace(/"/g, "&quot;")
         .replace(/'/g, "&#039;");
 }
+
+// Load Webhooks
+async function loadWebhooks() {
+    const tbody = document.getElementById("webhooks-table-body");
+    if (!tbody) return;
+
+    try {
+        const res = await fetch("/admin/v1/webhooks");
+        if (!res.ok) throw new Error("Chyba pri načítaní webhookov");
+        const list = await res.json();
+
+        if (!list || list.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="5" style="text-align: center; color: var(--text-muted); padding: 24px;">Žiadne aktívne webhooky. Kliknite na "+ Pridať Webhook".</td></tr>`;
+            return;
+        }
+
+        tbody.innerHTML = list.map(wh => {
+            const eventsHtml = (wh.events || ["*"]).map(e => `<span class="badge badge-info" style="margin-right: 4px;">${escapeHtml(e)}</span>`).join("");
+            const statusBadge = wh.isActive
+                ? `<span class="badge badge-active">Aktívny</span>`
+                : `<span class="badge badge-revoked">Neaktívny</span>`;
+            const createdDate = new Date(wh.createdAt).toLocaleString("sk-SK");
+
+            return `
+                <tr>
+                    <td><code style="color: var(--accent-indigo); font-size: 13px;">${escapeHtml(wh.url)}</code></td>
+                    <td>${eventsHtml}</td>
+                    <td>${statusBadge}</td>
+                    <td style="color: var(--text-secondary); font-size: 13px;">${createdDate}</td>
+                    <td>
+                        <button class="btn btn-secondary btn-sm" onclick="testWebhookPing('${wh.id}')" title="Odošle test.ping udalosť">⚡ Test</button>
+                        <button class="btn btn-secondary btn-sm" onclick="viewWebhookDeliveries('${wh.id}', '${escapeHtml(wh.url)}')" title="História doručení">📜 História</button>
+                        <button class="btn btn-danger btn-sm" onclick="deleteWebhookPrompt('${wh.id}')" title="Zmazať webhook">🗑️</button>
+                    </td>
+                </tr>
+            `;
+        }).join("");
+    } catch (err) {
+        tbody.innerHTML = `<tr><td colspan="5" style="text-align: center; color: var(--accent-rose); padding: 24px;">${escapeHtml(err.message)}</td></tr>`;
+    }
+}
+
+// Create Webhook Form & Event Handlers
+document.addEventListener("DOMContentLoaded", () => {
+    document.getElementById("form-create-webhook")?.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const url = document.getElementById("wh-url").value.trim();
+        const secret = document.getElementById("wh-secret").value.trim() || null;
+
+        const isAll = document.getElementById("wh-ev-all")?.checked ?? true;
+        let events = ["*"];
+        if (!isAll) {
+            const checked = Array.from(document.querySelectorAll(".wh-ev-item:checked")).map(el => el.value);
+            events = checked.length > 0 ? checked : ["*"];
+        }
+
+        try {
+            const res = await fetch("/admin/v1/webhooks", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ url, secret, events })
+            });
+
+            if (res.ok) {
+                showToast("Webhook úspešne pridaný!", "success");
+                closeModal("modal-create-webhook");
+                document.getElementById("form-create-webhook").reset();
+                loadWebhooks();
+            } else {
+                const err = await res.text();
+                showToast(`Chyba: ${err}`, "error");
+            }
+        } catch {
+            showToast("Sieťová chyba pri vytváraní webhooku", "error");
+        }
+    });
+
+    document.querySelectorAll(".wh-ev-item").forEach(cb => {
+        cb.addEventListener("change", () => {
+            if (cb.checked) {
+                const allCb = document.getElementById("wh-ev-all");
+                if (allCb) allCb.checked = false;
+            }
+        });
+    });
+    document.getElementById("wh-ev-all")?.addEventListener("change", (e) => {
+        if (e.target.checked) {
+            document.querySelectorAll(".wh-ev-item").forEach(cb => cb.checked = false);
+        }
+    });
+});
+
+// Test Webhook Ping
+async function testWebhookPing(id) {
+    showToast("Odosielam testovací ping...", "info");
+    try {
+        const res = await fetch(`/admin/v1/webhooks/${encodeURIComponent(id)}/test`, {
+            method: "POST"
+        });
+        const result = await res.json();
+        if (result.success) {
+            showToast(`✅ Ping úspešný! HTTP ${result.statusCode} (${result.elapsedMilliseconds} ms)`, "success");
+        } else {
+            showToast(`❌ Ping zlyhal: ${result.error || `HTTP ${result.statusCode}`}`, "error");
+        }
+    } catch {
+        showToast("Chyba pri volaní test pingu", "error");
+    }
+}
+
+// View Webhook Deliveries
+async function viewWebhookDeliveries(id, url) {
+    const titleEl = document.getElementById("deliveries-modal-title");
+    if (titleEl) titleEl.textContent = `História Doručení: ${url}`;
+
+    const tbody = document.getElementById("deliveries-table-body");
+    if (tbody) tbody.innerHTML = `<tr><td colspan="5" style="text-align: center; color: var(--text-muted); padding: 16px;">Načítavam históriu...</td></tr>`;
+    openModal("modal-webhook-deliveries");
+
+    try {
+        const res = await fetch(`/admin/v1/webhooks/${encodeURIComponent(id)}/deliveries`);
+        if (!res.ok) throw new Error("Chyba načítania doručení");
+        const list = await res.json();
+
+        if (!list || list.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="5" style="text-align: center; color: var(--text-muted); padding: 16px;">Zatiaľ neboli zaznamenané žiadne pokusy o doručenie.</td></tr>`;
+            return;
+        }
+
+        tbody.innerHTML = list.map(d => {
+            const statusBadge = d.status === "delivered"
+                ? `<span class="badge badge-active">Doručené</span>`
+                : `<span class="badge badge-revoked">Zlyhalo</span>`;
+            const codeBadge = d.statusCode
+                ? `<span class="badge badge-info">${d.statusCode}</span>`
+                : `<span style="color: var(--text-muted);">-</span>`;
+            const timeStr = new Date(d.createdAt).toLocaleTimeString("sk-SK");
+            const info = d.lastError
+                ? `<span style="color: var(--accent-rose); font-size: 11px;">${escapeHtml(d.lastError)}</span>`
+                : `<span style="color: var(--text-secondary); font-size: 11px;">${timeStr}</span>`;
+
+            return `
+                <tr>
+                    <td><strong style="color: var(--accent-indigo);">${escapeHtml(d.eventType)}</strong></td>
+                    <td>${statusBadge}</td>
+                    <td>${codeBadge}</td>
+                    <td>${d.attempts}</td>
+                    <td>${info}</td>
+                </tr>
+            `;
+        }).join("");
+    } catch (err) {
+        tbody.innerHTML = `<tr><td colspan="5" style="text-align: center; color: var(--accent-rose); padding: 16px;">${escapeHtml(err.message)}</td></tr>`;
+    }
+}
+
+// Delete Webhook Prompt
+async function deleteWebhookPrompt(id) {
+    if (!confirm("Naozaj si želáte zmazať tohto webhook odberateľa?")) return;
+
+    try {
+        const res = await fetch(`/admin/v1/webhooks/${encodeURIComponent(id)}`, {
+            method: "DELETE"
+        });
+
+        if (res.ok) {
+            showToast("Webhook bol zmazaný.", "success");
+            loadWebhooks();
+        } else {
+            showToast("Chyba pri mazaní webhooku", "error");
+        }
+    } catch {
+        showToast("Sieťová chyba pri mazaní", "error");
+    }
+}
+

@@ -160,3 +160,36 @@ public sealed record SigningKeyDto(
     string State,
     DateTimeOffset NotBefore,
     DateTimeOffset NotAfter);
+
+#pragma warning disable CA1054, CA1056 // URI-like properties and parameters should not be strings (DTO mapping)
+public sealed record CreateWebhookDto(
+    [Required] string Url,
+    IReadOnlyList<string>? Events,
+    string? Secret);
+
+public sealed record WebhookSubscriptionDto(
+    string Id,
+    string TenantId,
+    string Url,
+    IReadOnlyList<string> Events,
+    bool IsActive,
+    DateTimeOffset CreatedAt);
+#pragma warning restore CA1054, CA1056
+
+public sealed record WebhookDeliveryDto(
+    string Id,
+    string SubscriptionId,
+    string EventType,
+    string Status,
+    int? StatusCode,
+    int Attempts,
+    DateTimeOffset? DeliveredAt,
+    string? LastError,
+    DateTimeOffset CreatedAt);
+
+public sealed record WebhookTestResultDto(
+    bool Success,
+    int? StatusCode,
+    string? ResponseBody,
+    long ElapsedMilliseconds,
+    string? Error);

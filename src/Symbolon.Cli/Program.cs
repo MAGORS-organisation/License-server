@@ -38,6 +38,8 @@ internal static class Program
                 "KEYS" => HandleKeys(args[1..]),
                 "LICENSE" => HandleLicense(args[1..]),
                 "DOCTOR" => await HandleDoctorAsync(args[1..]).ConfigureAwait(false),
+                "IMPORT" => await Commands.MigrationCommands.HandleImportAsync(args[1..]).ConfigureAwait(false),
+                "EXPORT" => await Commands.MigrationCommands.HandleExportAsync(args[1..]).ConfigureAwait(false),
                 _ => UnknownCommand(args[0])
             };
         }
@@ -406,6 +408,8 @@ internal static class Program
               license issue --customer <id> --seats <n> [--out file]
               license inspect <file.symlic>
               doctor [--server <url>]
+              import --file <cesta> --policy <policy-id> [--format <keygen|csv>] [--dry-run]
+              export --out <cesta> [--format <json|csv>]
             """);
     }
 }

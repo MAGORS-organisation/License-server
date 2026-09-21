@@ -13,6 +13,7 @@ public sealed class Tenant
     public ICollection<SigningKeyEntity> SigningKeys { get; set; } = new List<SigningKeyEntity>();
     public ICollection<AuditEventEntity> AuditEvents { get; set; } = new List<AuditEventEntity>();
     public ICollection<RevocationEntity> Revocations { get; set; } = new List<RevocationEntity>();
+    public ICollection<WebhookSubscriptionEntity> WebhookSubscriptions { get; set; } = new List<WebhookSubscriptionEntity>();
 }
 
 public sealed class Product
@@ -199,4 +200,37 @@ public sealed class SigningKeyEntity
     public string State { get; set; } = "active";
 
     public Tenant? Tenant { get; set; }
+}
+
+public sealed class WebhookSubscriptionEntity
+{
+    public string Id { get; set; } = string.Empty;
+    public string TenantId { get; set; } = string.Empty;
+#pragma warning disable CA1056 // URI-like properties should not be strings (EF Core column mapping)
+    public string Url { get; set; } = string.Empty;
+#pragma warning restore CA1056
+    public string Secret { get; set; } = string.Empty;
+    public string EventsJson { get; set; } = "[\"*\"]";
+    public bool IsActive { get; set; } = true;
+    public DateTimeOffset CreatedAt { get; set; }
+
+    public Tenant? Tenant { get; set; }
+    public ICollection<WebhookDeliveryEntity> Deliveries { get; set; } = new List<WebhookDeliveryEntity>();
+}
+
+public sealed class WebhookDeliveryEntity
+{
+    public string Id { get; set; } = string.Empty;
+    public string SubscriptionId { get; set; } = string.Empty;
+    public string EventType { get; set; } = string.Empty;
+    public string PayloadJson { get; set; } = "{}";
+    public string Status { get; set; } = "pending"; // pending, delivered, failed
+    public int? StatusCode { get; set; }
+    public int Attempts { get; set; }
+    public DateTimeOffset? NextAttemptAt { get; set; }
+    public DateTimeOffset? DeliveredAt { get; set; }
+    public string? LastError { get; set; }
+    public DateTimeOffset CreatedAt { get; set; }
+
+    public WebhookSubscriptionEntity? Subscription { get; set; }
 }

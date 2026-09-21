@@ -165,6 +165,7 @@ public static class AdminEndpoints
         CreateLicenseDto dto,
         SymbolonDbContext db,
         IAuditLedger audit,
+        Webhooks.IWebhookDispatcher webhooks,
         TimeProvider time,
         CancellationToken ct)
     {
@@ -216,6 +217,16 @@ public static class AdminEndpoints
         await db.SaveChangesAsync(ct).ConfigureAwait(false);
 
         await audit.AppendAsync(new AuditEvent("license.issued", licenseId, null, null, now, $"Issued license with {seats} seats"), ct).ConfigureAwait(false);
+
+        await webhooks.PublishEventAsync("license.created", new
+        {
+            licenseId = license.Id,
+            policyId = license.PolicyId,
+            tenantId = license.TenantId,
+            customerRef = license.CustomerRef,
+            maxSeats = license.MaxSeats,
+            expiresAt = license.ExpiresAt
+        }, license.TenantId, ct).ConfigureAwait(false);
 
         return TypedResults.Created($"/admin/v1/licenses/{licenseId}", new LicenseResponseDto(
             license.Id,
@@ -270,6 +281,7 @@ public static class AdminEndpoints
         RevokeLicenseDto dto,
         SymbolonDbContext db,
         IAuditLedger audit,
+        Webhooks.IWebhookDispatcher webhooks,
         TimeProvider time,
         CancellationToken ct)
     {
@@ -293,6 +305,14 @@ public static class AdminEndpoints
         await db.SaveChangesAsync(ct).ConfigureAwait(false);
 
         await audit.AppendAsync(new AuditEvent("license.revoked", license.Id, null, null, now, dto.Reason), ct).ConfigureAwait(false);
+
+        await webhooks.PublishEventAsync("license.revoked", new
+        {
+            licenseId = license.Id,
+            tenantId = license.TenantId,
+            reason = dto.Reason,
+            revokedAt = now
+        }, license.TenantId, ct).ConfigureAwait(false);
 
         return TypedResults.Ok(new { message = $"License {id} revoked.", reason = dto.Reason });
     }
@@ -365,6 +385,7 @@ public static class AdminEndpoints
         HttpContext context,
         Security.KeyManager keyManager,
         SymbolonDbContext db,
+        Webhooks.IWebhookDispatcher webhooks,
         CancellationToken ct)
     {
         string tenantId = dto.TenantId
@@ -384,6 +405,15 @@ public static class AdminEndpoints
             entity.State,
             entity.NotBefore,
             entity.NotAfter);
+
+        await webhooks.PublishEventAsync("key.rotated", new
+        {
+            kid = entity.Kid,
+            tenantId = entity.TenantId,
+            alg = entity.Alg,
+            notBefore = entity.NotBefore,
+            notAfter = entity.NotAfter
+        }, entity.TenantId, ct).ConfigureAwait(false);
 
         return TypedResults.Created($"/admin/v1/keys/{entity.Kid}", new { Key = keyDto, Jwk = jwk });
     }

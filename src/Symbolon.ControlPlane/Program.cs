@@ -48,6 +48,8 @@ builder.Services.AddScoped<ISeatStore, EfSeatStore>();
 builder.Services.AddScoped<IAuditLedger, EfAuditLedger>();
 builder.Services.AddScoped<ILeaseTokenIssuer>(sp =>
     new ControlPlaneLeaseTokenIssuer(sp.GetRequiredService<ISignatureProvider>()));
+builder.Services.AddHttpClient();
+builder.Services.AddSingleton<Symbolon.ControlPlane.Webhooks.IWebhookDispatcher, Symbolon.ControlPlane.Webhooks.WebhookDispatcher>();
 builder.Services.AddScoped<LeaseEngine>();
 
 // Rate Limiting (STRIDE T11, T12)
@@ -132,6 +134,7 @@ app.UseRateLimiter();
 // Map Endpoints with Rate Limiting (STRIDE T11, T12)
 app.MapPublicEndpoints().RequireRateLimiting("public-leases");
 app.MapAdminEndpoints().RequireRateLimiting("admin");
+app.MapWebhookEndpoints().RequireRateLimiting("admin");
 app.MapRelaySyncEndpoints().RequireRateLimiting("relay");
 app.MapOfflineEndpoints();
 

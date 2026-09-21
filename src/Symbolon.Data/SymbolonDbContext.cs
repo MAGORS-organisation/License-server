@@ -22,6 +22,8 @@ public class SymbolonDbContext : DbContext
     public DbSet<AuditEventEntity> AuditEvents => Set<AuditEventEntity>();
     public DbSet<RevocationEntity> Revocations => Set<RevocationEntity>();
     public DbSet<SigningKeyEntity> SigningKeys => Set<SigningKeyEntity>();
+    public DbSet<WebhookSubscriptionEntity> WebhookSubscriptions => Set<WebhookSubscriptionEntity>();
+    public DbSet<WebhookDeliveryEntity> WebhookDeliveries => Set<WebhookDeliveryEntity>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -201,6 +203,35 @@ public class SymbolonDbContext : DbContext
             b.HasOne(k => k.Tenant)
              .WithMany(t => t.SigningKeys)
              .HasForeignKey(k => k.TenantId)
+             .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // WebhookSubscription
+        modelBuilder.Entity<WebhookSubscriptionEntity>(b =>
+        {
+            b.ToTable("webhook_subscriptions");
+            b.HasKey(w => w.Id);
+            b.Property(w => w.Url).HasMaxLength(1024).IsRequired();
+            b.Property(w => w.Secret).HasMaxLength(256).IsRequired();
+            b.HasIndex(w => new { w.TenantId, w.IsActive });
+            b.HasOne(w => w.Tenant)
+             .WithMany(t => t.WebhookSubscriptions)
+             .HasForeignKey(w => w.TenantId)
+             .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // WebhookDelivery
+        modelBuilder.Entity<WebhookDeliveryEntity>(b =>
+        {
+            b.ToTable("webhook_deliveries");
+            b.HasKey(d => d.Id);
+            b.Property(d => d.EventType).HasMaxLength(128).IsRequired();
+            b.Property(d => d.Status).HasMaxLength(32).IsRequired();
+            b.HasIndex(d => new { d.SubscriptionId, d.CreatedAt });
+            b.HasIndex(d => new { d.Status, d.NextAttemptAt });
+            b.HasOne(d => d.Subscription)
+             .WithMany(s => s.Deliveries)
+             .HasForeignKey(d => d.SubscriptionId)
              .OnDelete(DeleteBehavior.Cascade);
         });
 

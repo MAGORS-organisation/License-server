@@ -1,0 +1,80 @@
+name: Symbolon CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+permissions:
+  contents: read
+
+jobs:
+  dotnet-tests:
+    name: .NET 10 Build & Tests (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 10 SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Restore Dependencies
+        run: dotnet restore Symbolon.slnx
+
+      - name: Build Solution
+        run: dotnet build Symbolon.slnx --configuration Release --no-restore
+
+      - name: Run Automated Test Suite
+        run: dotnet test Symbolon.slnx --configuration Release --no-build --verbosity normal
+
+  python-sdk-tests:
+    name: Python SDK Verification
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Run Python SDK Unit Tests
+        run: python -m unittest discover sdk/python/symbolon/tests
+
+  rust-sdk-verify:
+    name: Rust SDK Verification
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Rust Toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Verify Rust SDK Compilation
+        run: cargo check --manifest-path sdk/rust/symbolon/Cargo.toml
+
+  c-sdk-build:
+    name: C/C++ SDK Verification
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Compile C SDK and Example
+        run: |
+          gcc -Wall -Wextra -std=c99 -I sdk/c_cpp/include -c sdk/c_cpp/src/symbolon.c -o /tmp/symbolon.o
+          gcc -Wall -Wextra -std=c99 -I sdk/c_cpp/include sdk/c_cpp/examples/main.c /tmp/symbolon.o -o /tmp/sample
