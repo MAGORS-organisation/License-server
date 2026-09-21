@@ -21,48 +21,61 @@ public sealed class EfSeatStore(SymbolonDbContext db) : ISeatStore
         ArgumentNullException.ThrowIfNull(licenseId);
         ArgumentNullException.ThrowIfNull(fingerprint);
 
-        var seats = await db.Seats
-            .Where(s => s.LicenseId == licenseId && s.GrantId == null)
-            .OrderBy(s => s.IsOverage)
-            .ThenBy(s => s.SeatNo)
-            .ToListAsync(ct)
-            .ConfigureAwait(false);
-
-        var candidate = seats.FirstOrDefault(s =>
-            (s.LeaseId == null || s.ExpiresAt < now) &&
-            (s.BorrowedUntil == null || s.BorrowedUntil < now));
-
-        if (candidate is null)
+        const int maxRetries = 3;
+        for (int retry = 0; retry < maxRetries; retry++)
         {
-            return null;
+            var seats = await db.Seats
+                .Where(s => s.LicenseId == licenseId && s.GrantId == null)
+                .OrderBy(s => s.IsOverage)
+                .ThenBy(s => s.SeatNo)
+                .ToListAsync(ct)
+                .ConfigureAwait(false);
+
+            var candidate = seats.FirstOrDefault(s =>
+                (s.LeaseId == null || s.ExpiresAt < now) &&
+                (s.BorrowedUntil == null || s.BorrowedUntil < now));
+
+            if (candidate is null)
+            {
+                return null;
+            }
+
+            string leaseId = $"lse_{Guid.NewGuid():N}";
+            byte[] fpBytes = Encoding.UTF8.GetBytes(fingerprint);
+            var expiresAt = now + ttl;
+
+            candidate.LeaseId = leaseId;
+            candidate.HolderFp = fpBytes;
+            candidate.MachineId = machineId;
+            candidate.AcquiredAt = now;
+            candidate.ExpiresAt = expiresAt;
+            candidate.LeaseSeq = 0;
+
+            try
+            {
+                await db.SaveChangesAsync(ct).ConfigureAwait(false);
+
+                return new SeatAllocation
+                {
+                    SeatId = candidate.Id.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                    SeatNo = candidate.SeatNo,
+                    LicenseId = candidate.LicenseId,
+                    LeaseId = leaseId,
+                    HolderFingerprint = fingerprint,
+                    MachineId = machineId,
+                    AcquiredAt = now,
+                    ExpiresAt = expiresAt,
+                    LeaseSeq = 0,
+                    IsOverage = candidate.IsOverage
+                };
+            }
+            catch (DbUpdateConcurrencyException)
+            {
+                db.ChangeTracker.Clear();
+            }
         }
 
-        string leaseId = $"lse_{Guid.NewGuid():N}";
-        byte[] fpBytes = Encoding.UTF8.GetBytes(fingerprint);
-        var expiresAt = now + ttl;
-
-        candidate.LeaseId = leaseId;
-        candidate.HolderFp = fpBytes;
-        candidate.MachineId = machineId;
-        candidate.AcquiredAt = now;
-        candidate.ExpiresAt = expiresAt;
-        candidate.LeaseSeq = 0;
-
-        await db.SaveChangesAsync(ct).ConfigureAwait(false);
-
-        return new SeatAllocation
-        {
-            SeatId = candidate.Id.ToString(System.Globalization.CultureInfo.InvariantCulture),
-            SeatNo = candidate.SeatNo,
-            LicenseId = candidate.LicenseId,
-            LeaseId = leaseId,
-            HolderFingerprint = fingerprint,
-            MachineId = machineId,
-            AcquiredAt = now,
-            ExpiresAt = expiresAt,
-            LeaseSeq = 0,
-            IsOverage = candidate.IsOverage
-        };
+        return null;
     }
 
     public async Task<SeatAllocation[]?> TryAcquireManyAsync(
@@ -82,56 +95,69 @@ public sealed class EfSeatStore(SymbolonDbContext db) : ISeatStore
             return null;
         }
 
-        var seats = await db.Seats
-            .Where(s => s.LicenseId == licenseId && s.GrantId == null)
-            .OrderBy(s => s.IsOverage)
-            .ThenBy(s => s.SeatNo)
-            .ToListAsync(ct)
-            .ConfigureAwait(false);
-
-        var candidates = seats
-            .Where(s => (s.LeaseId == null || s.ExpiresAt < now) &&
-                        (s.BorrowedUntil == null || s.BorrowedUntil < now))
-            .Take(quantity)
-            .ToList();
-
-        if (candidates.Count < quantity)
+        const int maxRetries = 3;
+        for (int retry = 0; retry < maxRetries; retry++)
         {
-            return null;
-        }
+            var seats = await db.Seats
+                .Where(s => s.LicenseId == licenseId && s.GrantId == null)
+                .OrderBy(s => s.IsOverage)
+                .ThenBy(s => s.SeatNo)
+                .ToListAsync(ct)
+                .ConfigureAwait(false);
 
-        string leaseId = $"lse_{Guid.NewGuid():N}";
-        byte[] fpBytes = Encoding.UTF8.GetBytes(fingerprint);
-        var expiresAt = now + ttl;
-        var allocations = new SeatAllocation[quantity];
+            var candidates = seats
+                .Where(s => (s.LeaseId == null || s.ExpiresAt < now) &&
+                            (s.BorrowedUntil == null || s.BorrowedUntil < now))
+                .Take(quantity)
+                .ToList();
 
-        for (int i = 0; i < quantity; i++)
-        {
-            var seat = candidates[i];
-            seat.LeaseId = leaseId;
-            seat.HolderFp = fpBytes;
-            seat.MachineId = machineId;
-            seat.AcquiredAt = now;
-            seat.ExpiresAt = expiresAt;
-            seat.LeaseSeq = 0;
-
-            allocations[i] = new SeatAllocation
+            if (candidates.Count < quantity)
             {
-                SeatId = seat.Id.ToString(System.Globalization.CultureInfo.InvariantCulture),
-                SeatNo = seat.SeatNo,
-                LicenseId = seat.LicenseId,
-                LeaseId = leaseId,
-                HolderFingerprint = fingerprint,
-                MachineId = machineId,
-                AcquiredAt = now,
-                ExpiresAt = expiresAt,
-                LeaseSeq = 0,
-                IsOverage = seat.IsOverage
-            };
+                return null;
+            }
+
+            string leaseId = $"lse_{Guid.NewGuid():N}";
+            byte[] fpBytes = Encoding.UTF8.GetBytes(fingerprint);
+            var expiresAt = now + ttl;
+            var allocations = new SeatAllocation[quantity];
+
+            for (int i = 0; i < quantity; i++)
+            {
+                var seat = candidates[i];
+                seat.LeaseId = leaseId;
+                seat.HolderFp = fpBytes;
+                seat.MachineId = machineId;
+                seat.AcquiredAt = now;
+                seat.ExpiresAt = expiresAt;
+                seat.LeaseSeq = 0;
+
+                allocations[i] = new SeatAllocation
+                {
+                    SeatId = seat.Id.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                    SeatNo = seat.SeatNo,
+                    LicenseId = seat.LicenseId,
+                    LeaseId = leaseId,
+                    HolderFingerprint = fingerprint,
+                    MachineId = machineId,
+                    AcquiredAt = now,
+                    ExpiresAt = expiresAt,
+                    LeaseSeq = 0,
+                    IsOverage = seat.IsOverage
+                };
+            }
+
+            try
+            {
+                await db.SaveChangesAsync(ct).ConfigureAwait(false);
+                return allocations;
+            }
+            catch (DbUpdateConcurrencyException)
+            {
+                db.ChangeTracker.Clear();
+            }
         }
 
-        await db.SaveChangesAsync(ct).ConfigureAwait(false);
-        return allocations;
+        return null;
     }
 
     public async Task<RenewOutcome> TryRenewAsync(
@@ -215,6 +241,8 @@ public sealed class EfSeatStore(SymbolonDbContext db) : ISeatStore
             seat.MachineId = null;
             seat.AcquiredAt = null;
             seat.ExpiresAt = null;
+            seat.BorrowedUntil = null;
+            seat.ReservedFor = null;
             seat.LeaseSeq = 0;
         }
 
@@ -251,6 +279,18 @@ public sealed class EfSeatStore(SymbolonDbContext db) : ISeatStore
     {
         string key = $"{licenseId}:{idempotencyKey}";
         IdempotencyCache[key] = (now + ttl, allocations);
+
+        if (IdempotencyCache.Count > 500)
+        {
+            foreach (var kv in IdempotencyCache)
+            {
+                if (kv.Value.ExpiresAt <= now)
+                {
+                    IdempotencyCache.TryRemove(kv.Key, out _);
+                }
+            }
+        }
+
         return Task.CompletedTask;
     }
 

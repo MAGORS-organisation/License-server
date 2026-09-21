@@ -7,7 +7,7 @@ import time
 import urllib.request
 import urllib.error
 from datetime import datetime, timezone
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Union
 
 from .models import LeaseToken, SymbolonException, SeatAllocationDenied
 from .fingerprint import get_hardware_components, compute_canonical_fingerprint
@@ -16,9 +16,10 @@ from .fingerprint import get_hardware_components, compute_canonical_fingerprint
 class SeatLease:
     """Represents an acquired floating seat lease. Supports Python context manager."""
 
-    def __init__(self, client: "SymbolonClient", token: LeaseToken):
+    def __init__(self, client: "SymbolonClient", token: LeaseToken, seq: int = 0):
         self._client = client
         self.token = token
+        self.seq = seq
         self._is_released = False
 
     @property
@@ -67,8 +68,6 @@ class SymbolonClient:
         self.timeout = timeout
 
         self._active_leases: Dict[str, threading.Event] = {}
-        self._seq_counter = 1
-        self._lock = threading.Lock()
 
     def acquire_seat(
         self,
@@ -97,22 +96,44 @@ class SymbolonClient:
             entitlements=data.get("entitlements", []),
         )
 
-        lease = SeatLease(self, token)
-        self._start_heartbeat(token.lease_id, components)
+        lease = SeatLease(self, token, seq=data.get("seq", 0))
+        self._start_heartbeat(lease, components)
         return lease
 
-    def renew_seat(self, lease_id: str, components: Dict[str, str]) -> None:
-        """Sends a heartbeat to renew the active lease."""
-        with self._lock:
-            self._seq_counter += 1
-            seq = self._seq_counter
+    def renew_seat(self, lease: Union[SeatLease, str], components: Dict[str, str]) -> dict:
+        """Sends a heartbeat to renew the active lease with strict sequence monotonicity."""
+        if isinstance(lease, SeatLease):
+            lease_id = lease.lease_id
+            seq = lease.seq
+        else:
+            lease_id = str(lease)
+            seq = 0
 
         url = f"{self.server_url}/v1/leases/{lease_id}/renew"
         payload = {
             "clientSeq": seq,
             "fingerprintComponents": components,
         }
-        self._post_json(url, payload)
+        res_data = self._post_json(url, payload)
+
+        if isinstance(lease, SeatLease):
+            if "leaseSeq" in res_data:
+                lease.seq = res_data["leaseSeq"]
+            new_jwt = res_data.get("token") or lease.token.token_jwt
+            new_exp = (
+                datetime.fromisoformat(res_data["expiresAt"].replace("Z", "+00:00"))
+                if "expiresAt" in res_data
+                else lease.token.expires_at
+            )
+            lease.token = LeaseToken(
+                lease_id=lease.token.lease_id,
+                token_jwt=new_jwt,
+                seat_number=lease.token.seat_number,
+                expires_at=new_exp,
+                entitlements=lease.token.entitlements,
+            )
+
+        return res_data
 
     def release_seat(self, lease_id: str) -> None:
         """Frees the seat on the server."""
@@ -124,9 +145,9 @@ class SymbolonClient:
         except Exception:
             pass  # Best effort release
 
-    def _start_heartbeat(self, lease_id: str, components: Dict[str, str]) -> None:
+    def _start_heartbeat(self, lease: SeatLease, components: Dict[str, str]) -> None:
         stop_event = threading.Event()
-        self._active_leases[lease_id] = stop_event
+        self._active_leases[lease.lease_id] = stop_event
 
         def worker():
             while not stop_event.is_set():
@@ -136,11 +157,11 @@ class SymbolonClient:
                 if stop_event.wait(sleep_time):
                     break
                 try:
-                    self.renew_seat(lease_id, components)
+                    self.renew_seat(lease, components)
                 except Exception:
                     pass
 
-        thread = threading.Thread(target=worker, daemon=True, name=f"symbolon-hb-{lease_id}")
+        thread = threading.Thread(target=worker, daemon=True, name=f"symbolon-hb-{lease.lease_id}")
         thread.start()
 
     def _stop_heartbeat(self, lease_id: str) -> None:

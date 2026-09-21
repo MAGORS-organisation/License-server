@@ -117,6 +117,7 @@ public class SymbolonDbContext : DbContext
             b.HasIndex(s => new { s.LicenseId, s.SeatNo }).IsUnique();
             b.HasIndex(s => s.ExpiresAt);
             b.HasIndex(s => s.LeaseId);
+            b.Property(s => s.LeaseId).IsConcurrencyToken();
             b.HasOne(s => s.License)
              .WithMany(l => l.Seats)
              .HasForeignKey(s => s.LicenseId)

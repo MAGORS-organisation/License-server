@@ -95,7 +95,16 @@ public sealed class ApiKeyAuthenticationHandler : AuthenticationHandler<ApiKeyAu
                 continue;
             }
 
-            byte[] storedHash = Convert.FromHexString(key.KeyHash);
+            byte[] storedHash;
+            try
+            {
+                storedHash = Convert.FromHexString(key.KeyHash);
+            }
+            catch (FormatException)
+            {
+                continue;
+            }
+
             if (CryptographicOperations.FixedTimeEquals(providedHash, storedHash))
             {
                 var claims = new[]

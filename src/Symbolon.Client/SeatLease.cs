@@ -193,9 +193,26 @@ public sealed partial class SeatLease : IAsyncDisposable, IDisposable
         }
     }
 
+    private bool _isDisposed;
+    private readonly object _disposeLock = new();
+
     public async ValueTask DisposeAsync()
     {
-        await _cts.CancelAsync().ConfigureAwait(false);
+        lock (_disposeLock)
+        {
+            if (_isDisposed) return;
+            _isDisposed = true;
+        }
+
+        try
+        {
+            await _cts.CancelAsync().ConfigureAwait(false);
+        }
+        catch (ObjectDisposedException)
+        {
+            // already disposed
+        }
+
         if (_heartbeatTask is not null)
         {
             try
@@ -211,15 +228,18 @@ public sealed partial class SeatLease : IAsyncDisposable, IDisposable
         if (LeaseId is not null && _state != SeatState.Released)
         {
             State = SeatState.Released;
-            try
+            if (_http is not null)
             {
-                // Best-effort explicit release call
-                using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(3));
-                await _http.DeleteAsync(new Uri($"v1/leases/{LeaseId}", UriKind.Relative), cts.Token).ConfigureAwait(false);
-            }
-            catch (Exception ex) when (ex is HttpRequestException or TimeoutException or OperationCanceledException)
-            {
-                // Silent ignore on disposal failure
+                try
+                {
+                    // Best-effort explicit release call
+                    using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(3));
+                    await _http.DeleteAsync(new Uri($"v1/leases/{LeaseId}", UriKind.Relative), cts.Token).ConfigureAwait(false);
+                }
+                catch (Exception ex) when (ex is HttpRequestException or TimeoutException or OperationCanceledException)
+                {
+                    // Silent ignore on disposal failure
+                }
             }
         }
 
@@ -228,6 +248,52 @@ public sealed partial class SeatLease : IAsyncDisposable, IDisposable
 
     public void Dispose()
     {
-        DisposeAsync().AsTask().GetAwaiter().GetResult();
+        lock (_disposeLock)
+        {
+            if (_isDisposed) return;
+            _isDisposed = true;
+        }
+
+        try
+        {
+            _cts.Cancel();
+        }
+        catch (ObjectDisposedException)
+        {
+            // already disposed
+        }
+
+        if (_heartbeatTask is not null)
+        {
+            try
+            {
+                // Brief non-deadlocking wait for heartbeat loop exit
+                _heartbeatTask.Wait(TimeSpan.FromMilliseconds(500));
+            }
+            catch (Exception ex) when (ex is OperationCanceledException or TimeoutException or AggregateException)
+            {
+                // ignore
+            }
+        }
+
+        if (LeaseId is not null && _state != SeatState.Released)
+        {
+            State = SeatState.Released;
+            if (_http is not null)
+            {
+                try
+                {
+                    // Synchronous send completely eliminates sync-over-async deadlock risk in UI threads
+                    using var request = new HttpRequestMessage(HttpMethod.Delete, new Uri($"v1/leases/{LeaseId}", UriKind.Relative));
+                    using var response = _http.Send(request);
+                }
+                catch (Exception ex) when (ex is HttpRequestException or TimeoutException or OperationCanceledException or InvalidOperationException)
+                {
+                    // Silent ignore on disposal failure
+                }
+            }
+        }
+
+        _cts.Dispose();
     }
 }

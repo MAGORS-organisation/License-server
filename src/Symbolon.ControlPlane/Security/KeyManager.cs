@@ -13,9 +13,8 @@ public sealed class KeyManager : IDisposable
 {
     private readonly SymbolonDbContext _db;
     private readonly TimeProvider _time;
-    private readonly ConcurrentDictionary<string, ISignatureProvider> _activeProviders = new(StringComparer.Ordinal);
-    private ISignatureProvider? _primarySigningKey;
-    private readonly SemaphoreSlim _lock = new(1, 1);
+    private static readonly ConcurrentDictionary<string, ISignatureProvider> ActiveProviders = new(StringComparer.Ordinal);
+    private static readonly SemaphoreSlim Lock = new(1, 1);
 
     public KeyManager(SymbolonDbContext db, TimeProvider time)
     {
@@ -25,14 +24,9 @@ public sealed class KeyManager : IDisposable
 
     public async Task<ISignatureProvider> GetActiveSigningKeyAsync(CancellationToken ct = default)
     {
-        await _lock.WaitAsync(ct).ConfigureAwait(false);
+        await Lock.WaitAsync(ct).ConfigureAwait(false);
         try
         {
-            if (_primarySigningKey is not null)
-            {
-                return _primarySigningKey;
-            }
-
             var activeKeyEntity = await _db.SigningKeys
                 .Where(k => k.State == "active" && k.Role == "product")
                 .OrderByDescending(k => k.NotBefore)
@@ -79,24 +73,22 @@ public sealed class KeyManager : IDisposable
                 _db.SigningKeys.Add(entity);
                 await _db.SaveChangesAsync(ct).ConfigureAwait(false);
 
-                _activeProviders[kid] = key;
-                _primarySigningKey = key;
+                ActiveProviders[kid] = key;
                 return key;
             }
 
             // In-memory key provider matching active kid
-            if (!_activeProviders.TryGetValue(activeKeyEntity.Kid, out var provider))
+            if (!ActiveProviders.TryGetValue(activeKeyEntity.Kid, out var provider))
             {
                 provider = Es256SignatureProvider.GenerateKey(activeKeyEntity.Kid);
-                _activeProviders[activeKeyEntity.Kid] = provider;
+                ActiveProviders[activeKeyEntity.Kid] = provider;
             }
 
-            _primarySigningKey = provider;
             return provider;
         }
         finally
         {
-            _lock.Release();
+            Lock.Release();
         }
     }
 
@@ -105,7 +97,7 @@ public sealed class KeyManager : IDisposable
         string alg = Alg.Es256,
         CancellationToken ct = default)
     {
-        await _lock.WaitAsync(ct).ConfigureAwait(false);
+        await Lock.WaitAsync(ct).ConfigureAwait(false);
         try
         {
             var now = _time.GetUtcNow();
@@ -163,20 +155,19 @@ public sealed class KeyManager : IDisposable
             _db.SigningKeys.Add(newEntity);
             await _db.SaveChangesAsync(ct).ConfigureAwait(false);
 
-            _activeProviders[kid] = key;
-            _primarySigningKey = key;
+            ActiveProviders[kid] = key;
 
             return (newEntity, jwk);
         }
         finally
         {
-            _lock.Release();
+            Lock.Release();
         }
     }
 
     public async Task<bool> RevokeKeyAsync(string kid, string reason, CancellationToken ct = default)
     {
-        await _lock.WaitAsync(ct).ConfigureAwait(false);
+        await Lock.WaitAsync(ct).ConfigureAwait(false);
         try
         {
             var keyEntity = await _db.SigningKeys
@@ -203,17 +194,16 @@ public sealed class KeyManager : IDisposable
             _db.Revocations.Add(revocation);
             await _db.SaveChangesAsync(ct).ConfigureAwait(false);
 
-            _activeProviders.TryRemove(kid, out _);
-            if (_primarySigningKey?.Kid == kid)
+            if (ActiveProviders.TryRemove(kid, out var removed))
             {
-                _primarySigningKey = null;
+                removed.Dispose();
             }
 
             return true;
         }
         finally
         {
-            _lock.Release();
+            Lock.Release();
         }
     }
 
@@ -262,12 +252,6 @@ public sealed class KeyManager : IDisposable
 
     public void Dispose()
     {
-        _lock.Dispose();
-        _primarySigningKey?.Dispose();
-        foreach (var provider in _activeProviders.Values)
-        {
-            provider.Dispose();
-        }
-        _activeProviders.Clear();
+        // KeyManager is a scoped service; process-wide key cache is managed across scopes.
     }
 }

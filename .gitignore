@@ -32,4 +32,8 @@ Thumbs.db
 appsettings.*.Local.json
 .env
 .env.*
-secrets/
+## Python
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/

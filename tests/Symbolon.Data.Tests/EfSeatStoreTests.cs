@@ -141,4 +141,39 @@ public sealed class EfSeatStoreTests : IDisposable
         Assert.NotNull(secondAlloc);
         Assert.Equal(1, secondAlloc.SeatNo);
     }
+
+    [Fact]
+    public async Task TryRelease_Clears_BorrowedUntil_For_Early_Return()
+    {
+        const string licenseId = "lic_test_borrow_release";
+        await SeedLicenseAsync(licenseId, 1);
+
+        await using var db = new SymbolonDbContext(_options);
+        var store = new EfSeatStore(db);
+        var now = DateTimeOffset.UtcNow;
+        var ttl = TimeSpan.FromDays(7);
+
+        // Acquire seat
+        var alloc = await store.TryAcquireOneAsync(licenseId, "sha256:fp1", "mch1", now, ttl);
+        Assert.NotNull(alloc);
+
+        // Manually mark seat as borrowed for 7 days
+        var seat = await db.Seats.FirstAsync(s => s.LeaseId == alloc.LeaseId);
+        seat.BorrowedUntil = now.AddDays(7);
+        await db.SaveChangesAsync();
+
+        // Client returns borrowed seat early
+        bool released = await store.TryReleaseAsync(alloc.LeaseId!, now.AddDays(1));
+        Assert.True(released);
+
+        // Verify BorrowedUntil is cleared
+        var updatedSeat = await db.Seats.FirstAsync(s => s.LicenseId == licenseId && s.SeatNo == 1);
+        Assert.Null(updatedSeat.BorrowedUntil);
+        Assert.Null(updatedSeat.LeaseId);
+
+        // Another client can acquire immediately even though original borrow period hasn't elapsed
+        var nextAlloc = await store.TryAcquireOneAsync(licenseId, "sha256:fp2", "mch2", now.AddDays(1), TimeSpan.FromHours(1));
+        Assert.NotNull(nextAlloc);
+        Assert.Equal(1, nextAlloc.SeatNo);
+    }
 }
