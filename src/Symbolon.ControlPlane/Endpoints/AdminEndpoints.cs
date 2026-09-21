@@ -38,6 +38,11 @@ public static class AdminEndpoints
         group.MapGet("/audit", GetAuditEventsAsync).WithName("GetAuditEvents");
         group.MapGet("/reports/concurrency", GetConcurrencyReportAsync).WithName("GetConcurrencyReport");
 
+        // Key Management & Rotation
+        group.MapGet("/keys", GetKeysAsync).WithName("GetKeys");
+        group.MapPost("/keys/rotate", RotateKeyAsync).WithName("RotateKey");
+        group.MapPost("/keys/{kid}/revoke", RevokeKeyAsync).WithName("RevokeKey");
+
         return group;
     }
 
@@ -335,5 +340,63 @@ public static class AdminEndpoints
             availableSeats,
             Math.Round(util, 1),
             denials));
+    }
+
+    private static async Task<IResult> GetKeysAsync(
+        Security.KeyManager keyManager,
+        CancellationToken ct)
+    {
+        var keys = await keyManager.GetAllKeysAsync(ct).ConfigureAwait(false);
+        var dtos = keys.Select(k => new SigningKeyDto(
+            k.Id,
+            k.TenantId,
+            k.Kid,
+            k.Alg,
+            k.Role,
+            k.State,
+            k.NotBefore,
+            k.NotAfter)).ToList();
+
+        return TypedResults.Ok(dtos);
+    }
+
+    private static async Task<IResult> RotateKeyAsync(
+        RotateKeyDto dto,
+        HttpContext context,
+        Security.KeyManager keyManager,
+        SymbolonDbContext db,
+        CancellationToken ct)
+    {
+        string tenantId = dto.TenantId
+            ?? context.Request.Headers["X-Tenant-Id"].FirstOrDefault()
+            ?? await db.Tenants.Select(t => t.Id).FirstOrDefaultAsync(ct).ConfigureAwait(false)
+            ?? "default";
+
+        string alg = dto.Alg ?? Crypto.Alg.Es256;
+        var (entity, jwk) = await keyManager.RotateKeyAsync(tenantId, alg, ct).ConfigureAwait(false);
+
+        var keyDto = new SigningKeyDto(
+            entity.Id,
+            entity.TenantId,
+            entity.Kid,
+            entity.Alg,
+            entity.Role,
+            entity.State,
+            entity.NotBefore,
+            entity.NotAfter);
+
+        return TypedResults.Created($"/admin/v1/keys/{entity.Kid}", new { Key = keyDto, Jwk = jwk });
+    }
+
+    private static async Task<IResult> RevokeKeyAsync(
+        string kid,
+        RevokeKeyDto dto,
+        Security.KeyManager keyManager,
+        CancellationToken ct)
+    {
+        bool revoked = await keyManager.RevokeKeyAsync(kid, dto.Reason, ct).ConfigureAwait(false);
+        return revoked
+            ? TypedResults.Ok(new { message = $"Key '{kid}' revoked successfully.", kid, reason = dto.Reason })
+            : TypedResults.NotFound($"Key '{kid}' not found or already revoked.");
     }
 }

@@ -143,3 +143,20 @@ public sealed record ConcurrencyReportDto(
     int AvailableSeats,
     double UtilizationPercentage,
     int DenialsCount);
+
+public sealed record RotateKeyDto(
+    string? TenantId,
+    string? Alg);
+
+public sealed record RevokeKeyDto(
+    [Required] string Reason);
+
+public sealed record SigningKeyDto(
+    string Id,
+    string TenantId,
+    string Kid,
+    string Alg,
+    string Role,
+    string State,
+    DateTimeOffset NotBefore,
+    DateTimeOffset NotAfter);

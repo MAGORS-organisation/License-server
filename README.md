@@ -2,7 +2,7 @@
 
 [![Platform](https://img.shields.io/badge/.NET-10.0%20LTS-512BD4?logo=dotnet)](https://dotnet.microsoft.com/)
 [![Language](https://img.shields.io/badge/C%23-14.0-239120?logo=csharp)](https://learn.microsoft.com/dotnet/csharp/)
-[![Tests](https://img.shields.io/badge/tests-78%20passed-brightgreen)](#výsledky-testovania)
+[![Tests](https://img.shields.io/badge/tests-81%20passed-brightgreen)](#výsledky-testovania)
 [![License: AGPL-3.0](https://img.shields.io/badge/license-AGPL--3.0-blue.svg)](LICENSE)
 [![License: Apache-2.0](https://img.shields.io/badge/client%20SDK-Apache--2.0-blue.svg)](LICENSES/Apache-2.0.txt)
 [![Crypto](https://img.shields.io/badge/cryptography-ES256%20%2B%20ML--DSA--65%20(PQC)-orange)](#kryptografia)
@@ -31,6 +31,10 @@ Rieši to, čo dnešné cloud-first platformy ponúkajú iba ako obmedzený dopl
    - Každá udalosť (checkout, renew, release, borrow, revoke) je zapísaná do nemenného auditného denníka zreťazeného cez `SHA-256(prev_hash + data)`.
 6. **Produkčná Observabilita**
    - Vstavaný Prometheus `/metrics` exporter, Kubernetes liveness/readiness sondy a predpripravený Grafana dashboard.
+7. **Bezpečnosť, mTLS & Správa Podpisových Kľúčov**
+   - Striktná autentifikácia Relay uzlov pomocou API kľúčov a mTLS certifikátov zabraňujúca impersonácii.
+   - Vstavaný ASP.NET Core Rate Limiting (Sliding Window & Fixed Window) chrániaci API pred zneužitím.
+   - Bezvýpadková rotácia kryptografických kľúčov (`/admin/v1/keys/rotate`), okamžitá revokácia a dynamický JWKS filter garantujúci vylúčenie kompromitovaných kľúčov.
 
 ---
 
@@ -93,7 +97,7 @@ cd License-server
 # Zostavenie celého solution
 dotnet build Symbolon.slnx
 
-# Spustenie všetkých 75 unit a integračných testov
+# Spustenie všetkých 81 unit a integračných testov
 dotnet test Symbolon.slnx
 ```
 
@@ -220,11 +224,15 @@ await using (var lease = await client.AcquireSeatAsync(
 - `POST /admin/v1/policies` — definícia licenčných šablón (TTL, grace periódy, borrow limity).
 - `POST /admin/v1/licenses` — vydanie licencie s materializáciou $N$ sedadiel a generovaním Crockford Base32 kľúča.
 - `POST /admin/v1/licenses/{id}/revoke` — okamžitá revokácia licencie.
+- `GET /admin/v1/keys` — inventár podpisových kľúčov (aktívne, deprecované a revokované).
+- `POST /admin/v1/keys/rotate` — bezvýpadková rotácia nového podpisového kľúča (ES256 / hybrid).
+- `POST /admin/v1/keys/{kid}/revoke` — okamžitá revokácia kompromitovaného kľúča a jeho vyradenie z JWKS.
 - `GET /admin/v1/reports/concurrency` — analytika vyťaženia floating licencií a počtu odmietnutí.
 - `GET /admin/v1/audit` — prehľadávanie kryptograficky reťazeného auditného ledgeru.
 
 ### Synchronizačné API pre Relay (`/relay/v1`)
-- `POST /relay/v1/register` — registrácia on-premise relay uzla.
+Endpointy sú zabezpečené autentifikáciou cez hlavičku `X-Relay-Api-Key` a validáciou mTLS klientskeho certifikátu:
+- `POST /relay/v1/register` — registrácia on-premise relay uzla a vystavenie bezpečného API kľúča.
 - `POST /relay/v1/grants:request` — delegovanie kapacity sedadiel (`SeatGrant`) lokálnemu serveru.
 - `POST /relay/v1/usage` — dávkový príjem auditných a telemetrických záznamov z relayov.
 
@@ -282,9 +290,9 @@ Passed!  - Failed: 0, Passed:  7, Skipped: 0, Total:  7 - Symbolon.Relay.Tests.d
 Passed!  - Failed: 0, Passed:  4, Skipped: 0, Total:  4 - Symbolon.Client.Tests.dll
 Passed!  - Failed: 0, Passed:  6, Skipped: 0, Total:  6 - Symbolon.Cli.Tests.dll
 Passed!  - Failed: 0, Passed:  5, Skipped: 0, Total:  5 - Symbolon.Data.Tests.dll
-Passed!  - Failed: 0, Passed:  9, Skipped: 0, Total:  9 - Symbolon.ControlPlane.Tests.dll
+Passed!  - Failed: 0, Passed: 12, Skipped: 0, Total: 12 - Symbolon.ControlPlane.Tests.dll
 
-Celkovo: 78 úspešných testov, 0 zlyhaní, 0 chýb. Trvanie: ~6 sekúnd.
+Celkovo: 81 úspešných testov, 0 zlyhaní, 0 chýb. Trvanie: ~6 sekúnd.
 ```
 
 ---

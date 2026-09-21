@@ -416,10 +416,11 @@ public static class PublicEndpoints
         return TypedResults.Ok(revs);
     }
 
-    private static IResult GetJwks(ISignatureProvider signingKey)
+    private static async Task<IResult> GetJwks(
+        Security.KeyManager keyManager,
+        CancellationToken ct)
     {
-        var jwk = signingKey.ExportPublicJwk();
-        var jwks = new JsonWebKeySetDto { Keys = [jwk] };
+        var jwks = await keyManager.GetPublicJwksAsync(ct).ConfigureAwait(false);
         return TypedResults.Ok(jwks);
     }
 

@@ -1,10 +1,13 @@
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using Symbolon.ControlPlane;
 using Symbolon.ControlPlane.Endpoints;
 using Symbolon.Crypto;
 using Symbolon.Data;
+using Symbolon.Data.Entities;
 using Symbolon.Data.Stores;
 using Symbolon.Domain;
+using System.Threading.RateLimiting;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -40,22 +43,62 @@ builder.Services.AddSingleton<ISignatureProvider>(es256Key);
 // Services
 builder.Services.AddSingleton<TimeProvider>(TimeProvider.System);
 builder.Services.AddSingleton<Symbolon.ControlPlane.Observability.SymbolonMetrics>();
+builder.Services.AddScoped<Symbolon.ControlPlane.Security.KeyManager>();
 builder.Services.AddScoped<ISeatStore, EfSeatStore>();
 builder.Services.AddScoped<IAuditLedger, EfAuditLedger>();
 builder.Services.AddScoped<ILeaseTokenIssuer>(sp =>
     new ControlPlaneLeaseTokenIssuer(sp.GetRequiredService<ISignatureProvider>()));
 builder.Services.AddScoped<LeaseEngine>();
 
+// Rate Limiting (STRIDE T11, T12)
+builder.Services.AddRateLimiter(options =>
+{
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+
+    options.AddFixedWindowLimiter("public-leases", opt =>
+    {
+        opt.PermitLimit = 100;
+        opt.Window = TimeSpan.FromMinutes(1);
+        opt.QueueLimit = 0;
+    });
+
+    options.AddSlidingWindowLimiter("admin", opt =>
+    {
+        opt.PermitLimit = 200;
+        opt.Window = TimeSpan.FromMinutes(1);
+        opt.SegmentsPerWindow = 4;
+        opt.QueueLimit = 0;
+    });
+
+    options.AddFixedWindowLimiter("relay", opt =>
+    {
+        opt.PermitLimit = 120;
+        opt.Window = TimeSpan.FromMinutes(1);
+        opt.QueueLimit = 0;
+    });
+});
+
 // OpenAPI 3.1
 builder.Services.AddOpenApi();
 
 var app = builder.Build();
 
-// Ensure DB is created on startup
+// Ensure DB is created on startup and default tenant seeded
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<SymbolonDbContext>();
     db.Database.EnsureCreated();
+    if (!db.Tenants.Any())
+    {
+        db.Tenants.Add(new Tenant
+        {
+            Id = "ten_default",
+            Slug = "default",
+            Name = "Default Organization",
+            CreatedAt = DateTimeOffset.UtcNow
+        });
+        db.SaveChanges();
+    }
 }
 
 app.MapOpenApi();
@@ -80,10 +123,12 @@ app.MapGet("/health/ready", async (SymbolonDbContext db, CancellationToken ct) =
         : Results.StatusCode(StatusCodes.Status503ServiceUnavailable);
 }).WithTags("Health");
 
-// Map Endpoints
-app.MapPublicEndpoints();
-app.MapAdminEndpoints();
-app.MapRelaySyncEndpoints();
+app.UseRateLimiter();
+
+// Map Endpoints with Rate Limiting (STRIDE T11, T12)
+app.MapPublicEndpoints().RequireRateLimiting("public-leases");
+app.MapAdminEndpoints().RequireRateLimiting("admin");
+app.MapRelaySyncEndpoints().RequireRateLimiting("relay");
 
 app.Run();
 

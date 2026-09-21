@@ -59,11 +59,16 @@ public sealed class RelaySyncApiTests : IClassFixture<ControlPlaneFactory>
         Assert.NotEmpty(relay.ApiKey);
 
         // 3. Request Seat Grant of 4 seats for this relay
-        var grantRes = await _client.PostAsJsonAsync("/relay/v1/grants:request", new RequestSeatGrantDto(
-            relay.RelayId,
-            license!.Id,
-            4,
-            30));
+        var grantReq = new HttpRequestMessage(HttpMethod.Post, "/relay/v1/grants:request")
+        {
+            Content = JsonContent.Create(new RequestSeatGrantDto(
+                relay.RelayId,
+                license!.Id,
+                4,
+                30))
+        };
+        grantReq.Headers.Add("X-Relay-Api-Key", relay.ApiKey);
+        var grantRes = await _client.SendAsync(grantReq);
         Assert.Equal(HttpStatusCode.OK, grantRes.StatusCode);
         var grant = await grantRes.Content.ReadFromJsonAsync<SeatGrantResponseDto>();
         Assert.NotNull(grant);
@@ -71,12 +76,17 @@ public sealed class RelaySyncApiTests : IClassFixture<ControlPlaneFactory>
         Assert.Equal(4, grant.SeatTo - grant.SeatFrom + 1);
 
         // 4. Upload Usage Batch from Relay
-        var usageRes = await _client.PostAsJsonAsync("/relay/v1/usage", new RelayUsageBatchDto(
-            relay.RelayId,
-            [
-                new RelayAuditEventDto("checkout", license.Id, "sha256:fp1", DateTimeOffset.UtcNow, "Seat checkout at branch"),
-                new RelayAuditEventDto("renew", license.Id, "sha256:fp1", DateTimeOffset.UtcNow, "Heartbeat renewal")
-            ]));
+        var usageReq = new HttpRequestMessage(HttpMethod.Post, "/relay/v1/usage")
+        {
+            Content = JsonContent.Create(new RelayUsageBatchDto(
+                relay.RelayId,
+                [
+                    new RelayAuditEventDto("checkout", license.Id, "sha256:fp1", DateTimeOffset.UtcNow, "Seat checkout at branch"),
+                    new RelayAuditEventDto("renew", license.Id, "sha256:fp1", DateTimeOffset.UtcNow, "Heartbeat renewal")
+                ]))
+        };
+        usageReq.Headers.Add("X-Relay-Api-Key", relay.ApiKey);
+        var usageRes = await _client.SendAsync(usageReq);
         Assert.Equal(HttpStatusCode.OK, usageRes.StatusCode);
     }
 }

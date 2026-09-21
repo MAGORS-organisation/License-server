@@ -22,11 +22,14 @@ public static class RelaySyncEndpoints
             .WithName("RegisterRelay")
             .WithSummary("Zaregistruje on-premise relay uzol.");
 
-        group.MapPost("/grants:request", RequestSeatGrantAsync)
+        var protectedGroup = group.MapGroup(string.Empty)
+            .AddEndpointFilter<Security.RelayAuthFilter>();
+
+        protectedGroup.MapPost("/grants:request", RequestSeatGrantAsync)
             .WithName("RequestSeatGrant")
             .WithSummary("Požiada o delegovanú kapacitu sedadiel pre relay.");
 
-        group.MapPost("/usage", UploadUsageBatchAsync)
+        protectedGroup.MapPost("/usage", UploadUsageBatchAsync)
             .WithName("UploadRelayUsage")
             .WithSummary("Dávkový príjem auditných a usage dát z relayu.");
 
@@ -40,9 +43,25 @@ public static class RelaySyncEndpoints
         TimeProvider time,
         CancellationToken ct)
     {
-        string tenantId = context.Request.Headers["X-Tenant-Id"].FirstOrDefault()
-            ?? (await db.Tenants.Select(t => t.Id).FirstOrDefaultAsync(ct).ConfigureAwait(false))
-            ?? "default";
+        string? requestedTenant = context.Request.Headers["X-Tenant-Id"].FirstOrDefault();
+        var tenant = !string.IsNullOrWhiteSpace(requestedTenant)
+            ? await db.Tenants.FirstOrDefaultAsync(t => t.Id == requestedTenant || t.Slug == requestedTenant, ct).ConfigureAwait(false)
+            : await db.Tenants.FirstOrDefaultAsync(ct).ConfigureAwait(false);
+
+        if (tenant is null)
+        {
+            tenant = new Tenant
+            {
+                Id = "ten_default",
+                Slug = "default",
+                Name = "Default Organization",
+                CreatedAt = time.GetUtcNow()
+            };
+            db.Tenants.Add(tenant);
+            await db.SaveChangesAsync(ct).ConfigureAwait(false);
+        }
+
+        string tenantId = tenant.Id;
 
         string relayId = $"rly_{Guid.NewGuid():N}";
         string apiKey = $"rlykey_{Guid.NewGuid():N}";
@@ -66,11 +85,21 @@ public static class RelaySyncEndpoints
 
     private static async Task<IResult> RequestSeatGrantAsync(
         RequestSeatGrantDto dto,
+        HttpContext context,
         SymbolonDbContext db,
         ISignatureProvider signingKey,
         TimeProvider time,
         CancellationToken ct)
     {
+        string? authenticatedRelayId = context.Items["AuthenticatedRelayId"] as string;
+        if (!string.IsNullOrEmpty(authenticatedRelayId) && !string.Equals(authenticatedRelayId, dto.RelayId, StringComparison.Ordinal))
+        {
+            return TypedResults.Problem(
+                statusCode: StatusCodes.Status403Forbidden,
+                title: "Forbidden",
+                detail: "Authenticated relay credentials do not match the requested RelayId.");
+        }
+
         var relay = await db.Relays.FirstOrDefaultAsync(r => r.Id == dto.RelayId, ct).ConfigureAwait(false);
         if (relay is null) return TypedResults.NotFound($"Relay '{dto.RelayId}' not found.");
 
@@ -169,11 +198,21 @@ public static class RelaySyncEndpoints
 
     private static async Task<IResult> UploadUsageBatchAsync(
         RelayUsageBatchDto dto,
+        HttpContext context,
         SymbolonDbContext db,
         IAuditLedger audit,
         TimeProvider time,
         CancellationToken ct)
     {
+        string? authenticatedRelayId = context.Items["AuthenticatedRelayId"] as string;
+        if (!string.IsNullOrEmpty(authenticatedRelayId) && !string.Equals(authenticatedRelayId, dto.RelayId, StringComparison.Ordinal))
+        {
+            return TypedResults.Problem(
+                statusCode: StatusCodes.Status403Forbidden,
+                title: "Forbidden",
+                detail: "Authenticated relay credentials do not match the requested RelayId.");
+        }
+
         var relay = await db.Relays.FirstOrDefaultAsync(r => r.Id == dto.RelayId, ct).ConfigureAwait(false);
         if (relay is not null)
         {
