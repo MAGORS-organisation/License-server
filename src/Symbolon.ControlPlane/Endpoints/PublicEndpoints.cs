@@ -60,6 +60,14 @@ public static class PublicEndpoints
             .WithName("ProcessOfflineRequest")
             .WithSummary("Spracuje offline .symreq požiadavku.");
 
+        group.MapGet("/queue/{ticket}", GetQueueStatusAsync)
+            .WithName("GetQueueStatus")
+            .WithSummary("Zistí aktuálny stav čakajúcej požiadavky vo fronte.");
+
+        group.MapDelete("/queue/{ticket}", CancelQueueAsync)
+            .WithName("CancelQueue")
+            .WithSummary("Zruší požiadavku vo fronte na sedadlo.");
+
         return group;
     }
 
@@ -68,6 +76,7 @@ public static class PublicEndpoints
         HttpContext context,
         SymbolonDbContext db,
         LeaseEngine engine,
+        Queuing.IQueueManager queueManager,
         Webhooks.IWebhookDispatcher webhooks,
         TimeProvider time,
         Observability.SymbolonMetrics metrics,
@@ -96,6 +105,31 @@ public static class PublicEndpoints
                 statusCode: StatusCodes.Status403Forbidden,
                 title: "License Expired",
                 type: ProblemTypes.LicenseNotFound);
+        }
+
+        // Named User Enforcement (§4.3)
+        if (string.Equals(license.Policy?.LicenseModel, "named-user", StringComparison.OrdinalIgnoreCase))
+        {
+            if (string.IsNullOrWhiteSpace(dto.UserId))
+            {
+                return TypedResults.Problem(
+                    statusCode: StatusCodes.Status403Forbidden,
+                    title: "User Identification Required",
+                    detail: "This policy enforces named-user licensing. Parameter 'userId' is required.",
+                    type: ProblemTypes.UserNotAuthorized);
+            }
+
+            bool authorized = await db.LicenseUsers.AnyAsync(
+                u => u.LicenseId == license.Id && (u.UserId == dto.UserId || u.GroupName == dto.UserId), ct).ConfigureAwait(false);
+
+            if (!authorized)
+            {
+                return TypedResults.Problem(
+                    statusCode: StatusCodes.Status403Forbidden,
+                    title: "User Not Authorized",
+                    detail: $"User '{dto.UserId}' is not assigned to this named-user license.",
+                    type: ProblemTypes.UserNotAuthorized);
+            }
         }
 
         string fingerprint = dto.ToFingerprintHash();
@@ -129,13 +163,23 @@ public static class PublicEndpoints
             });
         }
 
-        if (result.QueueTicket is not null)
+        if (result.QueueTicket is not null || (dto.AllowQueue == true && result.Reason == "seat-pool-exhausted"))
         {
-            return TypedResults.Accepted($"/v1/queue/{result.QueueTicket}", new QueuedResponseDto
+            var ticket = await queueManager.EnqueueAsync(
+                license.Id,
+                fingerprint,
+                dto.MachineId,
+                dto.UserId,
+                quantity,
+                dto.Features,
+                ttl: TimeSpan.FromMinutes(10),
+                ct).ConfigureAwait(false);
+
+            return TypedResults.Accepted($"/v1/queue/{ticket.Ticket}", new QueuedResponseDto
             {
-                Ticket = result.QueueTicket,
+                Ticket = ticket.Ticket,
                 Position = 1,
-                EstimatedWait = result.EstimatedWait?.ToString()
+                EstimatedWait = "PT2M"
             });
         }
 
@@ -230,14 +274,23 @@ public static class PublicEndpoints
 
     private static async Task<IResult> ReleaseAsync(
         string id,
+        SymbolonDbContext db,
         LeaseEngine engine,
+        Queuing.IQueueManager queueManager,
         Observability.SymbolonMetrics metrics,
         CancellationToken ct)
     {
+        var seat = await db.Seats.FirstOrDefaultAsync(s => s.LeaseId == id, ct).ConfigureAwait(false);
+        string? licenseId = seat?.LicenseId;
+
         bool released = await engine.ReleaseAsync(id, ct).ConfigureAwait(false);
         if (released)
         {
             metrics.RecordSeatReleased(1);
+            if (!string.IsNullOrWhiteSpace(licenseId))
+            {
+                await queueManager.TryPromoteNextAsync(licenseId, ct).ConfigureAwait(false);
+            }
         }
         return TypedResults.Ok(new ReleaseResponseDto { Success = released });
     }
@@ -458,5 +511,39 @@ public static class PublicEndpoints
     private static IResult ProcessOfflineRequest()
     {
         return TypedResults.Ok(new { status = "received", message = "Offline request processed" });
+    }
+
+    private static async Task<IResult> GetQueueStatusAsync(
+        string ticket,
+        Queuing.IQueueManager queueManager,
+        CancellationToken ct)
+    {
+        var status = await queueManager.GetStatusAsync(ticket, ct).ConfigureAwait(false);
+        if (status is null)
+        {
+            return TypedResults.NotFound();
+        }
+
+        if (status.Status == "expired" || status.Status == "cancelled")
+        {
+            return TypedResults.Problem(
+                statusCode: StatusCodes.Status410Gone,
+                title: "Queue Ticket No Longer Valid",
+                detail: $"Queue ticket '{ticket}' is {status.Status}.",
+                type: ProblemTypes.InvalidRequest);
+        }
+
+        return TypedResults.Ok(status);
+    }
+
+    private static async Task<IResult> CancelQueueAsync(
+        string ticket,
+        Queuing.IQueueManager queueManager,
+        CancellationToken ct)
+    {
+        bool cancelled = await queueManager.CancelAsync(ticket, ct).ConfigureAwait(false);
+        return cancelled
+            ? TypedResults.Ok(new { message = $"Queue ticket {ticket} cancelled.", ticket })
+            : TypedResults.NotFound();
     }
 }

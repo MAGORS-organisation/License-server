@@ -91,6 +91,9 @@ public sealed class LicenseEntity
     public ICollection<SeatEntity> Seats { get; set; } = new List<SeatEntity>();
     public ICollection<MachineEntity> Machines { get; set; } = new List<MachineEntity>();
     public ICollection<SeatGrantEntity> SeatGrants { get; set; } = new List<SeatGrantEntity>();
+    public ICollection<LicenseUserEntity> LicenseUsers { get; set; } = new List<LicenseUserEntity>();
+    public ICollection<QueueTicketEntity> QueueTickets { get; set; } = new List<QueueTicketEntity>();
+    public ICollection<LicenseQuotaEntity> Quotas { get; set; } = new List<LicenseQuotaEntity>();
 }
 
 public sealed class SeatEntity
@@ -233,4 +236,47 @@ public sealed class WebhookDeliveryEntity
     public DateTimeOffset CreatedAt { get; set; }
 
     public WebhookSubscriptionEntity? Subscription { get; set; }
+}
+
+public sealed class LicenseUserEntity
+{
+    public string Id { get; set; } = string.Empty;
+    public string LicenseId { get; set; } = string.Empty;
+    public string UserId { get; set; } = string.Empty;
+    public string? GroupName { get; set; }
+    public DateTimeOffset CreatedAt { get; set; }
+
+    public LicenseEntity? License { get; set; }
+}
+
+public sealed class QueueTicketEntity
+{
+    public string Ticket { get; set; } = string.Empty;
+    public string LicenseId { get; set; } = string.Empty;
+    public string Fingerprint { get; set; } = string.Empty;
+    public string? MachineId { get; set; }
+    public string? UserId { get; set; }
+    public int Quantity { get; set; } = 1;
+    public string FeaturesJson { get; set; } = "[]";
+    public string Status { get; set; } = "waiting"; // waiting, ready, cancelled, expired
+    public string? PromotedLeaseId { get; set; }
+    public string? PromotedToken { get; set; }
+    public DateTimeOffset? PromotedExpiresAt { get; set; }
+    public int? PromotedSeatNo { get; set; }
+    public DateTimeOffset ExpiresAt { get; set; }
+    public DateTimeOffset CreatedAt { get; set; }
+
+    public LicenseEntity? License { get; set; }
+}
+
+public sealed class LicenseQuotaEntity
+{
+    public string Id { get; set; } = string.Empty;
+    public string LicenseId { get; set; } = string.Empty;
+    public string EntitlementCode { get; set; } = string.Empty;
+    public long TotalUnits { get; set; }
+    public long ConsumedUnits { get; set; }
+    public DateTimeOffset UpdatedAt { get; set; }
+
+    public LicenseEntity? License { get; set; }
 }

@@ -193,3 +193,28 @@ public sealed record WebhookTestResultDto(
     string? ResponseBody,
     long ElapsedMilliseconds,
     string? Error);
+
+public sealed record AssignLicenseUserDto(
+    [Required] string UserId,
+    string? GroupName);
+
+public sealed record LicenseUserDto(
+    string Id,
+    string LicenseId,
+    string UserId,
+    string? GroupName,
+    DateTimeOffset CreatedAt);
+
+public sealed record SetLicenseQuotaDto(
+    [Required] string EntitlementCode,
+    [Range(1, 1000000000)] long TotalUnits);
+
+public sealed record LicenseQuotaAdminDto(
+    string Id,
+    string LicenseId,
+    string EntitlementCode,
+    long TotalUnits,
+    long ConsumedUnits,
+    long RemainingUnits,
+    DateTimeOffset UpdatedAt);
+

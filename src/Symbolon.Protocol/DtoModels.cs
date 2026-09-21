@@ -30,6 +30,10 @@ public sealed record CheckoutRequestDto
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? MachineId { get; init; }
 
+    [JsonPropertyName("userId")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? UserId { get; init; }
+
     public string ToFingerprintHash() => FingerprintHelper.ComputeHash(FingerprintComponents);
 }
 
@@ -117,6 +121,57 @@ public sealed record QueuedResponseDto
     public string? EstimatedWait { get; init; }
 }
 
+public sealed record QueueStatusResponseDto
+{
+    [JsonPropertyName("ticket")]
+    public required string Ticket { get; init; }
+
+    [JsonPropertyName("status")]
+    public required string Status { get; init; } // "waiting" | "ready" | "cancelled" | "expired"
+
+    [JsonPropertyName("position")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public int? Position { get; init; }
+
+    [JsonPropertyName("leaseId")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? LeaseId { get; init; }
+
+    [JsonPropertyName("token")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Token { get; init; }
+
+    [JsonPropertyName("seat")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public int? Seat { get; init; }
+
+    [JsonPropertyName("expiresAt")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public DateTimeOffset? ExpiresAt { get; init; }
+}
+
+public sealed record ConsumeQuotaRequestDto
+{
+    [Required]
+    [JsonPropertyName("licenseKey")]
+    public required string LicenseKey { get; init; }
+
+    [Required]
+    [JsonPropertyName("entitlementCode")]
+    public required string EntitlementCode { get; init; }
+
+    [Range(1, 10000000)]
+    [JsonPropertyName("units")]
+    public long Units { get; init; } = 1;
+}
+
+public sealed record QuotaBalanceDto(
+    [property: JsonPropertyName("entitlementCode")] string EntitlementCode,
+    [property: JsonPropertyName("totalUnits")] long TotalUnits,
+    [property: JsonPropertyName("consumedUnits")] long ConsumedUnits,
+    [property: JsonPropertyName("remainingUnits")] long RemainingUnits,
+    [property: JsonPropertyName("updatedAt")] DateTimeOffset UpdatedAt);
+
 public static class ProblemTypes
 {
     public const string LicenseNotFound = "https://symbolon.dev/errors/license-not-found";
@@ -126,4 +181,6 @@ public static class ProblemTypes
     public const string StaleSequence = "https://symbolon.dev/errors/stale-sequence";
     public const string FingerprintMismatch = "https://symbolon.dev/errors/fingerprint-mismatch";
     public const string InvalidRequest = "https://symbolon.dev/errors/invalid-request";
+    public const string UserNotAuthorized = "https://symbolon.dev/errors/user-not-authorized";
+    public const string QuotaExhausted = "https://symbolon.dev/errors/quota-exhausted";
 }

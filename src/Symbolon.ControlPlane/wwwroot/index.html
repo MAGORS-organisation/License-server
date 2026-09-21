@@ -508,6 +508,73 @@
         </div>
     </div>
 
+    <!-- Modal: Named Users & Quotas -->
+    <div class="modal-overlay" id="modal-license-details">
+        <div class="modal-box" style="max-width: 750px;">
+            <div class="modal-header">
+                <div class="modal-title" id="license-details-modal-title">Používatelia &amp; Kreditové Kvóty</div>
+                <button class="modal-close" onclick="closeModal('modal-license-details')">&times;</button>
+            </div>
+            <input type="hidden" id="current-details-license-id">
+
+            <!-- Section 1: Named Users -->
+            <div style="margin-bottom: 24px;">
+                <div style="font-weight: 600; font-size: 14px; margin-bottom: 8px; color: var(--text-primary);">
+                    👤 Menovaní Používatelia &amp; Skupiny (FlexNet Options)
+                </div>
+                <form id="form-assign-user" style="display: flex; gap: 8px; margin-bottom: 12px;">
+                    <input type="text" class="form-control" id="assign-user-id" required placeholder="User ID / Email (napr. ing.kovac@firma.sk)">
+                    <input type="text" class="form-control" id="assign-user-group" placeholder="Skupina (voliteľné)">
+                    <button type="submit" class="btn btn-primary btn-sm" style="white-space: nowrap;">+ Priradiť</button>
+                </form>
+                <table style="width: 100%;">
+                    <thead>
+                        <tr>
+                            <th>User ID</th>
+                            <th>Skupina</th>
+                            <th>Priradený</th>
+                            <th>Akcia</th>
+                        </tr>
+                    </thead>
+                    <tbody id="license-users-table-body">
+                        <tr><td colspan="4" style="text-align: center; color: var(--text-muted); padding: 8px;">Žiadni používatelia</td></tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <hr style="border: 0; border-top: 1px solid var(--border-color); margin: 16px 0;">
+
+            <!-- Section 2: Quotas -->
+            <div>
+                <div style="font-weight: 600; font-size: 14px; margin-bottom: 8px; color: var(--text-primary);">
+                    ⚡ Metered Kredity &amp; Kvóty Entitlementov
+                </div>
+                <form id="form-set-quota" style="display: flex; gap: 8px; margin-bottom: 12px;">
+                    <input type="text" class="form-control" id="quota-entitlement-code" required placeholder="Kód entitlementu (napr. render-minutes)">
+                    <input type="number" class="form-control" id="quota-total-units" required min="1" placeholder="Počet jednotiek (napr. 5000)">
+                    <button type="submit" class="btn btn-primary btn-sm" style="white-space: nowrap;">Nastaviť Kvótu</button>
+                </form>
+                <table style="width: 100%;">
+                    <thead>
+                        <tr>
+                            <th>Entitlement</th>
+                            <th>Celkovo</th>
+                            <th>Vyčerpané</th>
+                            <th>Zostáva</th>
+                        </tr>
+                    </thead>
+                    <tbody id="license-quotas-table-body">
+                        <tr><td colspan="4" style="text-align: center; color: var(--text-muted); padding: 8px;">Žiadne aktívne kvóty</td></tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="modal-footer" style="margin-top: 20px;">
+                <button type="button" class="btn btn-secondary" onclick="closeModal('modal-license-details')">Zavrieť</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Modal: Create Webhook -->
     <div class="modal-overlay" id="modal-create-webhook">
         <div class="modal-box">

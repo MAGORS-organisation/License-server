@@ -24,6 +24,9 @@ public class SymbolonDbContext : DbContext
     public DbSet<SigningKeyEntity> SigningKeys => Set<SigningKeyEntity>();
     public DbSet<WebhookSubscriptionEntity> WebhookSubscriptions => Set<WebhookSubscriptionEntity>();
     public DbSet<WebhookDeliveryEntity> WebhookDeliveries => Set<WebhookDeliveryEntity>();
+    public DbSet<LicenseUserEntity> LicenseUsers => Set<LicenseUserEntity>();
+    public DbSet<QueueTicketEntity> QueueTickets => Set<QueueTicketEntity>();
+    public DbSet<LicenseQuotaEntity> LicenseQuotas => Set<LicenseQuotaEntity>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -232,6 +235,47 @@ public class SymbolonDbContext : DbContext
             b.HasOne(d => d.Subscription)
              .WithMany(s => s.Deliveries)
              .HasForeignKey(d => d.SubscriptionId)
+             .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // LicenseUser
+        modelBuilder.Entity<LicenseUserEntity>(b =>
+        {
+            b.ToTable("license_users");
+            b.HasKey(u => u.Id);
+            b.Property(u => u.UserId).HasMaxLength(256).IsRequired();
+            b.Property(u => u.GroupName).HasMaxLength(128);
+            b.HasIndex(u => new { u.LicenseId, u.UserId }).IsUnique();
+            b.HasOne(u => u.License)
+             .WithMany(l => l.LicenseUsers)
+             .HasForeignKey(u => u.LicenseId)
+             .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // QueueTicket
+        modelBuilder.Entity<QueueTicketEntity>(b =>
+        {
+            b.ToTable("queue_tickets");
+            b.HasKey(q => q.Ticket);
+            b.Property(q => q.Fingerprint).HasMaxLength(128).IsRequired();
+            b.Property(q => q.Status).HasMaxLength(32).IsRequired();
+            b.HasIndex(q => new { q.LicenseId, q.Status, q.CreatedAt });
+            b.HasOne(q => q.License)
+             .WithMany(l => l.QueueTickets)
+             .HasForeignKey(q => q.LicenseId)
+             .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // LicenseQuota
+        modelBuilder.Entity<LicenseQuotaEntity>(b =>
+        {
+            b.ToTable("license_quotas");
+            b.HasKey(q => q.Id);
+            b.Property(q => q.EntitlementCode).HasMaxLength(128).IsRequired();
+            b.HasIndex(q => new { q.LicenseId, q.EntitlementCode }).IsUnique();
+            b.HasOne(q => q.License)
+             .WithMany(l => l.Quotas)
+             .HasForeignKey(q => q.LicenseId)
              .OnDelete(DeleteBehavior.Cascade);
         });
 

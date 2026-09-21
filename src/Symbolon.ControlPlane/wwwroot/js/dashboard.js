@@ -223,6 +223,9 @@ async function loadLicenses() {
                     <td>
                         <div style="display:flex;gap:6px;">
                             ${!isRevoked ? `
+                                <button class="btn btn-secondary btn-sm" onclick="openLicenseDetailsModal('${escapeHtml(l.id)}', '${escapeHtml(l.customer || l.id)}')">
+                                    👤 Používatelia
+                                </button>
                                 <button class="btn btn-secondary btn-sm" onclick="downloadLicenseFile('${escapeHtml(l.licenseKey)}')">
                                     ⬇ .symlic
                                 </button>
@@ -755,4 +758,137 @@ async function deleteWebhookPrompt(id) {
         showToast("Sieťová chyba pri mazaní", "error");
     }
 }
+
+// License Details (Named Users & Quotas) Modal
+function openLicenseDetailsModal(id, name) {
+    document.getElementById("current-details-license-id").value = id;
+    document.getElementById("license-details-modal-title").textContent = `Používatelia & Kvóty: ${name}`;
+    loadLicenseUsers(id);
+    loadLicenseQuotas(id);
+    openModal("modal-license-details");
+}
+
+async function loadLicenseUsers(id) {
+    const tbody = document.getElementById("license-users-table-body");
+    if (!tbody) return;
+
+    try {
+        const res = await fetch(`/admin/v1/licenses/${encodeURIComponent(id)}/users`);
+        if (!res.ok) throw new Error("Chyba načítania");
+        const users = await res.json();
+
+        if (!users || users.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="4" style="text-align: center; color: var(--text-muted); padding: 8px;">Žiadni priradení používatelia (Floating pool prístupný pre všetkých).</td></tr>`;
+            return;
+        }
+
+        tbody.innerHTML = users.map(u => `
+            <tr>
+                <td><code>${escapeHtml(u.userId)}</code></td>
+                <td>${u.groupName ? `<span class="badge badge-info">${escapeHtml(u.groupName)}</span>` : "-"}</td>
+                <td style="font-size: 12px; color: var(--text-secondary);">${new Date(u.createdAt).toLocaleDateString()}</td>
+                <td>
+                    <button class="btn btn-danger btn-sm" onclick="removeLicenseUser('${escapeHtml(id)}', '${escapeHtml(u.userId)}')">Odstrániť</button>
+                </td>
+            </tr>
+        `).join("");
+    } catch {
+        tbody.innerHTML = `<tr><td colspan="4" style="text-align: center; color: var(--accent-rose); padding: 8px;">Chyba pri načítaní používateľov</td></tr>`;
+    }
+}
+
+async function removeLicenseUser(licId, userId) {
+    try {
+        const res = await fetch(`/admin/v1/licenses/${encodeURIComponent(licId)}/users/${encodeURIComponent(userId)}`, {
+            method: "DELETE"
+        });
+        if (res.ok) {
+            showToast("Používateľ odstránený", "success");
+            loadLicenseUsers(licId);
+        } else {
+            showToast("Chyba pri odstraňovaní používateľa", "error");
+        }
+    } catch {
+        showToast("Sieťová chyba", "error");
+    }
+}
+
+async function loadLicenseQuotas(id) {
+    const tbody = document.getElementById("license-quotas-table-body");
+    if (!tbody) return;
+
+    try {
+        const res = await fetch(`/admin/v1/licenses/${encodeURIComponent(id)}/quotas`);
+        if (!res.ok) throw new Error("Chyba načítania");
+        const quotas = await res.json();
+
+        if (!quotas || quotas.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="4" style="text-align: center; color: var(--text-muted); padding: 8px;">Žiadne metered kvóty.</td></tr>`;
+            return;
+        }
+
+        tbody.innerHTML = quotas.map(q => `
+            <tr>
+                <td><strong>${escapeHtml(q.entitlementCode)}</strong></td>
+                <td>${q.totalUnits}</td>
+                <td>${q.consumedUnits}</td>
+                <td><strong style="color: var(--accent-emerald);">${q.remainingUnits}</strong></td>
+            </tr>
+        `).join("");
+    } catch {
+        tbody.innerHTML = `<tr><td colspan="4" style="text-align: center; color: var(--accent-rose); padding: 8px;">Chyba pri načítaní kvót</td></tr>`;
+    }
+}
+
+// Form Handlers for Users & Quotas
+document.addEventListener("DOMContentLoaded", () => {
+    document.getElementById("form-assign-user")?.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const licId = document.getElementById("current-details-license-id").value;
+        const userId = document.getElementById("assign-user-id").value.trim();
+        const groupName = document.getElementById("assign-user-group").value.trim() || null;
+
+        try {
+            const res = await fetch(`/admin/v1/licenses/${encodeURIComponent(licId)}/users`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ userId, groupName })
+            });
+            if (res.ok) {
+                showToast("Používateľ priradený!", "success");
+                document.getElementById("form-assign-user").reset();
+                loadLicenseUsers(licId);
+            } else {
+                showToast("Chyba pri priraďovaní", "error");
+            }
+        } catch {
+            showToast("Sieťová chyba", "error");
+        }
+    });
+
+    document.getElementById("form-set-quota")?.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const licId = document.getElementById("current-details-license-id").value;
+        const entitlementCode = document.getElementById("quota-entitlement-code").value.trim();
+        const totalUnits = parseInt(document.getElementById("quota-total-units").value, 10);
+
+        try {
+            const res = await fetch(`/admin/v1/licenses/${encodeURIComponent(licId)}/quotas`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ entitlementCode, totalUnits })
+            });
+            if (res.ok) {
+                showToast("Kvóta nastavená!", "success");
+                document.getElementById("form-set-quota").reset();
+                loadLicenseQuotas(licId);
+            } else {
+                showToast("Chyba pri nastavovaní kvóty", "error");
+            }
+        } catch {
+            showToast("Sieťová chyba", "error");
+        }
+    });
+});
+
 

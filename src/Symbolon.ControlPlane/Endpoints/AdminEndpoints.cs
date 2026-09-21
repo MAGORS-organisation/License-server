@@ -43,6 +43,15 @@ public static class AdminEndpoints
         group.MapPost("/keys/rotate", RotateKeyAsync).WithName("RotateKey");
         group.MapPost("/keys/{kid}/revoke", RevokeKeyAsync).WithName("RevokeKey");
 
+        // Named Users & Options
+        group.MapPost("/licenses/{id}/users", AssignLicenseUserAsync).WithName("AssignLicenseUser");
+        group.MapGet("/licenses/{id}/users", GetLicenseUsersAsync).WithName("GetLicenseUsers");
+        group.MapDelete("/licenses/{id}/users/{userId}", RemoveLicenseUserAsync).WithName("RemoveLicenseUser");
+
+        // Quotas & Metered Units
+        group.MapPost("/licenses/{id}/quotas", SetLicenseQuotaAsync).WithName("SetLicenseQuota");
+        group.MapGet("/licenses/{id}/quotas", GetLicenseQuotasAsync).WithName("GetLicenseQuotas");
+
         return group;
     }
 
@@ -428,5 +437,124 @@ public static class AdminEndpoints
         return revoked
             ? TypedResults.Ok(new { message = $"Key '{kid}' revoked successfully.", kid, reason = dto.Reason })
             : TypedResults.NotFound($"Key '{kid}' not found or already revoked.");
+    }
+
+    private static async Task<IResult> AssignLicenseUserAsync(
+        string id,
+        AssignLicenseUserDto dto,
+        SymbolonDbContext db,
+        TimeProvider time,
+        CancellationToken ct)
+    {
+        var license = await db.Licenses.FirstOrDefaultAsync(l => l.Id == id, ct).ConfigureAwait(false);
+        if (license is null) return TypedResults.NotFound();
+
+        string userRecordId = $"usr_{Guid.NewGuid():N}";
+        var existing = await db.LicenseUsers.FirstOrDefaultAsync(u => u.LicenseId == id && u.UserId == dto.UserId.Trim(), ct).ConfigureAwait(false);
+        if (existing is not null)
+        {
+            existing.GroupName = dto.GroupName?.Trim();
+            await db.SaveChangesAsync(ct).ConfigureAwait(false);
+            return TypedResults.Ok(new LicenseUserDto(existing.Id, existing.LicenseId, existing.UserId, existing.GroupName, existing.CreatedAt));
+        }
+
+        var user = new LicenseUserEntity
+        {
+            Id = userRecordId,
+            LicenseId = id,
+            UserId = dto.UserId.Trim(),
+            GroupName = dto.GroupName?.Trim(),
+            CreatedAt = time.GetUtcNow()
+        };
+
+        db.LicenseUsers.Add(user);
+        await db.SaveChangesAsync(ct).ConfigureAwait(false);
+
+        return TypedResults.Created($"/admin/v1/licenses/{id}/users/{user.UserId}",
+            new LicenseUserDto(user.Id, user.LicenseId, user.UserId, user.GroupName, user.CreatedAt));
+    }
+
+    private static async Task<IResult> GetLicenseUsersAsync(
+        string id,
+        SymbolonDbContext db,
+        CancellationToken ct)
+    {
+        var users = await db.LicenseUsers
+            .Where(u => u.LicenseId == id)
+            .OrderBy(u => u.CreatedAt)
+            .Select(u => new LicenseUserDto(u.Id, u.LicenseId, u.UserId, u.GroupName, u.CreatedAt))
+            .ToListAsync(ct)
+            .ConfigureAwait(false);
+
+        return TypedResults.Ok(users);
+    }
+
+    private static async Task<IResult> RemoveLicenseUserAsync(
+        string id,
+        string userId,
+        SymbolonDbContext db,
+        CancellationToken ct)
+    {
+        var user = await db.LicenseUsers.FirstOrDefaultAsync(u => u.LicenseId == id && (u.Id == userId || u.UserId == userId), ct).ConfigureAwait(false);
+        if (user is null) return TypedResults.NotFound();
+
+        db.LicenseUsers.Remove(user);
+        await db.SaveChangesAsync(ct).ConfigureAwait(false);
+        return TypedResults.Ok(new { message = $"User {userId} removed from license {id}." });
+    }
+
+    private static async Task<IResult> SetLicenseQuotaAsync(
+        string id,
+        SetLicenseQuotaDto dto,
+        SymbolonDbContext db,
+        TimeProvider time,
+        CancellationToken ct)
+    {
+        var license = await db.Licenses.FirstOrDefaultAsync(l => l.Id == id, ct).ConfigureAwait(false);
+        if (license is null) return TypedResults.NotFound();
+
+        var existing = await db.LicenseQuotas.FirstOrDefaultAsync(q => q.LicenseId == id && q.EntitlementCode == dto.EntitlementCode.Trim(), ct).ConfigureAwait(false);
+        var now = time.GetUtcNow();
+
+        if (existing is not null)
+        {
+            existing.TotalUnits = dto.TotalUnits;
+            existing.UpdatedAt = now;
+            await db.SaveChangesAsync(ct).ConfigureAwait(false);
+            return TypedResults.Ok(new LicenseQuotaAdminDto(
+                existing.Id, existing.LicenseId, existing.EntitlementCode, existing.TotalUnits, existing.ConsumedUnits, existing.TotalUnits - existing.ConsumedUnits, existing.UpdatedAt));
+        }
+
+        var quota = new LicenseQuotaEntity
+        {
+            Id = $"qta_{Guid.NewGuid():N}",
+            LicenseId = id,
+            EntitlementCode = dto.EntitlementCode.Trim(),
+            TotalUnits = dto.TotalUnits,
+            ConsumedUnits = 0,
+            UpdatedAt = now
+        };
+
+        db.LicenseQuotas.Add(quota);
+        await db.SaveChangesAsync(ct).ConfigureAwait(false);
+
+        return TypedResults.Created($"/admin/v1/licenses/{id}/quotas", new LicenseQuotaAdminDto(
+            quota.Id, quota.LicenseId, quota.EntitlementCode, quota.TotalUnits, quota.ConsumedUnits, quota.TotalUnits, quota.UpdatedAt));
+    }
+
+    private static async Task<IResult> GetLicenseQuotasAsync(
+        string id,
+        SymbolonDbContext db,
+        CancellationToken ct)
+    {
+        var quotas = await db.LicenseQuotas
+            .Where(q => q.LicenseId == id)
+            .OrderBy(q => q.EntitlementCode)
+            .Select(q => new LicenseQuotaAdminDto(
+                q.Id, q.LicenseId, q.EntitlementCode, q.TotalUnits, q.ConsumedUnits, q.TotalUnits - q.ConsumedUnits, q.UpdatedAt))
+            .ToListAsync(ct)
+            .ConfigureAwait(false);
+
+        return TypedResults.Ok(quotas);
     }
 }
