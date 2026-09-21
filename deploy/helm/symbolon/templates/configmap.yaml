@@ -1,0 +1,9 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "symbolon.fullname" . }}-config
+  labels:
+    {{- include "symbolon.labels" . | nindent 4 }}
+data:
+  ASPNETCORE_ENVIRONMENT: {{ .Values.env.ASPNETCORE_ENVIRONMENT | quote }}
+  ASPNETCORE_HTTP_PORTS: {{ .Values.env.ASPNETCORE_HTTP_PORTS | quote }}

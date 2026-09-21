@@ -39,6 +39,7 @@ builder.Services.AddSingleton<ISignatureProvider>(es256Key);
 
 // Services
 builder.Services.AddSingleton<TimeProvider>(TimeProvider.System);
+builder.Services.AddSingleton<Symbolon.ControlPlane.Observability.SymbolonMetrics>();
 builder.Services.AddScoped<ISeatStore, EfSeatStore>();
 builder.Services.AddScoped<IAuditLedger, EfAuditLedger>();
 builder.Services.AddScoped<ILeaseTokenIssuer>(sp =>
@@ -59,9 +60,25 @@ using (var scope = app.Services.CreateScope())
 
 app.MapOpenApi();
 
-// Health endpoint
+// Observability & Metrics
+app.MapGet("/metrics", (Symbolon.ControlPlane.Observability.SymbolonMetrics metrics) =>
+    Results.Content(metrics.GeneratePrometheusMetrics(), "text/plain; version=0.0.4"))
+   .WithTags("Observability");
+
+// Health endpoints
 app.MapGet("/health", () => Results.Ok(new { status = "healthy", timestamp = DateTimeOffset.UtcNow }))
    .WithTags("Health");
+
+app.MapGet("/health/live", () => Results.Ok(new { status = "alive", timestamp = DateTimeOffset.UtcNow }))
+   .WithTags("Health");
+
+app.MapGet("/health/ready", async (SymbolonDbContext db, CancellationToken ct) =>
+{
+    bool canConnect = await db.Database.CanConnectAsync(ct).ConfigureAwait(false);
+    return canConnect
+        ? Results.Ok(new { status = "ready", database = "connected", timestamp = DateTimeOffset.UtcNow })
+        : Results.StatusCode(StatusCodes.Status503ServiceUnavailable);
+}).WithTags("Health");
 
 // Map Endpoints
 app.MapPublicEndpoints();

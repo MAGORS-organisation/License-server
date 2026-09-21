@@ -1,0 +1,44 @@
+# Stage 1: Build & Publish
+FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
+WORKDIR /app
+
+# Copy configuration files and csproj files for layer caching
+COPY Directory.Build.props Directory.Packages.props ./
+COPY src/Symbolon.Crypto/Symbolon.Crypto.csproj src/Symbolon.Crypto/
+COPY src/Symbolon.Format/Symbolon.Format.csproj src/Symbolon.Format/
+COPY src/Symbolon.Protocol/Symbolon.Protocol.csproj src/Symbolon.Protocol/
+COPY src/Symbolon.Domain/Symbolon.Domain.csproj src/Symbolon.Domain/
+COPY src/Symbolon.Relay/Symbolon.Relay.csproj src/Symbolon.Relay/
+
+RUN dotnet restore src/Symbolon.Relay/Symbolon.Relay.csproj
+
+# Copy source files
+COPY src/Symbolon.Crypto/ src/Symbolon.Crypto/
+COPY src/Symbolon.Format/ src/Symbolon.Format/
+COPY src/Symbolon.Protocol/ src/Symbolon.Protocol/
+COPY src/Symbolon.Domain/ src/Symbolon.Domain/
+COPY src/Symbolon.Relay/ src/Symbolon.Relay/
+
+RUN dotnet publish src/Symbolon.Relay/Symbolon.Relay.csproj \
+    -c Release \
+    -o /out \
+    --no-restore
+
+# Stage 2: Runtime
+FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS runtime
+WORKDIR /app
+
+# Create directory for sqlite database with write permissions
+RUN mkdir -p /app/data && chown -R $APP_UID:$APP_UID /app/data
+
+USER $APP_UID
+
+COPY --from=build /out .
+
+ENV ASPNETCORE_HTTP_PORTS=8081 \
+    ASPNETCORE_ENVIRONMENT=Production \
+    Database__ConnectionString="Data Source=/app/data/symbolon-relay.db"
+
+EXPOSE 8081
+
+ENTRYPOINT ["dotnet", "Symbolon.Relay.dll"]

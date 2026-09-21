@@ -1,0 +1,11 @@
+apiVersion: 1
+
+providers:
+  - name: 'Symbolon Dashboards'
+    orgId: 1
+    folder: 'Symbolon'
+    type: file
+    disableDeletion: false
+    editable: true
+    options:
+      path: /var/lib/grafana/dashboards

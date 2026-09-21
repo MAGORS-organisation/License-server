@@ -69,6 +69,7 @@ public static class PublicEndpoints
         SymbolonDbContext db,
         LeaseEngine engine,
         TimeProvider time,
+        Observability.SymbolonMetrics metrics,
         CancellationToken ct)
     {
         string? idempotencyKey = context.Request.Headers["Idempotency-Key"].FirstOrDefault();
@@ -114,6 +115,7 @@ public static class PublicEndpoints
 
         if (result.IsSuccess && result.Allocations is { Count: > 0 } && result.Tokens is { Count: > 0 })
         {
+            metrics.RecordSeatAcquired(quantity);
             var alloc = result.Allocations[0];
             var entitlements = dto.Features ?? ["core"];
             return TypedResults.Ok(new CheckoutResponseDto
@@ -136,6 +138,7 @@ public static class PublicEndpoints
             });
         }
 
+        metrics.RecordCheckoutDenied(license.Id);
         if (result.Reason == "seat-pool-exhausted")
         {
             return TypedResults.Problem(
@@ -155,6 +158,7 @@ public static class PublicEndpoints
         string id,
         RenewRequestDto dto,
         LeaseEngine engine,
+        Observability.SymbolonMetrics metrics,
         CancellationToken ct)
     {
         string? fp = dto.ResolveFingerprintHash();
@@ -177,6 +181,7 @@ public static class PublicEndpoints
 
         if (result.IsSuccess && result.Allocation is not null && result.Token is not null)
         {
+            metrics.RecordLeaseRenewed();
             return TypedResults.Ok(new RenewResponseDto
             {
                 Token = result.Token,
@@ -213,9 +218,14 @@ public static class PublicEndpoints
     private static async Task<IResult> ReleaseAsync(
         string id,
         LeaseEngine engine,
+        Observability.SymbolonMetrics metrics,
         CancellationToken ct)
     {
         bool released = await engine.ReleaseAsync(id, ct).ConfigureAwait(false);
+        if (released)
+        {
+            metrics.RecordSeatReleased(1);
+        }
         return TypedResults.Ok(new ReleaseResponseDto { Success = released });
     }
 

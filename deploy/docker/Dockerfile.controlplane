@@ -1,0 +1,43 @@
+# Stage 1: Build & Publish
+FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
+WORKDIR /app
+
+# Copy configuration files and csproj files for layer caching
+COPY Directory.Build.props Directory.Packages.props ./
+COPY src/Symbolon.Crypto/Symbolon.Crypto.csproj src/Symbolon.Crypto/
+COPY src/Symbolon.Format/Symbolon.Format.csproj src/Symbolon.Format/
+COPY src/Symbolon.Protocol/Symbolon.Protocol.csproj src/Symbolon.Protocol/
+COPY src/Symbolon.Domain/Symbolon.Domain.csproj src/Symbolon.Domain/
+COPY src/Symbolon.Data/Symbolon.Data.csproj src/Symbolon.Data/
+COPY src/Symbolon.ControlPlane/Symbolon.ControlPlane.csproj src/Symbolon.ControlPlane/
+
+RUN dotnet restore src/Symbolon.ControlPlane/Symbolon.ControlPlane.csproj
+
+# Copy source files
+COPY src/Symbolon.Crypto/ src/Symbolon.Crypto/
+COPY src/Symbolon.Format/ src/Symbolon.Format/
+COPY src/Symbolon.Protocol/ src/Symbolon.Protocol/
+COPY src/Symbolon.Domain/ src/Symbolon.Domain/
+COPY src/Symbolon.Data/ src/Symbolon.Data/
+COPY src/Symbolon.ControlPlane/ src/Symbolon.ControlPlane/
+
+RUN dotnet publish src/Symbolon.ControlPlane/Symbolon.ControlPlane.csproj \
+    -c Release \
+    -o /out \
+    --no-restore
+
+# Stage 2: Runtime
+FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS runtime
+WORKDIR /app
+
+# Run as non-root user
+USER $APP_UID
+
+COPY --from=build /out .
+
+ENV ASPNETCORE_HTTP_PORTS=8080 \
+    ASPNETCORE_ENVIRONMENT=Production
+
+EXPOSE 8080
+
+ENTRYPOINT ["dotnet", "Symbolon.ControlPlane.dll"]

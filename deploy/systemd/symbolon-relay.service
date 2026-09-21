@@ -1,0 +1,35 @@
+[Unit]
+Description=Symbolon License Relay Server
+Documentation=https://github.com/MAGORS-organisation/License-server
+After=network.target network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=symbolon
+Group=symbolon
+WorkingDirectory=/opt/symbolon/relay
+ExecStart=/usr/bin/dotnet /opt/symbolon/relay/Symbolon.Relay.dll
+Restart=always
+RestartSec=5
+
+# Environment configuration
+Environment=ASPNETCORE_ENVIRONMENT=Production
+Environment=ASPNETCORE_HTTP_PORTS=8081
+Environment=Database__ConnectionString=Data Source=/var/lib/symbolon/relay.db
+
+# Security & Sandbox hardening
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+NoNewPrivileges=true
+ReadWritePaths=/var/lib/symbolon
+ProtectKernelTunables=true
+ProtectControlGroups=true
+RestrictRealtime=true
+
+# Resource limits
+LimitNOFILE=65535
+
+[Install]
+WantedBy=multi-user.target
