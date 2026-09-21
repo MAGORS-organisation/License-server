@@ -84,6 +84,17 @@ builder.Services.AddRateLimiter(options =>
 // OpenAPI 3.1
 builder.Services.AddOpenApi();
 
+// Authentication & Authorization (STRIDE T8, T10, §9.6)
+builder.Services.AddAuthentication(Symbolon.ControlPlane.Security.ApiKeyAuthenticationOptions.DefaultScheme)
+    .AddScheme<Symbolon.ControlPlane.Security.ApiKeyAuthenticationOptions, Symbolon.ControlPlane.Security.ApiKeyAuthenticationHandler>(
+        Symbolon.ControlPlane.Security.ApiKeyAuthenticationOptions.DefaultScheme, _ => { });
+
+builder.Services.AddAuthorization(options =>
+{
+    options.AddPolicy("SuperAdminOnly", policy => policy.RequireRole("admin:super"));
+    options.AddPolicy("AdminOrAuditor", policy => policy.RequireRole("admin:super", "admin:tenant", "auditor"));
+});
+
 var app = builder.Build();
 
 // Ensure DB is created on startup and default tenant seeded
@@ -130,13 +141,17 @@ app.MapGet("/health/ready", async (SymbolonDbContext db, CancellationToken ct) =
 app.UseDefaultFiles();
 app.UseStaticFiles();
 
+app.UseAuthentication();
+app.UseAuthorization();
 app.UseRateLimiter();
 
 // Map Endpoints with Rate Limiting (STRIDE T11, T12)
 app.MapPublicEndpoints().RequireRateLimiting("public-leases");
 app.MapEntitlementEndpoints().RequireRateLimiting("public-leases");
-app.MapAdminEndpoints().RequireRateLimiting("admin");
-app.MapWebhookEndpoints().RequireRateLimiting("admin");
+app.MapTransparencyEndpoints().RequireRateLimiting("public-leases");
+app.MapAdminEndpoints().RequireAuthorization().RequireRateLimiting("admin");
+app.MapApiKeyEndpoints().RequireAuthorization("SuperAdminOnly").RequireRateLimiting("admin");
+app.MapWebhookEndpoints().RequireAuthorization().RequireRateLimiting("admin");
 app.MapRelaySyncEndpoints().RequireRateLimiting("relay");
 app.MapOfflineEndpoints();
 

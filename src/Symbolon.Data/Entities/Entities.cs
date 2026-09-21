@@ -280,3 +280,19 @@ public sealed class LicenseQuotaEntity
 
     public LicenseEntity? License { get; set; }
 }
+
+public sealed class ApiKeyEntity
+{
+    public string Id { get; set; } = string.Empty;
+    public string TenantId { get; set; } = string.Empty;
+    public string Name { get; set; } = string.Empty;
+    public string KeyHash { get; set; } = string.Empty;
+    public string Prefix { get; set; } = string.Empty;
+    public string Role { get; set; } = "admin:super"; // admin:super, admin:tenant, auditor
+    public DateTimeOffset? ExpiresAt { get; set; }
+    public DateTimeOffset? RevokedAt { get; set; }
+    public DateTimeOffset CreatedAt { get; set; }
+
+    public Tenant? Tenant { get; set; }
+}
+

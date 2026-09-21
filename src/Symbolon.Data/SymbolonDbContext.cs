@@ -27,6 +27,7 @@ public class SymbolonDbContext : DbContext
     public DbSet<LicenseUserEntity> LicenseUsers => Set<LicenseUserEntity>();
     public DbSet<QueueTicketEntity> QueueTickets => Set<QueueTicketEntity>();
     public DbSet<LicenseQuotaEntity> LicenseQuotas => Set<LicenseQuotaEntity>();
+    public DbSet<ApiKeyEntity> ApiKeys => Set<ApiKeyEntity>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -276,6 +277,22 @@ public class SymbolonDbContext : DbContext
             b.HasOne(q => q.License)
              .WithMany(l => l.Quotas)
              .HasForeignKey(q => q.LicenseId)
+             .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // ApiKey
+        modelBuilder.Entity<ApiKeyEntity>(b =>
+        {
+            b.ToTable("api_keys");
+            b.HasKey(k => k.Id);
+            b.Property(k => k.Name).HasMaxLength(256).IsRequired();
+            b.Property(k => k.Prefix).HasMaxLength(32).IsRequired();
+            b.Property(k => k.KeyHash).IsRequired();
+            b.Property(k => k.Role).HasMaxLength(64).IsRequired();
+            b.HasIndex(k => new { k.TenantId, k.Prefix });
+            b.HasOne(k => k.Tenant)
+             .WithMany()
+             .HasForeignKey(k => k.TenantId)
              .OnDelete(DeleteBehavior.Cascade);
         });
 

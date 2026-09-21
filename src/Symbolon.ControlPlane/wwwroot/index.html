@@ -62,6 +62,12 @@
                 </a>
             </li>
             <li class="nav-item">
+                <a class="nav-link" data-view="view-apikeys">
+                    <span class="nav-icon">🛡️</span>
+                    <span>API Kľúče & Merkle Tree</span>
+                </a>
+            </li>
+            <li class="nav-item">
                 <a class="nav-link" data-view="view-system">
                     <span class="nav-icon">⚡</span>
                     <span>API & Diagnostika</span>
@@ -80,6 +86,7 @@
         <header class="topbar">
             <h1 class="page-title" id="page-title">Prehľad</h1>
             <div class="topbar-actions">
+                <button class="btn btn-secondary btn-sm" id="btn-api-key-config" onclick="openModal('modal-auth-config')" title="Nastaviť prístupový API kľúč pre Dashboard">🔑 API Kľúč</button>
                 <div class="health-badge">
                     <div class="pulse-dot"></div>
                     <span id="health-text">Kontrola spojenia...</span>
@@ -362,6 +369,78 @@
                 </div>
             </section>
 
+            <!-- VIEW: API Kľúče & Merkle Tree -->
+            <section id="view-apikeys" class="view-section">
+                <!-- Transparency Log KPI & Root -->
+                <div class="kpi-grid">
+                    <div class="kpi-card" style="grid-column: span 2;">
+                        <div class="kpi-label">
+                            <span>Kryptografický Transparency Root (RFC 6962)</span>
+                            <span>🌲</span>
+                        </div>
+                        <div class="kpi-value" id="transparency-root-hash" style="font-size: 15px; font-family: monospace; word-break: break-all; color: var(--accent-emerald);">Načítavam...</div>
+                        <div class="kpi-subtext" id="transparency-tree-meta">Veľkosť stromu: 0 udalostí · Hashovaný Merkle koreň</div>
+                    </div>
+                    <div class="kpi-card">
+                        <div class="kpi-label">
+                            <span>Správa Stromu</span>
+                            <span>⚡</span>
+                        </div>
+                        <div style="margin-top: 10px;">
+                            <button class="btn btn-secondary btn-sm" onclick="loadTransparencyRoot()">🔄 Obnoviť Merkle Root</button>
+                        </div>
+                        <div class="kpi-subtext">Deterministický SHA-256 strom</div>
+                    </div>
+                </div>
+
+                <!-- API Keys Table Card -->
+                <div class="table-card" style="margin-top: 20px;">
+                    <div class="table-header">
+                        <div>
+                            <div class="table-title">Prístupové API Kľúče & Riadenie Rolí (RBAC)</div>
+                            <div class="table-subtitle">Bezpečné tokeny pre CI/CD pipelines, externé CRM a administrátorov</div>
+                        </div>
+                        <div class="table-actions">
+                            <button class="btn btn-primary btn-sm" onclick="openModal('modal-create-apikey')">+ Vytvoriť API Kľúč</button>
+                        </div>
+                    </div>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Názov / Popis</th>
+                                <th>Prefix Kľúča</th>
+                                <th>Rola (RBAC)</th>
+                                <th>Expirácia</th>
+                                <th>Vytvorený</th>
+                                <th>Akcie</th>
+                            </tr>
+                        </thead>
+                        <tbody id="apikeys-table-body">
+                            <tr>
+                                <td colspan="6" style="text-align: center; color: var(--text-muted); padding: 24px;">Načítavam API kľúče...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Inclusion Proof Verification Card -->
+                <div class="table-card" style="margin-top: 20px;">
+                    <div class="table-header">
+                        <div>
+                            <div class="table-title">Verifikácia Inkluzívneho Dôkazu (Merkle Audit Path)</div>
+                            <div class="table-subtitle">Matematické overenie, že konkrétny záznam v audite nebol zmenený ani sfalšovaný</div>
+                        </div>
+                    </div>
+                    <div style="padding: 20px;">
+                        <div style="display: flex; gap: 10px; max-width: 600px; margin-bottom: 16px;">
+                            <input type="text" class="form-control" id="verify-audit-id" placeholder="Zadajte ID auditnej udalosti (napr. aud_...)">
+                            <button class="btn btn-primary" onclick="verifyAuditInclusion()">Overiť Inklúziu</button>
+                        </div>
+                        <div id="verify-result" style="display: none; padding: 16px; border-radius: 6px; font-family: monospace; font-size: 13px;"></div>
+                    </div>
+                </div>
+            </section>
+
             <!-- VIEW 6: API & Diagnostika -->
             <section id="view-system" class="view-section">
                 <div class="kpi-grid">
@@ -638,6 +717,81 @@
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" onclick="closeModal('modal-webhook-deliveries')">Zavrieť</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Auth Config (API Key) -->
+    <div class="modal-overlay" id="modal-auth-config">
+        <div class="modal-box" style="max-width: 500px;">
+            <div class="modal-header">
+                <div class="modal-title">Konfigurácia Prístupového API Kľúča</div>
+                <button class="modal-close" onclick="closeModal('modal-auth-config')">&times;</button>
+            </div>
+            <div style="padding: 10px 0;">
+                <p style="color: var(--text-secondary); font-size: 13px; line-height: 1.5; margin-bottom: 12px;">
+                    Zadajte API kľúč, ktorý bude odosielaný v hlavičke <code>X-Api-Key</code> pri požiadavkách do Admin API. Kľúč je bezpečne uložený vo vašom prehliadači (localStorage).
+                </p>
+                <div class="form-group">
+                    <label class="form-label" for="cfg-api-key">API Kľúč (sym_adm_...)</label>
+                    <input type="password" class="form-control" id="cfg-api-key" placeholder="sym_adm_xxxxxxxx_xxxxxxxxxxxxxxxx">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="clearApiKey()">Odstrániť Kľúč</button>
+                <button type="button" class="btn btn-primary" onclick="saveApiKey()">Uložiť a Použiť</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Create API Key -->
+    <div class="modal-overlay" id="modal-create-apikey">
+        <div class="modal-box" style="max-width: 500px;">
+            <div class="modal-header">
+                <div class="modal-title">Vytvorenie Nového API Kľúča</div>
+                <button class="modal-close" onclick="closeModal('modal-create-apikey')">&times;</button>
+            </div>
+            <form id="form-create-apikey">
+                <div class="form-group">
+                    <label class="form-label" for="apikey-name">Názov / Účel Tokenu</label>
+                    <input type="text" class="form-control" id="apikey-name" required placeholder="napr. GitHub Actions CI/CD">
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="apikey-role">Rola (RBAC Úroveň Prístupu)</label>
+                    <select class="form-control" id="apikey-role">
+                        <option value="admin:super">admin:super (Úplný prístup ku všetkým entitám a kľúčom)</option>
+                        <option value="admin:tenant">admin:tenant (Správa licencií, produktov a politík)</option>
+                        <option value="auditor">auditor (Len čítanie audit logov a prehľadov)</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="apikey-days">Platnosť (dní, nechajte 0 pre trvalý kľúč)</label>
+                    <input type="number" class="form-control" id="apikey-days" min="0" max="3650" value="90">
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" onclick="closeModal('modal-create-apikey')">Zrušiť</button>
+                    <button type="submit" class="btn btn-primary">Vygenerovať Kľúč</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal: API Key Created Success -->
+    <div class="modal-overlay" id="modal-apikey-success">
+        <div class="modal-box" style="max-width: 550px;">
+            <div class="modal-header">
+                <div class="modal-title">🎉 API Kľúč Bol Úspešne Vytvorený!</div>
+                <button class="modal-close" onclick="closeModal('modal-apikey-success')">&times;</button>
+            </div>
+            <div style="padding: 10px 0;">
+                <p style="color: var(--accent-rose); font-size: 13px; font-weight: 600; margin-bottom: 8px;">
+                    ⚠️ DÔLEŽITÉ: Skopírujte si tento kľúč teraz. Z bezpečnostných dôvodov nebude možné ho znovu zobraziť!
+                </p>
+                <div style="background: rgba(0,0,0,0.3); border: 1px solid var(--border-color); border-radius: 6px; padding: 12px; font-family: monospace; font-size: 14px; word-break: break-all; color: var(--accent-amber); margin-bottom: 12px;" id="generated-apikey-display"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-primary" onclick="copyGeneratedApiKey()">📋 Skopírovať Kľúč</button>
+                <button type="button" class="btn btn-secondary" onclick="closeModal('modal-apikey-success')">Zatvoriť</button>
             </div>
         </div>
     </div>

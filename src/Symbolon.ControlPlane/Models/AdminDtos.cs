@@ -218,3 +218,19 @@ public sealed record LicenseQuotaAdminDto(
     long RemainingUnits,
     DateTimeOffset UpdatedAt);
 
+public sealed record CreateApiKeyDto(
+    [Required, MaxLength(256)] string Name,
+    string Role = "admin:super",
+    DateTimeOffset? ExpiresAt = null);
+
+public sealed record ApiKeyResponseDto(
+    string Id,
+    string TenantId,
+    string Name,
+    string Prefix,
+    string Role,
+    DateTimeOffset? ExpiresAt,
+    DateTimeOffset CreatedAt,
+    string? SecretKey = null);
+
+

@@ -52,6 +52,23 @@ public static class AdminEndpoints
         group.MapPost("/licenses/{id}/quotas", SetLicenseQuotaAsync).WithName("SetLicenseQuota");
         group.MapGet("/licenses/{id}/quotas", GetLicenseQuotasAsync).WithName("GetLicenseQuotas");
 
+        group.AddEndpointFilter(async (invocationContext, next) =>
+        {
+            var http = invocationContext.HttpContext;
+            if (http.User.Identity?.IsAuthenticated == true && http.User.IsInRole("auditor"))
+            {
+                if (!HttpMethods.IsGet(http.Request.Method) && !HttpMethods.IsHead(http.Request.Method) && !HttpMethods.IsOptions(http.Request.Method))
+                {
+                    return Results.Problem(
+                        statusCode: StatusCodes.Status403Forbidden,
+                        title: "Auditor Access Denied",
+                        detail: "Auditor role has read-only permissions and cannot modify resources.",
+                        type: Symbolon.Protocol.ProblemTypes.Forbidden);
+                }
+            }
+            return await next(invocationContext).ConfigureAwait(false);
+        });
+
         return group;
     }
 

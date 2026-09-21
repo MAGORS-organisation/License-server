@@ -1,8 +1,29 @@
 // Symbolon Control Plane - Web Dashboard Client
 
+// Intercept fetch to append API Key header automatically
+const originalFetch = window.fetch;
+window.fetch = function(url, options = {}) {
+    const key = localStorage.getItem("symbolon_api_key");
+    if (key && typeof url === "string" && (url.startsWith("/admin/") || url.startsWith("/v1/"))) {
+        options = { ...options };
+        options.headers = options.headers || {};
+        if (options.headers instanceof Headers) {
+            if (!options.headers.has("X-Api-Key")) {
+                options.headers.set("X-Api-Key", key);
+            }
+        } else if (Array.isArray(options.headers)) {
+            options.headers.push(["X-Api-Key", key]);
+        } else {
+            options.headers["X-Api-Key"] = key;
+        }
+    }
+    return originalFetch(url, options);
+};
+
 document.addEventListener("DOMContentLoaded", () => {
     initNavigation();
     initModals();
+    updateApiKeyButtonState();
     refreshAllData();
 
     // Auto refresh every 15 seconds
@@ -40,7 +61,9 @@ async function refreshAllData() {
         loadLicenses(),
         loadSigningKeys(),
         loadAuditLogs(),
-        loadWebhooks()
+        loadWebhooks(),
+        loadApiKeys(),
+        loadTransparencyRoot()
     ]);
 }
 
@@ -889,6 +912,227 @@ document.addEventListener("DOMContentLoaded", () => {
             showToast("Sieťová chyba", "error");
         }
     });
+
+    document.getElementById("form-create-apikey")?.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const name = document.getElementById("apikey-name").value.trim();
+        const role = document.getElementById("apikey-role").value;
+        const days = parseInt(document.getElementById("apikey-days").value, 10);
+        const expiresAt = days > 0 ? new Date(Date.now() + days * 86400000).toISOString() : null;
+
+        try {
+            const res = await fetch("/admin/v1/api-keys", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ name, role, expiresAt })
+            });
+
+            if (res.ok) {
+                const data = await res.json();
+                closeModal("modal-create-apikey");
+                document.getElementById("form-create-apikey").reset();
+                document.getElementById("generated-apikey-display").textContent = data.secretKey;
+                openModal("modal-apikey-success");
+                loadApiKeys();
+                showToast("API kľúč vygenerovaný!", "success");
+            } else {
+                showToast("Chyba pri vytváraní kľúča", "error");
+            }
+        } catch {
+            showToast("Sieťová chyba", "error");
+        }
+    });
 });
+
+// Auth Config & API Key Storage
+function updateApiKeyButtonState() {
+    const key = localStorage.getItem("symbolon_api_key");
+    const btn = document.getElementById("btn-api-key-config");
+    const input = document.getElementById("cfg-api-key");
+    if (!btn) return;
+    if (key) {
+        btn.textContent = "🔑 Kľúč (" + key.substring(0, 12) + "...)";
+        btn.classList.remove("btn-secondary");
+        btn.classList.add("btn-primary");
+        if (input) input.value = key;
+    } else {
+        btn.textContent = "🔑 API Kľúč";
+        btn.classList.remove("btn-primary");
+        btn.classList.add("btn-secondary");
+        if (input) input.value = "";
+    }
+}
+
+function saveApiKey() {
+    const input = document.getElementById("cfg-api-key");
+    const val = input.value.trim();
+    if (!val) {
+        showToast("Zadajte platný API kľúč", "error");
+        return;
+    }
+    localStorage.setItem("symbolon_api_key", val);
+    updateApiKeyButtonState();
+    closeModal("modal-auth-config");
+    showToast("API kľúč bol uložený!", "success");
+    refreshAllData();
+}
+
+function clearApiKey() {
+    localStorage.removeItem("symbolon_api_key");
+    updateApiKeyButtonState();
+    closeModal("modal-auth-config");
+    showToast("API kľúč bol odstránený", "info");
+    refreshAllData();
+}
+
+function copyGeneratedApiKey() {
+    const text = document.getElementById("generated-apikey-display").textContent;
+    if (text) {
+        navigator.clipboard.writeText(text);
+        showToast("API kľúč skopírovaný do schránky!", "success");
+    }
+}
+
+// API Keys Table & Management
+async function loadApiKeys() {
+    const tbody = document.getElementById("apikeys-table-body");
+    if (!tbody) return;
+
+    try {
+        const res = await fetch("/admin/v1/api-keys");
+        if (!res.ok) {
+            tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; color: var(--accent-rose); padding: 16px;">Prístup zamietnutý alebo chyba načítania (${res.status})</td></tr>`;
+            return;
+        }
+
+        const keys = await res.json();
+        if (keys.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; color: var(--text-muted); padding: 16px;">Žiadne aktívne API kľúče.</td></tr>`;
+            return;
+        }
+
+        tbody.innerHTML = keys.map(k => {
+            const roleBadge = k.role === "admin:super"
+                ? `<span class="badge badge-rose">super-admin</span>`
+                : k.role === "auditor"
+                    ? `<span class="badge badge-amber">auditor</span>`
+                    : `<span class="badge badge-indigo">tenant-admin</span>`;
+
+            const exp = k.expiresAt ? new Date(k.expiresAt).toLocaleDateString() : "Nikdy";
+            const created = new Date(k.createdAt).toLocaleDateString();
+
+            return `
+                <tr>
+                    <td><strong>${escapeHtml(k.name)}</strong></td>
+                    <td><code>${escapeHtml(k.prefix)}...</code></td>
+                    <td>${roleBadge}</td>
+                    <td>${exp}</td>
+                    <td>${created}</td>
+                    <td>
+                        <button class="btn btn-secondary btn-sm" style="color: var(--accent-rose);" onclick="revokeApiKey('${k.id}')">Revokovať</button>
+                    </td>
+                </tr>
+            `;
+        }).join("");
+    } catch {
+        tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; color: var(--accent-rose); padding: 16px;">Chyba spojenia</td></tr>`;
+    }
+}
+
+async function revokeApiKey(id) {
+    if (!confirm(`Naozaj chcete revokovať API kľúč ${id}?`)) return;
+
+    try {
+        const res = await fetch(`/admin/v1/api-keys/${encodeURIComponent(id)}`, { method: "DELETE" });
+        if (res.ok) {
+            showToast("API kľúč bol revokovaný!", "success");
+            loadApiKeys();
+        } else {
+            showToast("Chyba pri revokácii", "error");
+        }
+    } catch {
+        showToast("Sieťová chyba", "error");
+    }
+}
+
+// Transparency Log & Inclusion Proof
+async function loadTransparencyRoot() {
+    const hashEl = document.getElementById("transparency-root-hash");
+    const metaEl = document.getElementById("transparency-tree-meta");
+    if (!hashEl) return;
+
+    try {
+        const res = await fetch("/v1/transparency/root");
+        if (res.ok) {
+            const data = await res.json();
+            hashEl.textContent = data.rootHash;
+            metaEl.textContent = `Veľkosť stromu: ${data.treeSize} udalostí · Posledná aktualizácia: ${new Date(data.timestamp).toLocaleTimeString()}`;
+        }
+    } catch (err) {
+        console.error("Failed to load transparency root", err);
+    }
+}
+
+async function verifyAuditInclusion() {
+    const input = document.getElementById("verify-audit-id");
+    const resBox = document.getElementById("verify-result");
+    const auditId = input.value.trim();
+
+    if (!auditId) {
+        showToast("Zadajte ID auditnej udalosti", "error");
+        return;
+    }
+
+    resBox.style.display = "block";
+    resBox.style.background = "rgba(255,255,255,0.05)";
+    resBox.style.color = "var(--text-secondary)";
+    resBox.innerHTML = "Získavam inkluzívny dôkaz zo servera...";
+
+    try {
+        const incRes = await fetch(`/v1/transparency/inclusion/${encodeURIComponent(auditId)}`);
+        if (!incRes.ok) {
+            resBox.style.color = "var(--accent-rose)";
+            resBox.innerHTML = `❌ Udalosť ${escapeHtml(auditId)} nebola nájdená v transparency logu.`;
+            return;
+        }
+
+        const proof = await incRes.json();
+
+        // Verify proof with server
+        const verifyRes = await fetch("/v1/transparency/verify", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                leafHash: proof.leafHash,
+                rootHash: proof.rootHash,
+                path: proof.path
+            })
+        });
+
+        const verifyData = await verifyRes.json();
+
+        if (verifyData.isValid) {
+            resBox.style.background = "rgba(16, 185, 129, 0.1)";
+            resBox.style.border = "1px solid var(--accent-emerald)";
+            resBox.style.color = "var(--accent-emerald)";
+            resBox.innerHTML = `
+                <div>✅ <strong>Kryptografický dôkaz je PLATNÝ!</strong></div>
+                <div style="margin-top: 6px;">Audit ID: ${proof.auditId} (index ${proof.leafIndex} z ${proof.treeSize})</div>
+                <div>Leaf Hash: ${proof.leafHash}</div>
+                <div>Merkle Root: ${proof.rootHash}</div>
+                <div>Dĺžka cesty (Audit Path): ${proof.path.length} hashov</div>
+            `;
+        } else {
+            resBox.style.background = "rgba(239, 68, 68, 0.1)";
+            resBox.style.border = "1px solid var(--accent-rose)";
+            resBox.style.color = "var(--accent-rose)";
+            resBox.innerHTML = `❌ Overenie zlyhalo: ${verifyData.message}`;
+        }
+    } catch {
+        resBox.style.color = "var(--accent-rose)";
+        resBox.innerHTML = "❌ Nastala sieťová chyba pri verifikácii.";
+    }
+}
+
 
 

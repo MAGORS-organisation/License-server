@@ -172,6 +172,42 @@ public sealed record QuotaBalanceDto(
     [property: JsonPropertyName("remainingUnits")] long RemainingUnits,
     [property: JsonPropertyName("updatedAt")] DateTimeOffset UpdatedAt);
 
+public sealed record TransparencyProofStepDto(
+    [property: JsonPropertyName("hash")] string Hash,
+    [property: JsonPropertyName("direction")] string Direction);
+
+public sealed record TransparencyRootResponseDto(
+    [property: JsonPropertyName("rootHash")] string RootHash,
+    [property: JsonPropertyName("treeSize")] int TreeSize,
+    [property: JsonPropertyName("timestamp")] DateTimeOffset Timestamp);
+
+public sealed record TransparencyInclusionResponseDto(
+    [property: JsonPropertyName("auditId")] string AuditId,
+    [property: JsonPropertyName("leafIndex")] int LeafIndex,
+    [property: JsonPropertyName("treeSize")] int TreeSize,
+    [property: JsonPropertyName("leafHash")] string LeafHash,
+    [property: JsonPropertyName("rootHash")] string RootHash,
+    [property: JsonPropertyName("path")] IReadOnlyList<TransparencyProofStepDto> Path);
+
+public sealed record VerifyTransparencyProofRequestDto
+{
+    [Required]
+    [JsonPropertyName("leafHash")]
+    public required string LeafHash { get; init; }
+
+    [Required]
+    [JsonPropertyName("rootHash")]
+    public required string RootHash { get; init; }
+
+    [Required]
+    [JsonPropertyName("path")]
+    public required IReadOnlyList<TransparencyProofStepDto> Path { get; init; }
+}
+
+public sealed record VerifyTransparencyProofResponseDto(
+    [property: JsonPropertyName("isValid")] bool IsValid,
+    [property: JsonPropertyName("message")] string Message);
+
 public static class ProblemTypes
 {
     public const string LicenseNotFound = "https://symbolon.dev/errors/license-not-found";
@@ -183,4 +219,7 @@ public static class ProblemTypes
     public const string InvalidRequest = "https://symbolon.dev/errors/invalid-request";
     public const string UserNotAuthorized = "https://symbolon.dev/errors/user-not-authorized";
     public const string QuotaExhausted = "https://symbolon.dev/errors/quota-exhausted";
+    public const string Unauthorized = "https://symbolon.dev/errors/unauthorized";
+    public const string Forbidden = "https://symbolon.dev/errors/forbidden";
 }
+
