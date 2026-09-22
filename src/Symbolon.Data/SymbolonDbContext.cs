@@ -32,6 +32,10 @@ public class SymbolonDbContext : DbContext
     public DbSet<ScimGroupEntity> ScimGroups => Set<ScimGroupEntity>();
     public DbSet<ScimGroupMemberEntity> ScimGroupMembers => Set<ScimGroupMemberEntity>();
     public DbSet<SsoProviderEntity> SsoProviders => Set<SsoProviderEntity>();
+    public DbSet<TokenWalletEntity> TokenWallets => Set<TokenWalletEntity>();
+    public DbSet<TokenRateEntity> TokenRates => Set<TokenRateEntity>();
+    public DbSet<TokenReservationEntity> TokenReservations => Set<TokenReservationEntity>();
+    public DbSet<TokenLedgerEntryEntity> TokenLedgerEntries => Set<TokenLedgerEntryEntity>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -360,6 +364,89 @@ public class SymbolonDbContext : DbContext
              .WithMany()
              .HasForeignKey(p => p.TenantId)
              .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // Token Wallet
+        modelBuilder.Entity<TokenWalletEntity>(b =>
+        {
+            b.ToTable("token_wallets");
+            b.HasKey(w => w.Id);
+            b.Property(w => w.Code).HasMaxLength(64).IsRequired();
+            b.Property(w => w.Name).HasMaxLength(256).IsRequired();
+            b.Property(w => w.State).HasMaxLength(32).IsRequired();
+            b.Property(w => w.TotalCredits).HasPrecision(18, 4);
+            b.Property(w => w.Balance).HasPrecision(18, 4);
+            b.Property(w => w.ReservedCredits).HasPrecision(18, 4);
+            b.Property(w => w.OverdraftLimit).HasPrecision(18, 4);
+            b.HasIndex(w => new { w.TenantId, w.Code }).IsUnique();
+            b.HasOne(w => w.Tenant)
+             .WithMany(t => t.TokenWallets)
+             .HasForeignKey(w => w.TenantId)
+             .OnDelete(DeleteBehavior.Cascade);
+            b.HasOne(w => w.License)
+             .WithMany(l => l.TokenWallets)
+             .HasForeignKey(w => w.LicenseId)
+             .OnDelete(DeleteBehavior.SetNull);
+        });
+
+        // Token Rate
+        modelBuilder.Entity<TokenRateEntity>(b =>
+        {
+            b.ToTable("token_rates");
+            b.HasKey(r => r.Id);
+            b.Property(r => r.FeatureCode).HasMaxLength(128).IsRequired();
+            b.Property(r => r.RatePerMinute).HasPrecision(18, 4);
+            b.Property(r => r.RatePerUnit).HasPrecision(18, 4);
+            b.Property(r => r.Description).HasMaxLength(256);
+            b.HasIndex(r => new { r.TenantId, r.ProductId, r.FeatureCode }).IsUnique();
+            b.HasOne(r => r.Tenant)
+             .WithMany(t => t.TokenRates)
+             .HasForeignKey(r => r.TenantId)
+             .OnDelete(DeleteBehavior.Cascade);
+            b.HasOne(r => r.Product)
+             .WithMany(p => p.TokenRates)
+             .HasForeignKey(r => r.ProductId)
+             .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // Token Reservation
+        modelBuilder.Entity<TokenReservationEntity>(b =>
+        {
+            b.ToTable("token_reservations");
+            b.HasKey(r => r.Id);
+            b.Property(r => r.FeatureCode).HasMaxLength(128).IsRequired();
+            b.Property(r => r.ReservedAmount).HasPrecision(18, 4);
+            b.Property(r => r.ConsumedAmount).HasPrecision(18, 4);
+            b.Property(r => r.Status).HasMaxLength(32).IsRequired();
+            b.Property(r => r.IdempotencyKey).HasMaxLength(128);
+            b.HasIndex(r => r.WalletId);
+            b.HasIndex(r => r.IdempotencyKey);
+            b.HasOne(r => r.Wallet)
+             .WithMany(w => w.Reservations)
+             .HasForeignKey(r => r.WalletId)
+             .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // Token Ledger Entry
+        modelBuilder.Entity<TokenLedgerEntryEntity>(b =>
+        {
+            b.ToTable("token_ledger_entries");
+            b.HasKey(e => e.Id);
+            b.Property(e => e.TransactionType).HasMaxLength(32).IsRequired();
+            b.Property(e => e.Amount).HasPrecision(18, 4);
+            b.Property(e => e.BalanceAfter).HasPrecision(18, 4);
+            b.Property(e => e.FeatureCode).HasMaxLength(128);
+            b.Property(e => e.IdempotencyKey).HasMaxLength(128);
+            b.HasIndex(e => e.WalletId);
+            b.HasIndex(e => e.IdempotencyKey);
+            b.HasOne(e => e.Wallet)
+             .WithMany(w => w.LedgerEntries)
+             .HasForeignKey(e => e.WalletId)
+             .OnDelete(DeleteBehavior.Cascade);
+            b.HasOne(e => e.Reservation)
+             .WithMany(r => r.LedgerEntries)
+             .HasForeignKey(e => e.ReservationId)
+             .OnDelete(DeleteBehavior.SetNull);
         });
 
         if (Database.IsSqlite())

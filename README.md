@@ -117,6 +117,13 @@ Rieši to, čo dnešné cloud-first platformy ponúkajú iba ako obmedzený dopl
       - *Tier 3 (Ephemeral Lease Key)*: Efemerálny kľúč pre klastrové uzly a sedadlá (30 dní).
     - **Production Key Safety Guard (§9.3 Pravidlo 4)**: Fail-fast overenie pri štarte servera – odmietnutie štartu v produkčnom prostredí (`ASPNETCORE_ENVIRONMENT=Production`) pri detekcii nezašifrovaných privátnych kľúčov v bežných súboroch či premenných.
     - **CLI & Web TUI**: Príkazy `symbolon kms status`, `symbolon keys envelope`, `symbolon keys hierarchy` a interaktívna vizualizácia reťazca dôvery v Retro FoxPro Web TUI.
+27. **Token & Credit-Based Metered Licensing Engine (Pay-As-You-Go, Token Wallets & Consumption Ledger)**
+    - **Podnikové Účtovanie Spotreby**: Tokenový a kreditový licenčný model pre náročné CAD, FEA simulácie, AI inferenciu a HPC výpočty.
+    - **Multi-Tenant Kreditové Peňaženky (`TokenWallet`)**: Podpora kreditových fondov s konfigurovateľným povoleným prečerpaním (`OverdraftLimit`) a výstrahami pri nízkom zostatku (`ThresholdLowAlert`).
+    - **Flexibilný Sadzobník Jednotiek a Času (`TokenRate`)**: Sadzba za minútu behu (`RatePerMinute`) alebo za výpočtovú jednotku/úlohu (`RatePerUnit`).
+    - **Dvojfázové Rezervovanie Kreditov (2PC)**: Rezervácia pred začatím výpočtu (`reserve`), priebežný heartbeat spotreby s predlžovaním TTL (`heartbeat`), finálne zúčtovanie (`commit`) alebo okamžité uvoľnenie alokácie pri zlyhaní či zrušení úlohy (`rollback`).
+    - **Nemenný Auditný Ledger (`TokenLedgerEntry`)**: Záznam každého pohybu kreditov (credit, reserve, consume, release, refund) s podporou idempotencie.
+    - **CLI & Web / Retro FoxPro TUI**: Príkazy `symbolon tokens wallets|create|credit|rates|set-rate|balance`, nové navigačné menu a dedikované zobrazenie `view-tokens` v riadiacom paneli.
 
 ---
 
@@ -345,22 +352,22 @@ dotnet run --project src/Symbolon.Cli -- doctor --file license.symlic --key ./my
 Všetkých 10 testovacích projektov má 100% úspešnosť testov bez zlyhania:
 
 ```text
-Passed!  - Failed: 0, Passed: 19, Skipped: 0, Total: 19 - Symbolon.Crypto.Tests.dll
+Passed!  - Failed: 0, Passed: 28, Skipped: 0, Total: 28 - Symbolon.Crypto.Tests.dll
 Passed!  - Failed: 0, Passed: 37, Skipped: 0, Total: 37 - Symbolon.Format.Tests.dll
 Passed!  - Failed: 0, Passed: 16, Skipped: 0, Total: 16 - Symbolon.Protocol.Tests.dll
-Passed!  - Failed: 0, Passed: 24, Skipped: 0, Total: 24 - Symbolon.Domain.Tests.dll
+Passed!  - Failed: 0, Passed: 35, Skipped: 0, Total: 35 - Symbolon.Domain.Tests.dll
 Passed!  - Failed: 0, Passed:  9, Skipped: 0, Total:  9 - Symbolon.Relay.Tests.dll
 Passed!  - Failed: 0, Passed: 11, Skipped: 0, Total: 11 - Symbolon.Client.Tests.dll
-Passed!  - Failed: 0, Passed: 21, Skipped: 0, Total: 21 - Symbolon.Cli.Tests.dll
-Passed!  - Failed: 0, Passed:  7, Skipped: 0, Total:  7 - Symbolon.Data.Tests.dll
+Passed!  - Failed: 0, Passed: 22, Skipped: 0, Total: 22 - Symbolon.Cli.Tests.dll
+Passed!  - Failed: 0, Passed: 10, Skipped: 0, Total: 10 - Symbolon.Data.Tests.dll
 Passed!  - Failed: 0, Passed:  8, Skipped: 0, Total:  8 - Symbolon.Operator.Tests.dll
-Passed!  - Failed: 0, Passed: 64, Skipped: 0, Total: 64 - Symbolon.ControlPlane.Tests.dll
+Passed!  - Failed: 0, Passed: 71, Skipped: 0, Total: 71 - Symbolon.ControlPlane.Tests.dll
 
 Viacjazyčné SDK & WebAssembly testovacie sady:
 Passed!  - Failed: 0, Passed: 13, Skipped: 0, Total: 13 - Python SDK (unittest)
 Passed!  - Failed: 0, Passed: 11, Skipped: 0, Total: 11 - WebAssembly / WebCrypto SDK (node:test)
 
-Celkovo: 255 úspešných automatizovaných testov (231 .NET + 13 Python + 11 Node/Wasm), 0 zlyhaní, 0 chýb.
+Celkovo: 271 úspešných automatizovaných testov (247 .NET + 13 Python + 11 Node/Wasm), 0 zlyhaní, 0 chýb.
 ```
 
 ---

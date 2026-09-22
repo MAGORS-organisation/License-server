@@ -14,6 +14,8 @@ public sealed class Tenant
     public ICollection<AuditEventEntity> AuditEvents { get; set; } = new List<AuditEventEntity>();
     public ICollection<RevocationEntity> Revocations { get; set; } = new List<RevocationEntity>();
     public ICollection<WebhookSubscriptionEntity> WebhookSubscriptions { get; set; } = new List<WebhookSubscriptionEntity>();
+    public ICollection<TokenWalletEntity> TokenWallets { get; set; } = new List<TokenWalletEntity>();
+    public ICollection<TokenRateEntity> TokenRates { get; set; } = new List<TokenRateEntity>();
 }
 
 public sealed class Product
@@ -28,6 +30,7 @@ public sealed class Product
     public Tenant? Tenant { get; set; }
     public ICollection<Policy> Policies { get; set; } = new List<Policy>();
     public ICollection<Entitlement> Entitlements { get; set; } = new List<Entitlement>();
+    public ICollection<TokenRateEntity> TokenRates { get; set; } = new List<TokenRateEntity>();
 }
 
 public sealed class Entitlement
@@ -94,6 +97,7 @@ public sealed class LicenseEntity
     public ICollection<LicenseUserEntity> LicenseUsers { get; set; } = new List<LicenseUserEntity>();
     public ICollection<QueueTicketEntity> QueueTickets { get; set; } = new List<QueueTicketEntity>();
     public ICollection<LicenseQuotaEntity> Quotas { get; set; } = new List<LicenseQuotaEntity>();
+    public ICollection<TokenWalletEntity> TokenWallets { get; set; } = new List<TokenWalletEntity>();
 }
 
 public sealed class SeatEntity
@@ -359,4 +363,80 @@ public sealed class SsoProviderEntity
 
     public Tenant? Tenant { get; set; }
 }
+
+public sealed class TokenWalletEntity
+{
+    public string Id { get; set; } = string.Empty;
+    public string TenantId { get; set; } = string.Empty;
+    public string? LicenseId { get; set; }
+    public string Code { get; set; } = string.Empty;
+    public string Name { get; set; } = string.Empty;
+    public decimal TotalCredits { get; set; }
+    public decimal Balance { get; set; }
+    public decimal ReservedCredits { get; set; }
+    public decimal OverdraftLimit { get; set; }
+    public string State { get; set; } = "active";
+    public DateTimeOffset? ExpiresAt { get; set; }
+    public decimal? ThresholdLowAlert { get; set; }
+    public DateTimeOffset CreatedAt { get; set; }
+    public DateTimeOffset? LastRefillAt { get; set; }
+
+    public Tenant? Tenant { get; set; }
+    public LicenseEntity? License { get; set; }
+    public ICollection<TokenReservationEntity> Reservations { get; set; } = new List<TokenReservationEntity>();
+    public ICollection<TokenLedgerEntryEntity> LedgerEntries { get; set; } = new List<TokenLedgerEntryEntity>();
+}
+
+public sealed class TokenRateEntity
+{
+    public string Id { get; set; } = string.Empty;
+    public string TenantId { get; set; } = string.Empty;
+    public string? ProductId { get; set; }
+    public string FeatureCode { get; set; } = string.Empty;
+    public decimal RatePerMinute { get; set; }
+    public decimal RatePerUnit { get; set; }
+    public string Description { get; set; } = string.Empty;
+    public DateTimeOffset CreatedAt { get; set; }
+    public DateTimeOffset UpdatedAt { get; set; }
+
+    public Tenant? Tenant { get; set; }
+    public Product? Product { get; set; }
+}
+
+public sealed class TokenReservationEntity
+{
+    public string Id { get; set; } = string.Empty;
+    public string WalletId { get; set; } = string.Empty;
+    public string FeatureCode { get; set; } = string.Empty;
+    public decimal ReservedAmount { get; set; }
+    public decimal ConsumedAmount { get; set; }
+    public string? MachineId { get; set; }
+    public string? ClientRef { get; set; }
+    public string Status { get; set; } = "pending";
+    public string? IdempotencyKey { get; set; }
+    public DateTimeOffset ExpiresAt { get; set; }
+    public DateTimeOffset CreatedAt { get; set; }
+    public DateTimeOffset UpdatedAt { get; set; }
+
+    public TokenWalletEntity? Wallet { get; set; }
+    public ICollection<TokenLedgerEntryEntity> LedgerEntries { get; set; } = new List<TokenLedgerEntryEntity>();
+}
+
+public sealed class TokenLedgerEntryEntity
+{
+    public long Id { get; set; }
+    public string WalletId { get; set; } = string.Empty;
+    public string? ReservationId { get; set; }
+    public string TransactionType { get; set; } = "consume";
+    public decimal Amount { get; set; }
+    public decimal BalanceAfter { get; set; }
+    public string? FeatureCode { get; set; }
+    public string? IdempotencyKey { get; set; }
+    public DateTimeOffset Timestamp { get; set; }
+    public string MetadataJson { get; set; } = "{}";
+
+    public TokenWalletEntity? Wallet { get; set; }
+    public TokenReservationEntity? Reservation { get; set; }
+}
+
 

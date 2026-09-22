@@ -172,4 +172,25 @@ public sealed class CliCommandsTests
             }
         }
     }
+
+    [Fact]
+    public async Task TokensCommand_HelpAndValidation_ReturnsExpectedCodes()
+    {
+        // 1. Calling tokens with no subcommands prints help and returns 0
+        int helpCode = await Program.Main(["tokens"]);
+        helpCode.Should().Be(0);
+
+        // 2. Calling tokens with unknown subcommand fails with 1
+        int unknownCode = await Program.Main(["tokens", "unknown-action"]);
+        unknownCode.Should().Be(1);
+
+        // 3. Calling tokens create without required options fails with 1
+        int createFailCode = await Program.Main(["tokens", "create"]);
+        createFailCode.Should().Be(1);
+
+        // 4. Calling tokens set-rate without feature fails with 1
+        int setRateFailCode = await Program.Main(["tokens", "set-rate"]);
+        setRateFailCode.Should().Be(1);
+    }
 }
+

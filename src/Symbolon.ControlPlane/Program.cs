@@ -50,6 +50,8 @@ builder.Services.AddSingleton<Symbolon.ControlPlane.Observability.SymbolonTraceB
 builder.Services.AddScoped<Symbolon.ControlPlane.Security.KeyManager>();
 builder.Services.AddScoped<ISeatStore, EfSeatStore>();
 builder.Services.AddScoped<IAuditLedger, EfAuditLedger>();
+builder.Services.AddScoped<Symbolon.Domain.Tokens.ITokenStore, Symbolon.Data.Stores.EfTokenStore>();
+builder.Services.AddScoped<Symbolon.Domain.Tokens.ITokenEngine, Symbolon.Domain.Tokens.TokenEngine>();
 builder.Services.AddScoped<ILeaseTokenIssuer>(sp =>
     new ControlPlaneLeaseTokenIssuer(sp.GetRequiredService<ISignatureProvider>()));
 builder.Services.AddHttpClient();
@@ -219,6 +221,7 @@ app.MapEbpfEndpoints();
 app.MapScimEndpoints();
 app.MapSsoEndpoints();
 app.MapKmsEndpoints();
+app.MapTokenEndpoints();
 
 // SPA Fallback
 app.MapFallbackToFile("index.html");

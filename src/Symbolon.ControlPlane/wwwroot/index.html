@@ -87,6 +87,12 @@
                 </a>
             </li>
             <li class="nav-item">
+                <a class="nav-link" data-view="view-tokens">
+                    <span class="nav-icon">🪙</span>
+                    <span>Tokeny &amp; Kredity</span>
+                </a>
+            </li>
+            <li class="nav-item">
                 <a class="nav-link" data-view="view-system">
                     <span class="nav-icon">⚡</span>
                     <span>API &amp; Diagnostika</span>
@@ -983,6 +989,137 @@
                 </div>
             </section>
 
+            <!-- VIEW: Token & Credit-Based Licensing Engine -->
+            <section id="view-tokens" class="view-section">
+                <div class="kpi-grid">
+                    <div class="kpi-card">
+                        <div class="kpi-label">
+                            <span>Kreditové Peňaženky</span>
+                            <span>🪙</span>
+                        </div>
+                        <div class="kpi-value" id="kpi-tokens-total-wallets">0</div>
+                        <div class="kpi-subtext">evidovaných zákazníkov</div>
+                    </div>
+                    <div class="kpi-card">
+                        <div class="kpi-label">
+                            <span>Kredity v Obehu</span>
+                            <span>💎</span>
+                        </div>
+                        <div class="kpi-value" id="kpi-tokens-total-credits" style="color: var(--accent-blue);">0</div>
+                        <div class="kpi-subtext">celkový predplatený objem</div>
+                    </div>
+                    <div class="kpi-card">
+                        <div class="kpi-label">
+                            <span>Aktívne Rezervácie</span>
+                            <span>⏳</span>
+                        </div>
+                        <div class="kpi-value" id="kpi-tokens-active-reservations" style="color: var(--accent-amber);">0</div>
+                        <div class="kpi-subtext">bežiace metered úlohy</div>
+                    </div>
+                    <div class="kpi-card">
+                        <div class="kpi-label">
+                            <span>Sadzobník Funkcií</span>
+                            <span>📊</span>
+                        </div>
+                        <div class="kpi-value" id="kpi-tokens-active-rates" style="color: var(--accent-emerald);">0</div>
+                        <div class="kpi-subtext">modulov s dynamickou sadzbou</div>
+                    </div>
+                </div>
+
+                <!-- Wallets Table Card -->
+                <div class="table-card">
+                    <div class="table-header">
+                        <div>
+                            <div class="table-title">🪙 Kreditové Peňaženky Zákazníkov (Token Pools &amp; Wallets)</div>
+                            <div class="table-subtitle">Metered Pay-As-You-Go model spotreby tokenov pre CAD, simulácie a GPU výpočty</div>
+                        </div>
+                        <div class="table-actions">
+                            <button class="btn btn-secondary btn-sm" onclick="loadTokenWallets()">Obnoviť</button>
+                            <button class="btn btn-primary btn-sm" onclick="openModal('modal-create-wallet')">+ Vytvoriť Peňaženku</button>
+                        </div>
+                    </div>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Kód Peňaženky</th>
+                                <th>Názov / Popis</th>
+                                <th>Disponibilný Zostatok</th>
+                                <th>Rezervované</th>
+                                <th>Overdraft Limit</th>
+                                <th>Stav</th>
+                                <th>Akcie</th>
+                            </tr>
+                        </thead>
+                        <tbody id="token-wallets-table-body">
+                            <tr>
+                                <td colspan="7" style="text-align: center; color: var(--text-muted); padding: 24px;">Načítavam kreditové peňaženky...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Rates Table Card -->
+                <div class="table-card" style="margin-top: 24px;">
+                    <div class="table-header">
+                        <div>
+                            <div class="table-title">📊 Sadzobník Spotreby Modulov (Consumption Rates)</div>
+                            <div class="table-subtitle">Definícia počtu kreditov spotrebovaných za minútu behu alebo za dokončenú operáciu</div>
+                        </div>
+                        <div class="table-actions">
+                            <button class="btn btn-secondary btn-sm" onclick="loadTokenRates()">Obnoviť</button>
+                            <button class="btn btn-primary btn-sm" onclick="openModal('modal-set-rate')">+ Nastaviť Sadzbu</button>
+                        </div>
+                    </div>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Kód Funkcie (Feature)</th>
+                                <th>Sadzba / Minúta</th>
+                                <th>Sadzba / Operácia</th>
+                                <th>Popis Úlohy</th>
+                                <th>Posledná Úprava</th>
+                            </tr>
+                        </thead>
+                        <tbody id="token-rates-table-body">
+                            <tr>
+                                <td colspan="5" style="text-align: center; color: var(--text-muted); padding: 24px;">Načítavam sadzobník spotreby...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Ledger Table Card -->
+                <div class="table-card" style="margin-top: 24px;">
+                    <div class="table-header">
+                        <div>
+                            <div class="table-title">📜 Auditný Denník Pohybu Kreditov (Consumption Ledger)</div>
+                            <div class="table-subtitle">Nemenný záznam všetkých transakcií (credit, reserve, consume, release)</div>
+                        </div>
+                        <div class="table-actions">
+                            <button class="btn btn-secondary btn-sm" onclick="loadTokenLedger()">Obnoviť Ledger</button>
+                        </div>
+                    </div>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Časová Pečiatka</th>
+                                <th>Peňaženka</th>
+                                <th>Typ Transakcie</th>
+                                <th>Kredity</th>
+                                <th>Zostatok Po</th>
+                                <th>Funkcia</th>
+                                <th>Idempotencia</th>
+                            </tr>
+                        </thead>
+                        <tbody id="token-ledger-table-body">
+                            <tr>
+                                <td colspan="7" style="text-align: center; color: var(--text-muted); padding: 24px;">Načítavam ledger záznamy...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
             <!-- VIEW 6: API & Diagnostika -->
             <section id="view-system" class="view-section">
                 <div class="kpi-grid">
@@ -1401,6 +1538,107 @@
                 <button type="button" class="btn btn-primary" onclick="copyGeneratedApiKey()">📋 Skopírovať Kľúč</button>
                 <button type="button" class="btn btn-secondary" onclick="closeModal('modal-apikey-success')">Zatvoriť</button>
             </div>
+        </div>
+    </div>
+
+    <!-- Modal: Create Token Wallet -->
+    <div class="modal-overlay" id="modal-create-wallet">
+        <div class="modal-box" style="max-width: 500px;">
+            <div class="modal-header">
+                <div class="modal-title">Vytvorenie Kreditovej Peňaženky</div>
+                <button class="modal-close" onclick="closeModal('modal-create-wallet')">&times;</button>
+            </div>
+            <form id="form-create-wallet" onsubmit="createWalletSubmit(event)">
+                <div class="form-group">
+                    <label class="form-label" for="wallet-tenant-id">Tenant ID</label>
+                    <input type="text" class="form-control" id="wallet-tenant-id" required value="default" placeholder="napr. default alebo acme">
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="wallet-code">Kód Peňaženky (Unikátny)</label>
+                    <input type="text" class="form-control" id="wallet-code" required placeholder="napr. WAL-CAD-PRO">
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="wallet-name">Názov Peňaženky</label>
+                    <input type="text" class="form-control" id="wallet-name" required placeholder="napr. ACME Inžinierske Kredity">
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="wallet-initial-credits">Počiatočný Kredit</label>
+                    <input type="number" step="0.01" class="form-control" id="wallet-initial-credits" value="1000" min="0">
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="wallet-overdraft">Povolený Overdraft Limit (Kredity)</label>
+                    <input type="number" step="0.01" class="form-control" id="wallet-overdraft" value="200" min="0">
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" onclick="closeModal('modal-create-wallet')">Zrušiť</button>
+                    <button type="submit" class="btn btn-primary">Vytvoriť Peňaženku</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal: Credit Token Wallet -->
+    <div class="modal-overlay" id="modal-credit-wallet">
+        <div class="modal-box" style="max-width: 480px;">
+            <div class="modal-header">
+                <div class="modal-title">Dobiť Kredit do Peňaženky</div>
+                <button class="modal-close" onclick="closeModal('modal-credit-wallet')">&times;</button>
+            </div>
+            <form id="form-credit-wallet" onsubmit="creditWalletSubmit(event)">
+                <input type="hidden" id="credit-wallet-id">
+                <div class="form-group">
+                    <label class="form-label" for="credit-wallet-code-display">Cieľová Peňaženka</label>
+                    <input type="text" class="form-control" id="credit-wallet-code-display" readonly>
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="credit-wallet-amount">Počet Kreditov na Dobitie</label>
+                    <input type="number" step="0.01" class="form-control" id="credit-wallet-amount" required min="1" value="500">
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="credit-wallet-reason">Dôvod / Popis Dobitia</label>
+                    <input type="text" class="form-control" id="credit-wallet-reason" placeholder="napr. Objednávka #PO-2026-88">
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" onclick="closeModal('modal-credit-wallet')">Zrušiť</button>
+                    <button type="submit" class="btn btn-primary">Dobiť Kredit</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal: Set Token Rate -->
+    <div class="modal-overlay" id="modal-set-rate">
+        <div class="modal-box" style="max-width: 500px;">
+            <div class="modal-header">
+                <div class="modal-title">Nastavenie Sadzby pre Funkciu</div>
+                <button class="modal-close" onclick="closeModal('modal-set-rate')">&times;</button>
+            </div>
+            <form id="form-set-rate" onsubmit="setRateSubmit(event)">
+                <div class="form-group">
+                    <label class="form-label" for="rate-tenant-id">Tenant ID</label>
+                    <input type="text" class="form-control" id="rate-tenant-id" required value="default">
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="rate-feature-code">Kód Funkcie (FeatureCode)</label>
+                    <input type="text" class="form-control" id="rate-feature-code" required placeholder="napr. FEA-SIMULATION alebo GPU-RENDER">
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="rate-per-minute">Sadzba za Minútu (Kredity)</label>
+                    <input type="number" step="0.0001" class="form-control" id="rate-per-minute" value="0.5" min="0">
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="rate-per-unit">Sadzba za Úlohu / Job (Kredity)</label>
+                    <input type="number" step="0.0001" class="form-control" id="rate-per-unit" value="5.0" min="0">
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="rate-description">Popis Úlohy</label>
+                    <input type="text" class="form-control" id="rate-description" placeholder="napr. 3D Generatívny Solver výpočet">
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" onclick="closeModal('modal-set-rate')">Zrušiť</button>
+                    <button type="submit" class="btn btn-primary">Uložiť Sadzbu</button>
+                </div>
+            </form>
         </div>
     </div>
 

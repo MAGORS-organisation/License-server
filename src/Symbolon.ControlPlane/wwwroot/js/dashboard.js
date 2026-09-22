@@ -68,6 +68,9 @@ async function refreshAllData() {
         loadLicenses(),
         loadSigningKeys(),
         loadKmsHierarchy(),
+        loadTokenWallets(),
+        loadTokenRates(),
+        loadTokenLedger(),
         loadAuditLogs(),
         loadWebhooks(),
         loadApiKeys(),
@@ -1965,5 +1968,227 @@ async function runWasmValidation() {
         showToast(res.isValid ? 'Licencia je platná!' : 'Licencia zlyhala pri overení.', res.isValid ? 'success' : 'error');
     } catch (err) {
         showToast('Chyba validátora: ' + err.message, 'error');
+    }
+}
+
+// ==========================================
+// Token & Credit-Based Licensing Engine
+// ==========================================
+
+async function loadTokenWallets() {
+    const tbody = document.getElementById("token-wallets-table-body");
+    if (!tbody) return;
+
+    try {
+        const res = await fetch("/admin/v1/tokens/wallets");
+        if (!res.ok) return;
+        const wallets = await res.json();
+
+        let totalCredits = 0;
+        let totalReserved = 0;
+
+        wallets.forEach(w => {
+            totalCredits += (w.balance || 0);
+            totalReserved += (w.reservedCredits || 0);
+        });
+
+        const totalElem = document.getElementById("kpi-tokens-total-wallets");
+        const creditsElem = document.getElementById("kpi-tokens-total-credits");
+        const resElem = document.getElementById("kpi-tokens-active-reservations");
+
+        if (totalElem) totalElem.textContent = wallets.length;
+        if (creditsElem) creditsElem.textContent = Math.round(totalCredits).toLocaleString();
+        if (resElem) resElem.textContent = Math.round(totalReserved).toLocaleString();
+
+        if (wallets.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="7" style="text-align: center; color: var(--text-muted); padding: 32px;">Žiadne peňaženky neboli nájdené. Vytvorte prvú kliknutím na '+ Vytvoriť Peňaženku'.</td></tr>`;
+            return;
+        }
+
+        tbody.innerHTML = wallets.map(w => {
+            let badgeClass = "badge-active";
+            if (w.state === "depleted") badgeClass = "badge-expired";
+            if (w.state === "frozen") badgeClass = "badge-revoked";
+
+            return `
+                <tr>
+                    <td><code style="color: var(--accent-blue); font-weight: bold;">${escapeHtml(w.code)}</code></td>
+                    <td>${escapeHtml(w.name)}</td>
+                    <td>
+                        <strong>${(w.balance || 0).toLocaleString()}</strong> / <span style="color: var(--text-muted);">${(w.totalCredits || 0).toLocaleString()}</span>
+                    </td>
+                    <td style="color: var(--accent-amber);">${(w.reservedCredits || 0).toLocaleString()}</td>
+                    <td style="color: var(--text-secondary);">${(w.overdraftLimit || 0).toLocaleString()}</td>
+                    <td><span class="badge ${badgeClass}">${escapeHtml(w.state)}</span></td>
+                    <td>
+                        <button class="btn btn-secondary btn-sm" onclick="openCreditModal('${escapeHtml(w.id)}', '${escapeHtml(w.code)}')">
+                            + Dobiť
+                        </button>
+                    </td>
+                </tr>
+            `;
+        }).join("");
+    } catch (err) {
+        console.error("Error loading token wallets", err);
+    }
+}
+
+async function loadTokenRates() {
+    const tbody = document.getElementById("token-rates-table-body");
+    if (!tbody) return;
+
+    try {
+        const res = await fetch("/admin/v1/tokens/rates");
+        if (!res.ok) return;
+        const rates = await res.json();
+
+        const ratesCountElem = document.getElementById("kpi-tokens-active-rates");
+        if (ratesCountElem) ratesCountElem.textContent = rates.length;
+
+        if (rates.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="5" style="text-align: center; color: var(--text-muted); padding: 24px;">Žiadne špecifické sadzby. Predvolená sadzba je 1 kredit / jednotka.</td></tr>`;
+            return;
+        }
+
+        tbody.innerHTML = rates.map(r => `
+            <tr>
+                <td><code style="color: var(--accent-emerald);">${escapeHtml(r.featureCode)}</code></td>
+                <td><strong>${r.ratePerMinute}</strong> / min</td>
+                <td><strong>${r.ratePerUnit}</strong> / job</td>
+                <td>${escapeHtml(r.description || "—")}</td>
+                <td style="font-size: 11px; color: var(--text-muted);">${new Date(r.updatedAt).toLocaleDateString()}</td>
+            </tr>
+        `).join("");
+    } catch (err) {
+        console.error("Error loading token rates", err);
+    }
+}
+
+async function loadTokenLedger() {
+    const tbody = document.getElementById("token-ledger-table-body");
+    if (!tbody) return;
+
+    try {
+        const res = await fetch("/admin/v1/tokens/ledger?limit=30");
+        if (!res.ok) return;
+        const entries = await res.json();
+
+        if (entries.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="7" style="text-align: center; color: var(--text-muted); padding: 24px;">Žiadne pohyby kreditov v auditnom denníku.</td></tr>`;
+            return;
+        }
+
+        tbody.innerHTML = entries.map(e => {
+            let color = "var(--text-primary)";
+            let sign = "";
+            if (e.transactionType === "credit") { color = "var(--accent-emerald)"; sign = "+"; }
+            else if (e.transactionType === "consume") { color = "var(--accent-rose)"; sign = "-"; }
+            else if (e.transactionType === "reserve") { color = "var(--accent-amber)"; sign = "🔒 "; }
+            else if (e.transactionType === "release") { color = "var(--accent-blue)"; sign = "🔓 "; }
+
+            return `
+                <tr>
+                    <td style="white-space: nowrap; font-size: 11px; color: var(--text-secondary);">${new Date(e.timestamp).toLocaleTimeString()}</td>
+                    <td><code>${escapeHtml(e.walletId.substring(0, 10))}...</code></td>
+                    <td><span class="badge badge-type">${escapeHtml(e.transactionType)}</span></td>
+                    <td style="color: ${color}; font-weight: bold;">${sign}${e.amount}</td>
+                    <td><strong>${e.balanceAfter}</strong></td>
+                    <td><code>${escapeHtml(e.featureCode || "—")}</code></td>
+                    <td style="font-size: 11px; color: var(--text-muted); font-family: monospace;">${escapeHtml(e.idempotencyKey || "—")}</td>
+                </tr>
+            `;
+        }).join("");
+    } catch (err) {
+        console.error("Error loading token ledger", err);
+    }
+}
+
+function openCreditModal(walletId, code) {
+    const idElem = document.getElementById("credit-wallet-id");
+    const codeElem = document.getElementById("credit-wallet-code-display");
+    if (idElem) idElem.value = walletId;
+    if (codeElem) codeElem.value = code;
+    openModal("modal-credit-wallet");
+}
+
+async function createWalletSubmit(event) {
+    event.preventDefault();
+    const tenantId = document.getElementById("wallet-tenant-id").value.trim();
+    const code = document.getElementById("wallet-code").value.trim();
+    const name = document.getElementById("wallet-name").value.trim();
+    const initialCredits = parseFloat(document.getElementById("wallet-initial-credits").value) || 0;
+    const overdraftLimit = parseFloat(document.getElementById("wallet-overdraft").value) || 0;
+
+    try {
+        const res = await fetch("/admin/v1/tokens/wallets", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ tenantId, code, name, initialCredits, overdraftLimit })
+        });
+
+        if (res.ok) {
+            closeModal("modal-create-wallet");
+            showToast("Kreditová peňaženka úspešne vytvorená!", "success");
+            loadTokenWallets();
+            loadTokenLedger();
+        } else {
+            const err = await res.json().catch(() => ({}));
+            showToast("Chyba vytvorenia peňaženky: " + (err.error || res.status), "error");
+        }
+    } catch (e) {
+        showToast("Chyba: " + e.message, "error");
+    }
+}
+
+async function creditWalletSubmit(event) {
+    event.preventDefault();
+    const walletId = document.getElementById("credit-wallet-id").value;
+    const amount = parseFloat(document.getElementById("credit-wallet-amount").value);
+    const reason = document.getElementById("credit-wallet-reason").value.trim() || "Manual credit";
+
+    try {
+        const res = await fetch(`/admin/v1/tokens/wallets/${walletId}/credit`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ amount, reason })
+        });
+
+        if (res.ok) {
+            closeModal("modal-credit-wallet");
+            showToast(`Úspešne dobitých ${amount} kreditov!`, "success");
+            loadTokenWallets();
+            loadTokenLedger();
+        } else {
+            showToast("Chyba dobitia kreditu.", "error");
+        }
+    } catch (e) {
+        showToast("Chyba: " + e.message, "error");
+    }
+}
+
+async function setRateSubmit(event) {
+    event.preventDefault();
+    const tenantId = document.getElementById("rate-tenant-id").value.trim();
+    const featureCode = document.getElementById("rate-feature-code").value.trim();
+    const ratePerMinute = parseFloat(document.getElementById("rate-per-minute").value) || 0;
+    const ratePerUnit = parseFloat(document.getElementById("rate-per-unit").value) || 0;
+    const description = document.getElementById("rate-description").value.trim();
+
+    try {
+        const res = await fetch("/admin/v1/tokens/rates", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ tenantId, featureCode, ratePerMinute, ratePerUnit, description })
+        });
+
+        if (res.ok) {
+            closeModal("modal-set-rate");
+            showToast("Sadzba bola úspešne uložená!", "success");
+            loadTokenRates();
+        } else {
+            showToast("Chyba uloženia sadzby.", "error");
+        }
+    } catch (e) {
+        showToast("Chyba: " + e.message, "error");
     }
 }

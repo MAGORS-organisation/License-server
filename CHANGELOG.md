@@ -10,6 +10,30 @@ a projekt striktne dodržiava [Sémantické Verziovanie (Semantic Versioning 2.0
 ## [Unreleased]
 
 ### Pridané (Added)
+- **Token & Credit-Based Metered Licensing Engine (Pay-As-You-Go, Peňaženky & Auditný Ledger)**:
+  - **Dátová Vrstva a Entitné Modely (`Symbolon.Data`)**:
+    - Entita `TokenWalletEntity`: kreditový fond/peňaženka viazaná na tenanta a voliteľne licenciu s evidenciou `TotalCredits`, `Balance`, `ReservedCredits`, `OverdraftLimit`, `ExpiresAt`, `ThresholdLowAlert`.
+    - Entita `TokenRateEntity`: tarifikácia funkcií viazaná na tenanta a produkt s konfiguráciou sadzby za minútu (`RatePerMinute`) alebo za jednotku/job (`RatePerUnit`).
+    - Entita `TokenReservationEntity`: stavové rezervácie (2PC: `pending`, `committed`, `rolled_back`, `expired`) s TTL a časom expirácie.
+    - Entita `TokenLedgerEntryEntity`: nemenný auditný záznam každej kreditovej transakcie (`credit`, `reserve`, `consume`, `release`, `refund`) s idempotenciou.
+    - Konfigurácia EF Core v `SymbolonDbContext` s explicitnou decimálnou presnosťou `HasPrecision(18, 4)` a indexmi pre rýchle vyhľadávanie.
+  - **Doménový Motor (`Symbolon.Domain.Tokens`)**:
+    - Kontrakty `ITokenStore` a `ITokenEngine` s kompletnou doménovou implementáciou v `TokenEngine`.
+    - Implementácia perzistencie v `EfTokenStore` s atomickými operáciami aktualizácie zostatkov.
+    - Dvojfázové rezervovanie kreditov: rezervácia pred výpočtom s kalkuláciou sadzby, predlžovanie rezervácie cez heartbeat a finálne zúčtovanie / vrátenie nepoužitých kreditov.
+    - Riadenie povoleného prečerpania (`OverdraftLimit`) a detekcia poklesu pod varovnú hladinu (`ThresholdLowAlert`).
+  - **REST API Endpointy (`Symbolon.ControlPlane.Endpoints.TokenEndpoints`)**:
+    - Klientske metered endpointy: `POST /v1/tokens/reserve`, `POST /v1/tokens/heartbeat`, `POST /v1/tokens/commit`, `POST /v1/tokens/rollback`, `GET /v1/tokens/wallets/{id}/balance`.
+    - Správcovské admin endpointy: `GET/POST /admin/v1/tokens/wallets`, `POST /admin/v1/tokens/wallets/{id}/credit`, `GET/POST /admin/v1/tokens/rates`, `GET /admin/v1/tokens/ledger`.
+  - **CLI Podpora (`Symbolon.Cli.Commands.TokenCommands`)**:
+    - Príkazy `symbolon tokens wallets`, `symbolon tokens create`, `symbolon tokens credit`, `symbolon tokens rates`, `symbolon tokens set-rate`, `symbolon tokens balance`.
+    - Ochrana pred zlyhaním v neinteraktívnom / CI/CD režime (`Console.IsInputRedirected`).
+  - **Web TUI & Retro FoxPro TUI Integrácia**:
+    - Nové zobrazenie `view-tokens` (🪙 Tokeny & Kredity) v hlavnom paneli s prehľadovými kartami peňaženiek, sadzobníkov a auditného ledgeru.
+    - Modálne okná pre vytvorenie peňaženky, dobitie kreditu a konfiguráciu sadzieb.
+    - Rozšírenie Retro FoxPro TUI o položku `Tokeny (E)` a klávesové skratky.
+  - **Testovacie Pokrytie**:
+    - 16 nových unit a integračných testov v `TokenEngineTests`, `EfTokenStoreTests`, `TokenApiTests` a `CliCommandsTests` (celkovo 247 .NET testov, 271 testov v celej platforme, 100% pass rate).
 - **Enterprise Cloud KMS / Hardware HSM Integrácia & 3-Úrovňová Hierarchia Kľúčov (§9.3)**:
   - **Cloud KMS & Hardware HSM Provideri (`Symbolon.Crypto.Kms`)**:
     - Abstraktné rozhranie `IKmsProvider` pre hardvérovú izoláciu kľúčov a kryptografické operácie s asynchrónnym health checkom a enumeráciou kľúčov.
