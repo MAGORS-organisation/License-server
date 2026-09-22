@@ -192,5 +192,90 @@ public sealed class CliCommandsTests
         int setRateFailCode = await Program.Main(["tokens", "set-rate"]);
         setRateFailCode.Should().Be(1);
     }
+
+    [Fact]
+    public async Task MigrateCommand_EndToEnd_Execution_Succeeds()
+    {
+        // 1. Help & Unknown commands
+        int helpCode = await Program.Main(["migrate"]);
+        helpCode.Should().Be(0);
+
+        int unknownCode = await Program.Main(["migrate", "invalid-subcommand"]);
+        unknownCode.Should().Be(1);
+
+        string tempDir = Path.Combine(Path.GetTempPath(), $"sym_migrate_{Guid.NewGuid():N}");
+        Directory.CreateDirectory(tempDir);
+
+        try
+        {
+            // 2. FlexNet license & options transpilation
+            string licFile = Path.Combine(tempDir, "license.dat");
+            await File.WriteAllTextAsync(licFile, """
+                SERVER srv01.company.internal 001122334455 27000
+                VENDOR mysw_vd /opt/licenses/mysw_vd
+                FEATURE CAD_PRO mysw_vd 2026.1 31-dec-2027 10 SIGN="ABC1234"
+                """);
+
+            string optFile = Path.Combine(tempDir, "options.opt");
+            await File.WriteAllTextAsync(optFile, """
+                GROUP engineering alice bob
+                RESERVE 2 CAD_PRO GROUP engineering
+                TIMEOUT CAD_PRO 1800
+                """);
+
+            string outDir = Path.Combine(tempDir, "converted_out");
+            int flexCode = await Program.Main(["migrate", "flexnet", "--license", licFile, "--opt", optFile, "--out", outDir]);
+            flexCode.Should().Be(0);
+            File.Exists(Path.Combine(outDir, "symbolon-converted-plans.json")).Should().BeTrue();
+            File.Exists(Path.Combine(outDir, "symbolon-policy.json")).Should().BeTrue();
+
+            // 3. Options transpiler command
+            string outPolicy = Path.Combine(tempDir, "custom-policy.json");
+            int optCode = await Program.Main(["migrate", "options", "--in", optFile, "--out", outPolicy]);
+            optCode.Should().Be(0);
+            File.Exists(outPolicy).Should().BeTrue();
+
+            // 4. Log analysis command
+            string logFile = Path.Combine(tempDir, "lmgrd.log");
+            await File.WriteAllTextAsync(logFile, """
+                10:00:00 (mysw_vd) OUT: "CAD_PRO" alice@ws-01
+                10:15:00 (mysw_vd) DENIED: "CAD_PRO" bob@ws-02 (Licensed number of users already reached. (-4,342))
+                10:30:00 (mysw_vd) IN: "CAD_PRO" alice@ws-01
+                """);
+
+            int logCode = await Program.Main(["migrate", "log", "--file", logFile]);
+            logCode.Should().Be(0);
+
+            // 5. Keygen import command
+            string keygenFile = Path.Combine(tempDir, "keygen.json");
+            await File.WriteAllTextAsync(keygenFile, """
+                {
+                  "data": [
+                    {
+                      "id": "pol_1",
+                      "type": "policies",
+                      "attributes": { "name": "Annual", "code": "ANNUAL", "duration": 864000 }
+                    },
+                    {
+                      "id": "lic_1",
+                      "type": "licenses",
+                      "attributes": { "key": "KEYGEN-1234", "name": "Lic", "status": "ACTIVE" },
+                      "relationships": { "policy": { "data": { "id": "pol_1", "type": "policies" } } }
+                    }
+                  ]
+                }
+                """);
+
+            int keygenCode = await Program.Main(["migrate", "keygen", "--in", keygenFile]);
+            keygenCode.Should().Be(0);
+        }
+        finally
+        {
+            if (Directory.Exists(tempDir))
+            {
+                try { Directory.Delete(tempDir, true); } catch { /* ignore */ }
+            }
+        }
+    }
 }
 

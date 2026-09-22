@@ -31,6 +31,7 @@
         { id: 'airgap', label: 'Air-Gap portál', hotkey: 'G', view: 'view-airgap', hasSub: false },
         { id: 'wasm', label: 'Wasm Validátor', hotkey: 'D', view: 'view-wasm', hasSub: false },
         { id: 'tokens', label: 'Tokeny & Kredity', hotkey: 'E', view: 'view-tokens', hasSub: false },
+        { id: 'migrate', label: 'Migrácia (FlexNet)', hotkey: 'I', view: 'view-migrate', hasSub: false },
         { id: 'webhooky', label: 'Webhooky', hotkey: 'W', view: 'view-webhooks', hasSub: false },
         { isSeparator: true },
         { id: 'sulad', label: 'Súlad & CRA / SBOM', hotkey: 'S', view: 'view-system', hasSub: false },
@@ -77,6 +78,7 @@
                 <li class="retro-menu-item" onclick="switchRetroView('view-airgap')" tabindex="0">Air-<span class="hotkey">G</span>ap</li>
                 <li class="retro-menu-item" onclick="switchRetroView('view-wasm')" tabindex="0"><span class="hotkey">W</span>asm</li>
                 <li class="retro-menu-item" onclick="switchRetroView('view-tokens')" tabindex="0">Tok<span class="hotkey">e</span>ny</li>
+                <li class="retro-menu-item" onclick="switchRetroView('view-migrate')" tabindex="0">M<span class="hotkey">i</span>grácia</li>
                 <li class="retro-menu-item" onclick="switchRetroView('view-system')" tabindex="0"><span class="hotkey">S</span>úlad CRA</li>
                 <li class="retro-menu-item" onclick="openModal('modal-auth-config')" tabindex="0">K<span class="hotkey">o</span>nfigurácia</li>
             </ul>

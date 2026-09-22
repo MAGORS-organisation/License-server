@@ -25,6 +25,7 @@ public sealed class WebUiTests : IClassFixture<ControlPlaneFactory>
         Assert.Contains("view-licenses", content, StringComparison.Ordinal);
         Assert.Contains("view-keys", content, StringComparison.Ordinal);
         Assert.Contains("view-wasm", content, StringComparison.Ordinal);
+        Assert.Contains("view-migrate", content, StringComparison.Ordinal);
         Assert.Contains("symbolon-validator.js", content, StringComparison.Ordinal);
     }
 

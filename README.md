@@ -2,7 +2,7 @@
 
 [![Platform](https://img.shields.io/badge/.NET-10.0%20LTS-512BD4?logo=dotnet)](https://dotnet.microsoft.com/)
 [![Language](https://img.shields.io/badge/C%23-14.0-239120?logo=csharp)](https://learn.microsoft.com/dotnet/csharp/)
-[![Tests](https://img.shields.io/badge/tests-231%20passed%20(+13%20Python%2C%20+11%20Wasm)-brightgreen)](#výsledky-testovania)
+[![Tests](https://img.shields.io/badge/tests-256%20passed%20(+13%20Python%2C%20+11%20Wasm)-brightgreen)](#výsledky-testovania)
 [![License: AGPL-3.0](https://img.shields.io/badge/license-AGPL--3.0-blue.svg)](LICENSE)
 [![License: Apache-2.0](https://img.shields.io/badge/client%20SDK-Apache--2.0-blue.svg)](LICENSES/Apache-2.0.txt)
 [![CRA Compliant](https://img.shields.io/badge/CRA%20Compliance-EU%202024%2F2847-success)](SECURITY.md)
@@ -124,6 +124,12 @@ Rieši to, čo dnešné cloud-first platformy ponúkajú iba ako obmedzený dopl
     - **Dvojfázové Rezervovanie Kreditov (2PC)**: Rezervácia pred začatím výpočtu (`reserve`), priebežný heartbeat spotreby s predlžovaním TTL (`heartbeat`), finálne zúčtovanie (`commit`) alebo okamžité uvoľnenie alokácie pri zlyhaní či zrušení úlohy (`rollback`).
     - **Nemenný Auditný Ledger (`TokenLedgerEntry`)**: Záznam každého pohybu kreditov (credit, reserve, consume, release, refund) s podporou idempotencie.
     - **CLI & Web / Retro FoxPro TUI**: Príkazy `symbolon tokens wallets|create|credit|rates|set-rate|balance`, nové navigačné menu a dedikované zobrazenie `view-tokens` v riadiacom paneli.
+28. **Enterprise Migration Engine & Transpiler (FlexNet/FLEXlm, Options.opt, lmgrd Log Analytics & Keygen Importer)**
+    - **Automatizovaný Prechod z FlexNet Publisher**: Plnohodnotná podpora dekódovania `license.dat` / `*.lic` vrátane `SERVER`, `DAEMON`/`VENDOR`, `FEATURE`, `INCREMENT`, `PACKAGE` a `UPGRADE` s normalizáciou dátumov a prepočtom neobmedzených (`uncounted`) aj diskrétnych sedadiel.
+    - **Transpilácia `options.opt` do JSON Pravidiel**: Deterministická konverzia `GROUP`, `HOST_GROUP`, `RESERVE`, `MAX`, `INCLUDE`/`EXCLUDE`, `BORROW_LOWWATER` a časových limitov priamo do Symbolon `Policy` pravidiel.
+    - **lmgrd Log Analytics & Right-Sizing KPI Engine**: Hĺbková analýza záznamov `lmgrd.log` (`OUT`, `IN`, `DENIED`), výpočet reálnej krivky súbehu sedadiel, identifikácia špičiek a inteligentný odhad optimálnej kapacity s bezpečnostným kreditovým prečerpaním zabraňujúci zbytočnému preplácaniu licencií.
+    - **Keygen.sh Importer**: Bezproblémový import používateľov, politík a licencií priamo z cloudových JSON exportov platformy Keygen.sh.
+    - **CLI & Web / Retro FoxPro TUI**: Príkazy `symbolon migrate flexnet|options|log|keygen`, nové navigačné menu a dedikované zobrazenie `view-migrate` v riadiacom paneli s interaktívnymi šablónami.
 
 ---
 
@@ -355,19 +361,19 @@ Všetkých 10 testovacích projektov má 100% úspešnosť testov bez zlyhania:
 Passed!  - Failed: 0, Passed: 28, Skipped: 0, Total: 28 - Symbolon.Crypto.Tests.dll
 Passed!  - Failed: 0, Passed: 37, Skipped: 0, Total: 37 - Symbolon.Format.Tests.dll
 Passed!  - Failed: 0, Passed: 16, Skipped: 0, Total: 16 - Symbolon.Protocol.Tests.dll
-Passed!  - Failed: 0, Passed: 35, Skipped: 0, Total: 35 - Symbolon.Domain.Tests.dll
+Passed!  - Failed: 0, Passed: 39, Skipped: 0, Total: 39 - Symbolon.Domain.Tests.dll
 Passed!  - Failed: 0, Passed:  9, Skipped: 0, Total:  9 - Symbolon.Relay.Tests.dll
 Passed!  - Failed: 0, Passed: 11, Skipped: 0, Total: 11 - Symbolon.Client.Tests.dll
-Passed!  - Failed: 0, Passed: 22, Skipped: 0, Total: 22 - Symbolon.Cli.Tests.dll
+Passed!  - Failed: 0, Passed: 23, Skipped: 0, Total: 23 - Symbolon.Cli.Tests.dll
 Passed!  - Failed: 0, Passed: 10, Skipped: 0, Total: 10 - Symbolon.Data.Tests.dll
 Passed!  - Failed: 0, Passed:  8, Skipped: 0, Total:  8 - Symbolon.Operator.Tests.dll
-Passed!  - Failed: 0, Passed: 71, Skipped: 0, Total: 71 - Symbolon.ControlPlane.Tests.dll
+Passed!  - Failed: 0, Passed: 75, Skipped: 0, Total: 75 - Symbolon.ControlPlane.Tests.dll
 
 Viacjazyčné SDK & WebAssembly testovacie sady:
 Passed!  - Failed: 0, Passed: 13, Skipped: 0, Total: 13 - Python SDK (unittest)
 Passed!  - Failed: 0, Passed: 11, Skipped: 0, Total: 11 - WebAssembly / WebCrypto SDK (node:test)
 
-Celkovo: 271 úspešných automatizovaných testov (247 .NET + 13 Python + 11 Node/Wasm), 0 zlyhaní, 0 chýb.
+Celkovo: 280 úspešných automatizovaných testov (256 .NET + 13 Python + 11 Node/Wasm), 0 zlyhaní, 0 chýb.
 ```
 
 ---

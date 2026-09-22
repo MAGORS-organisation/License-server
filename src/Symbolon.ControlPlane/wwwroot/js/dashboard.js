@@ -2192,3 +2192,282 @@ async function setRateSubmit(event) {
         showToast("Chyba: " + e.message, "error");
     }
 }
+
+// ==========================================
+// Phase 12: Migration Engine & Transpiler UI
+// ==========================================
+
+function switchMigrateTab(tabId) {
+    document.querySelectorAll(".migrate-tab-content").forEach(el => el.style.display = "none");
+    document.querySelectorAll(".migrate-tab-btn").forEach(btn => {
+        btn.classList.remove("btn-primary");
+        btn.classList.add("btn-secondary");
+    });
+
+    const activeContent = document.getElementById(tabId);
+    if (activeContent) activeContent.style.display = "block";
+
+    const activeBtn = document.getElementById("btn-" + tabId);
+    if (activeBtn) {
+        activeBtn.classList.remove("btn-secondary");
+        activeBtn.classList.add("btn-primary");
+    }
+}
+
+function onMigrateTypeChange() {
+    const type = document.getElementById("migrate-input-type").value;
+    const textarea = document.getElementById("migrate-input-content");
+    if (type === "options") {
+        textarea.placeholder = "Sem vložte text options.opt (GROUP, RESERVE, MAX, EXCLUDE, TIMEOUT)...";
+    } else {
+        textarea.placeholder = "Sem vložte text license.dat (SERVER, FEATURE, INCREMENT, PACKAGE)...";
+    }
+}
+
+function loadSampleFlexNetLicense() {
+    const type = document.getElementById("migrate-input-type").value;
+    const textarea = document.getElementById("migrate-input-content");
+
+    if (type === "options") {
+        textarea.value = `# Options File pre mysw_vd
+GROUP engineering jan.novak peter.kovac maria.horvathova
+GROUP contractors extern1 extern2
+HOST_GROUP cluster node-01 node-02 node-03
+
+RESERVE 5 CAD_PRO GROUP engineering
+MAX 2 CAD_PRO GROUP contractors
+EXCLUDE FEA_SOLVER GROUP contractors
+INCLUDE CAD_PRO HOST_GROUP cluster
+
+BORROW_LOWWATER CAD_PRO 3
+MAX_BORROW_HOURS CAD_PRO 168
+TIMEOUT CAD_PRO 1800
+TIMEOUTALL 3600
+LINGER CAD_PRO 300
+REPORTLOG +/var/log/mysw_report.log`;
+    } else {
+        textarea.value = `# FlexNet Publisher Vzorka license.dat
+SERVER srv01.company.internal 001122334455 27000
+SERVER srv02.company.internal 001122334456 27000
+SERVER srv03.company.internal 001122334457 27000
+VENDOR mysw_vd /opt/licenses/mysw_vd
+
+FEATURE CAD_PRO mysw_vd 2026.1 31-dec-2027 15 \\
+    SIGN="98A7B6C5D4E3" \\
+    HOSTID=001122334455 \\
+    NOTICE="Licensed to ACME Engineering Corp" \\
+    SN=SN-998877
+
+INCREMENT FEA_SOLVER mysw_vd 2026.0 permanent 8 \\
+    SIGN="112233445566"
+
+PACKAGE SUITE_ENTERPRISE mysw_vd 2026.1 \\
+    COMPONENTS="CAD_PRO:2026.1 FEA_SOLVER:2026.0 SIM_RENDER:1.0"`;
+    }
+}
+
+function loadSampleLmgrdLog() {
+    document.getElementById("log-input-content").value = `09:00:00 (mysw_vd) TIMESTAMP 9/22/2026
+09:05:00 (mysw_vd) OUT: "CAD_PRO" alice@ws-01
+09:10:00 (mysw_vd) OUT: "CAD_PRO" bob@ws-02
+09:15:00 (mysw_vd) OUT: "CAD_PRO" charlie@ws-03
+09:20:00 (mysw_vd) OUT: "FEA_SOLVER" david@ws-compute
+09:30:00 (mysw_vd) DENIED: "CAD_PRO" eve@ws-04 (Licensed number of users already reached. (-4,342))
+09:35:00 (mysw_vd) DENIED: "CAD_PRO" frank@ws-05 (Licensed number of users already reached. (-4,342))
+10:00:00 (mysw_vd) IN: "CAD_PRO" alice@ws-01
+10:15:00 (mysw_vd) IN: "CAD_PRO" bob@ws-02
+10:30:00 (mysw_vd) IN: "CAD_PRO" charlie@ws-03
+11:00:00 (mysw_vd) IN: "FEA_SOLVER" david@ws-compute`;
+}
+
+function loadSampleKeygenJson() {
+    document.getElementById("keygen-json-content").value = JSON.stringify({
+        data: [
+            {
+                id: "pol_cad_annual",
+                type: "policies",
+                attributes: {
+                    name: "Enterprise CAD Floating",
+                    code: "CAD-FLOAT",
+                    duration: 31536000,
+                    maxMachines: 25,
+                    floating: true,
+                    concurrent: true
+                }
+            },
+            {
+                id: "usr_lead_eng",
+                type: "users",
+                attributes: {
+                    email: "lead.engineer@acme.com",
+                    firstName: "Martin",
+                    lastName: "Novak"
+                }
+            },
+            {
+                id: "lic_pool_cad_01",
+                type: "licenses",
+                attributes: {
+                    key: "KEYGEN-CAD-2026-9988",
+                    name: "ACME CAD 25-Seat Pool",
+                    status: "ACTIVE",
+                    expiry: "2027-12-31T23:59:59Z",
+                    maxMachines: 25
+                },
+                relationships: {
+                    policy: { data: { id: "pol_cad_annual", type: "policies" } },
+                    user: { data: { id: "usr_lead_eng", type: "users" } }
+                }
+            }
+        ]
+    }, null, 2);
+}
+
+async function transpileFlexNet(apply) {
+    const type = document.getElementById("migrate-input-type").value;
+    const content = document.getElementById("migrate-input-content").value.trim();
+
+    if (!content) {
+        showToast("Zadajte obsah súboru.", "error");
+        return;
+    }
+
+    const endpoint = type === "options" ? "/admin/v1/migrate/flexnet/options" : "/admin/v1/migrate/flexnet/license";
+    const body = { content, apply };
+
+    try {
+        const res = await fetch(endpoint, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(body)
+        });
+
+        if (!res.ok) {
+            const err = await res.json();
+            showToast("Chyba spracovania: " + (err.error || res.statusText), "error");
+            return;
+        }
+
+        const data = await res.json();
+        document.getElementById("migrate-output-json").textContent = JSON.stringify(data, null, 2);
+
+        // Update KPIs & Recommendations
+        if (type === "license") {
+            const planCount = data.plans ? data.plans.length : 0;
+            document.getElementById("kpi-migrate-products-count").textContent = planCount;
+
+            const recBox = document.getElementById("migrate-recommendations-box");
+            if (data.recommendations && data.recommendations.length > 0) {
+                recBox.style.display = "block";
+                recBox.innerHTML = `<strong>💡 Architektonické Odporúčania:</strong><ul style="margin: 6px 0 0 16px; padding: 0;">` +
+                    data.recommendations.map(r => `<li>${escapeHtml(r)}</li>`).join("") + `</ul>`;
+            } else {
+                recBox.style.display = "none";
+            }
+
+            if (apply) {
+                showToast(`Úspešne importovaných ${data.importedCount || planCount} licencií do Symbolon DB!`, "success");
+                refreshAllData();
+            } else {
+                showToast("Náhľad konverzie úspešne vygenerovaný!", "info");
+            }
+        } else {
+            const rulesCount = data.totalRulesParsed || 0;
+            document.getElementById("kpi-migrate-rules-count").textContent = rulesCount;
+
+            const recBox = document.getElementById("migrate-recommendations-box");
+            if (data.recommendations && data.recommendations.length > 0) {
+                recBox.style.display = "block";
+                recBox.innerHTML = `<strong>💡 Odporúčania pre options.opt:</strong><ul style="margin: 6px 0 0 16px; padding: 0;">` +
+                    data.recommendations.map(r => `<li>${escapeHtml(r)}</li>`).join("") + `</ul>`;
+            } else {
+                recBox.style.display = "none";
+            }
+            showToast(`Prevedených ${rulesCount} pravidiel z options.opt!`, "success");
+        }
+    } catch (e) {
+        showToast("Chyba spojenia: " + e.message, "error");
+    }
+}
+
+async function analyzeLogSubmit() {
+    const content = document.getElementById("log-input-content").value.trim();
+    if (!content) {
+        showToast("Vložte text lmgrd.log.", "error");
+        return;
+    }
+
+    try {
+        const res = await fetch("/admin/v1/migrate/flexnet/log-analysis", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ content })
+        });
+
+        if (!res.ok) {
+            showToast("Chyba analýzy logu.", "error");
+            return;
+        }
+
+        const data = await res.json();
+        document.getElementById("kpi-log-events").textContent = data.totalEventsCount || 0;
+        document.getElementById("kpi-log-peak").textContent = data.overallPeakConcurrency || 0;
+        document.getElementById("kpi-log-denials").textContent = data.totalDenialsAcrossAllFeatures || 0;
+
+        const tbody = document.getElementById("log-features-table-body");
+        if (!data.featureStatistics || data.featureStatistics.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="8" style="text-align: center; color: var(--text-muted); padding: 16px;">V logu neboli identifikované žiadne licenčné udalosti.</td></tr>`;
+        } else {
+            tbody.innerHTML = data.featureStatistics.map(f => `
+                <tr>
+                    <td><strong>${escapeHtml(f.featureCode)}</strong></td>
+                    <td><span class="badge" style="background: rgba(59, 130, 246, 0.2); color: var(--accent-indigo); font-weight: bold;">${f.peakConcurrency} sedadiel</span></td>
+                    <td>${f.totalCheckouts}</td>
+                    <td><span class="badge ${f.totalDenials > 0 ? "badge-revoked" : "badge-emerald"}">${f.totalDenials}</span></td>
+                    <td>${f.uniqueUsersCount} používateľov / ${f.uniqueHostsCount} staníc</td>
+                    <td><strong style="color: var(--accent-emerald); font-size: 14px;">${f.recommendedSeats}</strong></td>
+                    <td><span class="badge badge-amber">+${f.recommendedOverdraftBuffer} kreditov</span></td>
+                    <td style="font-size: 12px; color: var(--text-secondary);">${escapeHtml(f.sizingRationale)}</td>
+                </tr>
+            `).join("");
+        }
+
+        showToast("Analýza lmgrd.log úspešne dokončená!", "success");
+    } catch (e) {
+        showToast("Chyba spojenia: " + e.message, "error");
+    }
+}
+
+async function importKeygenSubmit(apply) {
+    const content = document.getElementById("keygen-json-content").value.trim();
+    if (!content) {
+        showToast("Vložte Keygen.sh export JSON.", "error");
+        return;
+    }
+
+    try {
+        const res = await fetch("/admin/v1/migrate/keygen", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ content, apply })
+        });
+
+        if (!res.ok) {
+            showToast("Chyba importu z Keygen.sh.", "error");
+            return;
+        }
+
+        const data = await res.json();
+        document.getElementById("keygen-output-preview").textContent = JSON.stringify(data, null, 2);
+
+        if (apply) {
+            showToast(`Úspešne importovaných ${data.importedCount || 0} Keygen licencií do Symbolon DB!`, "success");
+            refreshAllData();
+        } else {
+            showToast("Náhľad Keygen importu vygenerovaný!", "info");
+        }
+    } catch (e) {
+        showToast("Chyba: " + e.message, "error");
+    }
+}
+

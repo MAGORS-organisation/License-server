@@ -10,6 +10,39 @@ a projekt striktne dodržiava [Sémantické Verziovanie (Semantic Versioning 2.0
 ## [Unreleased]
 
 ### Pridané (Added)
+- **Enterprise Migration Engine & Transpiler (FlexNet/FLEXlm, Options.opt, lmgrd Log Analytics & Keygen Importer)**:
+  - **FlexNet License File Parser (`FlexNetLicenseParser`)**:
+    - Robustné spracovanie súborov `license.dat` / `*.lic` pre servery, daemony a licenčné atribúty (`SERVER`, `DAEMON`/`VENDOR`, `FEATURE`, `INCREMENT`, `PACKAGE`, `UPGRADE`).
+    - Plná podpora zalomenia riadkov pomocou spätných lomiek `\`, normalizácia formátov dátumov (`dd-MMM-yyyy`, `permanent`, `0`, `none`), neobmedzených (`uncounted`) aj diskrétnych sedadiel.
+    - Extrakcia `HOSTID` väzieb (MAC adresy, IP adresy, hostname) a balíkových komponentov.
+    - Automatizovaná konverzia do natívnych Symbolon produktových plánov s bezpečnostnými a architektonickými odporúčaniami (náhrada krehkých triadov za PostgreSQL HA + Delegated Seat Grants).
+  - **FlexNet Options.opt Transpiler (`FlexNetOptionsTranspiler`)**:
+    - Deterministický transpilér politík zo súborov `options.opt` do natívnych JSON pravidiel Symbolon (`PolicyModel`).
+    - Konverzia pravidiel: `GROUP`, `HOST_GROUP`, `RESERVE`, `MAX`, `INCLUDE`/`INCLUDEALL`, `EXCLUDE`/`EXCLUDEALL`, `BORROW_LOWWATER`, `MAX_BORROW_HOURS`, `TIMEOUT`/`TIMEOUTALL`, `LINGER`, `REPORTLOG`.
+    - Generovanie prehľadného transpilátorského reportu (`OptionsTranspilationReport`) s mapovaním pravidiel a detekciou nekompatibilít.
+  - **FlexNet lmgrd Log Analyzer & Right-Sizing Engine (`FlexNetLogAnalyzer`)**:
+    - Analytické spracovanie servisných protokolov `lmgrd.log` (`OUT`, `IN`, `DENIED`, `UNSUPPORTED`).
+    - Výpočet časovej krivky súbehu (concurrency timeline), historického maxima súbežných sedadiel (peak concurrent seats), celkového objemu výpožičiek a vrátení, miery zamietnutí licencií (denials) a unikátnych používateľov a staníc.
+    - 24-hodinový rozpad vyťaženia sedadiel pre identifikáciu špičiek.
+    - **Right-Sizing algoritmus**: Výpočet optimálnej kapacity sedadiel a odporúčaného kreditového prečerpania (overdraft buffer) zabraňujúci zbytočnému preplácaniu licencií.
+  - **Keygen.sh Cloud API Importer (`KeygenImporter`)**:
+    - Import exportovaných JSON dát z platformy Keygen.sh (`policies`, `licenses`, `users`).
+    - Automatické mapovanie modelov atribútov, floating a node-locked licencií do Symbolon schémy.
+  - **REST API Endpointy pre Migráciu (`MigrationEndpoints`)**:
+    - `POST /admin/v1/migrate/flexnet/license`: Analýza alebo priama aplikácia (`apply=true`) licenčných súborov FlexNet.
+    - `POST /admin/v1/migrate/flexnet/options`: Transpilácia pravidiel `options.opt`.
+    - `POST /admin/v1/migrate/flexnet/log-analysis`: Spracovanie logov `lmgrd.log` s kalkuláciou optimálneho počtu sedadiel.
+    - `POST /admin/v1/migrate/keygen`: Import a materializácia entít z Keygen.sh do databázy `SymbolonDbContext`.
+  - **CLI Príkazy pre Migráciu (`Symbolon.Cli.Commands.MigrateCommands`)**:
+    - `symbolon migrate flexnet [--file <path>] [--apply] [--out <file>]`: Konverzia licenčného súboru.
+    - `symbolon migrate options [--file <path>] [--out <file>]`: Transpilácia options pravidiel.
+    - `symbolon migrate log [--file <path>] [--out <file>]`: Log analytika a right-sizing odporúčania.
+    - `symbolon migrate keygen [--file <path>] [--apply] [--out <file>]`: Import z Keygen.sh.
+  - **Web Dashboard & Retro FoxPro TUI Integrácia**:
+    - Nové zobrazenie `view-migrate` (🔄 Migrácia z FlexNet / Keygen) s tromi interaktívnymi panelmi: Transpilér licencií, Log Analytik s Right-Sizing KPI a Keygen Importer vrátane vzorových šablón na jedno kliknutie.
+    - Rozšírenie Retro FoxPro TUI o položku `Migrácia (I)` a klávesovú skratku `I`.
+  - **Testovacie Pokrytie**:
+    - 9 nových unit a integračných testov v `MigrationTests`, `MigrationApiTests` a `CliCommandsTests` (celkovo 256 .NET testov, 280 testov v celej platforme, 100% pass rate).
 - **Token & Credit-Based Metered Licensing Engine (Pay-As-You-Go, Peňaženky & Auditný Ledger)**:
   - **Dátová Vrstva a Entitné Modely (`Symbolon.Data`)**:
     - Entita `TokenWalletEntity`: kreditový fond/peňaženka viazaná na tenanta a voliteľne licenciu s evidenciou `TotalCredits`, `Balance`, `ReservedCredits`, `OverdraftLimit`, `ExpiresAt`, `ThresholdLowAlert`.

@@ -222,6 +222,7 @@ app.MapScimEndpoints();
 app.MapSsoEndpoints();
 app.MapKmsEndpoints();
 app.MapTokenEndpoints();
+app.MapMigrationEndpoints();
 
 // SPA Fallback
 app.MapFallbackToFile("index.html");
