@@ -224,8 +224,10 @@ public class SymbolonDbContext : DbContext
         {
             b.ToTable("webhook_subscriptions");
             b.HasKey(w => w.Id);
+            b.Property(w => w.Name).HasMaxLength(128).IsRequired();
             b.Property(w => w.Url).HasMaxLength(1024).IsRequired();
             b.Property(w => w.Secret).HasMaxLength(256).IsRequired();
+            b.Property(w => w.Format).HasMaxLength(32).IsRequired();
             b.HasIndex(w => new { w.TenantId, w.IsActive });
             b.HasOne(w => w.Tenant)
              .WithMany(t => t.WebhookSubscriptions)
@@ -242,6 +244,7 @@ public class SymbolonDbContext : DbContext
             b.Property(d => d.Status).HasMaxLength(32).IsRequired();
             b.HasIndex(d => new { d.SubscriptionId, d.CreatedAt });
             b.HasIndex(d => new { d.Status, d.NextAttemptAt });
+            b.HasIndex(d => d.Status);
             b.HasOne(d => d.Subscription)
              .WithMany(s => s.Deliveries)
              .HasForeignKey(d => d.SubscriptionId)

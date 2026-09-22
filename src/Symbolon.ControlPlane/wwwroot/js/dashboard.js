@@ -73,6 +73,7 @@ async function refreshAllData() {
         loadTokenLedger(),
         loadAuditLogs(),
         loadWebhooks(),
+        loadGlobalDeliveries(),
         loadApiKeys(),
         loadTransparencyRoot(),
         loadMeshAndAlerts(),
@@ -748,6 +749,7 @@ function escapeHtml(str) {
 // Load Webhooks
 async function loadWebhooks() {
     const tbody = document.getElementById("webhooks-table-body");
+    const activeKpi = document.getElementById("kpi-wh-active");
     if (!tbody) return;
 
     try {
@@ -755,24 +757,39 @@ async function loadWebhooks() {
         if (!res.ok) throw new Error("Chyba pri načítaní webhookov");
         const list = await res.json();
 
+        if (activeKpi) {
+            activeKpi.textContent = list.filter(w => w.isActive).length;
+        }
+
         if (!list || list.length === 0) {
-            tbody.innerHTML = `<tr><td colspan="5" style="text-align: center; color: var(--text-muted); padding: 24px;">Žiadne aktívne webhooky. Kliknite na "+ Pridať Webhook".</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="7" style="text-align: center; color: var(--text-muted); padding: 24px;">Žiadne aktívne webhooky. Kliknite na "+ Pridať Webhook".</td></tr>`;
             return;
         }
 
         tbody.innerHTML = list.map(wh => {
-            const eventsHtml = (wh.events || ["*"]).map(e => `<span class="badge badge-info" style="margin-right: 4px;">${escapeHtml(e)}</span>`).join("");
+            const eventsHtml = (wh.events || ["*"]).map(e => `<span class="badge badge-info" style="margin-right: 4px; font-size: 11px;">${escapeHtml(e)}</span>`).join("");
             const statusBadge = wh.isActive
                 ? `<span class="badge badge-active">Aktívny</span>`
                 : `<span class="badge badge-revoked">Neaktívny</span>`;
-            const createdDate = new Date(wh.createdAt).toLocaleString("sk-SK");
+
+            const formatBadge = (wh.format === "slack")
+                ? `<span class="badge" style="background: rgba(224, 30, 90, 0.2); color: #e01e5a; border: 1px solid #e01e5a;">Slack</span>`
+                : (wh.format === "teams")
+                ? `<span class="badge" style="background: rgba(98, 100, 167, 0.2); color: #818cf8; border: 1px solid #6366f1;">Teams</span>`
+                : `<span class="badge badge-secondary">JSON</span>`;
+
+            const lastDelivered = wh.lastDeliveredAt
+                ? new Date(wh.lastDeliveredAt).toLocaleString("sk-SK")
+                : `<span style="color: var(--text-muted); font-size: 12px;">Nikdy</span>`;
 
             return `
                 <tr>
-                    <td><code style="color: var(--accent-indigo); font-size: 13px;">${escapeHtml(wh.url)}</code></td>
+                    <td><strong>${escapeHtml(wh.name || "Webhook")}</strong></td>
+                    <td>${formatBadge}</td>
+                    <td><code style="color: var(--accent-indigo); font-size: 12px;" title="${escapeHtml(wh.url)}">${escapeHtml(wh.url.length > 40 ? wh.url.substring(0, 38) + '...' : wh.url)}</code></td>
                     <td>${eventsHtml}</td>
+                    <td style="color: var(--text-secondary); font-size: 12px;">${lastDelivered}</td>
                     <td>${statusBadge}</td>
-                    <td style="color: var(--text-secondary); font-size: 13px;">${createdDate}</td>
                     <td>
                         <button class="btn btn-secondary btn-sm" onclick="testWebhookPing('${wh.id}')" title="Odošle test.ping udalosť">⚡ Test</button>
                         <button class="btn btn-secondary btn-sm" onclick="viewWebhookDeliveries('${wh.id}', '${escapeHtml(wh.url)}')" title="História doručení">📜 História</button>
@@ -782,7 +799,138 @@ async function loadWebhooks() {
             `;
         }).join("");
     } catch (err) {
-        tbody.innerHTML = `<tr><td colspan="5" style="text-align: center; color: var(--accent-rose); padding: 24px;">${escapeHtml(err.message)}</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="7" style="text-align: center; color: var(--accent-rose); padding: 24px;">${escapeHtml(err.message)}</td></tr>`;
+    }
+}
+
+// Global Deliveries & Dead-Letter Queue
+let currentDeliveryFilter = "";
+
+async function loadGlobalDeliveries(statusFilter = currentDeliveryFilter) {
+    currentDeliveryFilter = statusFilter;
+    const tbody = document.getElementById("global-deliveries-table-body");
+    if (!tbody) return;
+
+    try {
+        const query = statusFilter ? `?status=${encodeURIComponent(statusFilter)}` : "";
+        const res = await fetch(`/admin/v1/webhooks/deliveries${query}`);
+        if (!res.ok) throw new Error("Chyba načítania doručení");
+        const list = await res.json();
+
+        // Also update summary KPI counters from all deliveries
+        const allRes = await fetch("/admin/v1/webhooks/deliveries");
+        if (allRes.ok) {
+            const all = await allRes.json();
+            const delivered = all.filter(d => d.status === "delivered").length;
+            const failed = all.filter(d => d.status === "failed").length;
+            const dlq = all.filter(d => d.status === "dead_letter").length;
+
+            const elDelivered = document.getElementById("kpi-wh-delivered");
+            const elFailed = document.getElementById("kpi-wh-failed");
+            const elDlq = document.getElementById("kpi-wh-dlq");
+
+            if (elDelivered) elDelivered.textContent = delivered;
+            if (elFailed) elFailed.textContent = failed;
+            if (elDlq) elDlq.textContent = dlq;
+        }
+
+        if (!list || list.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="8" style="text-align: center; color: var(--text-muted); padding: 24px;">Žiadne záznamy pre vybraný filter (${escapeHtml(statusFilter || "všetky")}).</td></tr>`;
+            return;
+        }
+
+        tbody.innerHTML = list.map(d => {
+            let statusBadge = `<span class="badge badge-secondary">${escapeHtml(d.status)}</span>`;
+            if (d.status === "delivered") {
+                statusBadge = `<span class="badge badge-active">Doručené</span>`;
+            } else if (d.status === "failed") {
+                statusBadge = `<span class="badge badge-revoked">Zlyhalo</span>`;
+            } else if (d.status === "dead_letter") {
+                statusBadge = `<span class="badge" style="background: rgba(168, 85, 247, 0.2); color: #c084fc; border: 1px solid #a855f7;">DLQ (Zlyhané)</span>`;
+            } else if (d.status === "pending") {
+                statusBadge = `<span class="badge badge-amber">Čaká</span>`;
+            }
+
+            const codeBadge = d.statusCode
+                ? `<span class="badge ${d.statusCode >= 200 && d.statusCode < 300 ? 'badge-active' : 'badge-revoked'}">${d.statusCode}</span>`
+                : `<span style="color: var(--text-muted);">-</span>`;
+
+            const durationStr = (d.durationMs !== null && d.durationMs !== undefined)
+                ? `${d.durationMs} ms`
+                : "-";
+
+            const timeStr = new Date(d.createdAt).toLocaleTimeString("sk-SK");
+            const errorInfo = d.lastError
+                ? `<span style="color: var(--accent-rose); font-size: 11px;" title="${escapeHtml(d.lastError)}">${escapeHtml(d.lastError.length > 35 ? d.lastError.substring(0, 35) + '...' : d.lastError)}</span>`
+                : `<span style="color: var(--text-secondary); font-size: 11px;">${timeStr}</span>`;
+
+            const replayBtn = (d.status === "dead_letter" || d.status === "failed")
+                ? `<button class="btn btn-secondary btn-sm" onclick="replayDelivery('${escapeHtml(d.id)}')" title="Znovu odoslať zlyhanú správu">🔄 Replay</button>`
+                : `<span style="color: var(--text-muted); font-size: 12px;">—</span>`;
+
+            return `
+                <tr>
+                    <td><code>${escapeHtml(d.id.substring(0, 8))}...</code></td>
+                    <td><strong style="color: var(--accent-indigo);">${escapeHtml(d.eventType)}</strong></td>
+                    <td>${codeBadge}</td>
+                    <td style="font-size: 12px; color: var(--text-secondary);">${durationStr}</td>
+                    <td>${d.attempts}</td>
+                    <td>${statusBadge}</td>
+                    <td>${errorInfo}</td>
+                    <td>${replayBtn}</td>
+                </tr>
+            `;
+        }).join("");
+    } catch (err) {
+        tbody.innerHTML = `<tr><td colspan="8" style="text-align: center; color: var(--accent-rose); padding: 24px;">${escapeHtml(err.message)}</td></tr>`;
+    }
+}
+
+function filterDeliveries(status) {
+    document.querySelectorAll("#btn-filter-all, #btn-filter-delivered, #btn-filter-failed, #btn-filter-dlq").forEach(btn => btn.classList.remove("active"));
+    if (status === "delivered") document.getElementById("btn-filter-delivered")?.classList.add("active");
+    else if (status === "failed") document.getElementById("btn-filter-failed")?.classList.add("active");
+    else if (status === "dead_letter") document.getElementById("btn-filter-dlq")?.classList.add("active");
+    else document.getElementById("btn-filter-all")?.classList.add("active");
+
+    loadGlobalDeliveries(status);
+}
+
+async function replayDelivery(id) {
+    showToast("Opakujem doručenie správy...", "info");
+    try {
+        const res = await fetch(`/admin/v1/webhooks/deliveries/${encodeURIComponent(id)}/replay`, {
+            method: "POST"
+        });
+        const data = await res.json();
+        if (data.success) {
+            showToast("Správa bola zaradená na okamžité zopakovanie!", "success");
+            setTimeout(() => {
+                loadGlobalDeliveries();
+            }, 1000);
+        } else {
+            showToast(`Replay zlyhal: ${data.message || 'Neznáma chyba'}`, "error");
+        }
+    } catch (err) {
+        showToast("Chyba spojenia: " + err.message, "error");
+    }
+}
+
+async function evaluateLicenseLifecycle() {
+    showToast("Vyhodnocujem životný cyklus licencií...", "info");
+    try {
+        const res = await fetch("/admin/v1/lifecycle/evaluate", {
+            method: "POST"
+        });
+        if (res.ok) {
+            const data = await res.json();
+            showToast(`Kontrola ukončená! Vyhodnotených: ${data.evaluatedLicenses}, Odoslaných alertov: ${data.eventsDispatched}`, "success");
+            loadGlobalDeliveries();
+        } else {
+            showToast("Chyba pri vyhodnocovaní licencií", "error");
+        }
+    } catch (err) {
+        showToast("Chyba spojenia: " + err.message, "error");
     }
 }
 
@@ -790,6 +938,8 @@ async function loadWebhooks() {
 document.addEventListener("DOMContentLoaded", () => {
     document.getElementById("form-create-webhook")?.addEventListener("submit", async (e) => {
         e.preventDefault();
+        const name = document.getElementById("wh-name")?.value.trim() || null;
+        const format = document.getElementById("wh-format")?.value || "json";
         const url = document.getElementById("wh-url").value.trim();
         const secret = document.getElementById("wh-secret").value.trim() || null;
 
@@ -804,7 +954,7 @@ document.addEventListener("DOMContentLoaded", () => {
             const res = await fetch("/admin/v1/webhooks", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ url, secret, events })
+                body: JSON.stringify({ name, format, url, secret, events })
             });
 
             if (res.ok) {

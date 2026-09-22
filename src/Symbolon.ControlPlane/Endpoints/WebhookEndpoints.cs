@@ -9,17 +9,26 @@ using Symbolon.ControlPlane.Models;
 using Symbolon.ControlPlane.Webhooks;
 using Symbolon.Data;
 using Symbolon.Data.Entities;
+using Symbolon.Domain.Webhooks;
 
 namespace Symbolon.ControlPlane.Endpoints;
 
 public static class WebhookEndpoints
 {
+    private static readonly JsonSerializerOptions JsonOptions = new()
+    {
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+        WriteIndented = false
+    };
+
     public static RouteGroupBuilder MapWebhookEndpoints(this IEndpointRouteBuilder app)
     {
         var group = app.MapGroup("/admin/v1/webhooks").WithTags("Webhooks");
 
         group.MapPost("/", CreateWebhookAsync).WithName("CreateWebhook");
         group.MapGet("/", GetWebhooksAsync).WithName("GetWebhooks");
+        group.MapGet("/deliveries", GetAllWebhookDeliveriesAsync).WithName("GetAllWebhookDeliveries");
+        group.MapPost("/deliveries/{id}/replay", ReplayWebhookDeliveryAsync).WithName("ReplayWebhookDelivery");
         group.MapGet("/{id}", GetWebhookByIdAsync).WithName("GetWebhookById");
         group.MapDelete("/{id}", DeleteWebhookAsync).WithName("DeleteWebhook");
         group.MapPost("/{id}/test", TestWebhookAsync).WithName("TestWebhook");
@@ -63,7 +72,7 @@ public static class WebhookEndpoints
             ?? "ten_default";
 
         string secret = string.IsNullOrWhiteSpace(dto.Secret)
-            ? $"whsec_{Convert.ToHexString(RandomNumberGenerator.GetBytes(24)).ToLowerInvariant()}"
+            ? $"whsec_{Convert.ToHexStringLower(RandomNumberGenerator.GetBytes(24))}"
             : dto.Secret.Trim();
 
         var events = dto.Events is not null && dto.Events.Count > 0
@@ -71,14 +80,20 @@ public static class WebhookEndpoints
             : ["*"];
 
         string id = $"whk_{Guid.NewGuid():N}";
+        string cleanFormat = string.IsNullOrWhiteSpace(dto.Format) ? "json" : dto.Format.Trim().ToUpperInvariant();
+        string cleanName = string.IsNullOrWhiteSpace(dto.Name) ? dto.Url.Trim() : dto.Name.Trim();
+
         var subscription = new WebhookSubscriptionEntity
         {
             Id = id,
             TenantId = tenantId,
+            Name = cleanName,
             Url = dto.Url.Trim(),
             Secret = secret,
-            EventsJson = JsonSerializer.Serialize(events),
+            Format = cleanFormat,
+            EventsJson = JsonSerializer.Serialize(events, JsonOptions),
             IsActive = true,
+            FailureCount = 0,
             CreatedAt = time.GetUtcNow()
         };
 
@@ -91,7 +106,11 @@ public static class WebhookEndpoints
             subscription.Url,
             events,
             subscription.IsActive,
-            subscription.CreatedAt));
+            subscription.CreatedAt,
+            subscription.Name,
+            subscription.Format,
+            subscription.FailureCount,
+            subscription.LastDeliveredAt));
     }
 
     private static async Task<IResult> GetWebhooksAsync(
@@ -112,9 +131,13 @@ public static class WebhookEndpoints
             {
                 w.Id,
                 w.TenantId,
+                w.Name,
                 w.Url,
+                w.Format,
                 w.EventsJson,
                 w.IsActive,
+                w.FailureCount,
+                w.LastDeliveredAt,
                 w.CreatedAt
             })
             .ToListAsync(ct)
@@ -124,9 +147,13 @@ public static class WebhookEndpoints
             w.Id,
             w.TenantId,
             w.Url,
-            JsonSerializer.Deserialize<List<string>>(w.EventsJson) ?? ["*"],
+            JsonSerializer.Deserialize<List<string>>(w.EventsJson, JsonOptions) ?? ["*"],
             w.IsActive,
-            w.CreatedAt)).ToList();
+            w.CreatedAt,
+            w.Name,
+            w.Format,
+            w.FailureCount,
+            w.LastDeliveredAt)).ToList();
 
         return TypedResults.Ok(result);
     }
@@ -151,9 +178,13 @@ public static class WebhookEndpoints
             w.Id,
             w.TenantId,
             w.Url,
-            JsonSerializer.Deserialize<List<string>>(w.EventsJson) ?? ["*"],
+            JsonSerializer.Deserialize<List<string>>(w.EventsJson, JsonOptions) ?? ["*"],
             w.IsActive,
-            w.CreatedAt));
+            w.CreatedAt,
+            w.Name,
+            w.Format,
+            w.FailureCount,
+            w.LastDeliveredAt));
     }
 
     private static async Task<IResult> DeleteWebhookAsync(
@@ -230,10 +261,68 @@ public static class WebhookEndpoints
                 d.Attempts,
                 d.DeliveredAt,
                 d.LastError,
-                d.CreatedAt))
+                d.CreatedAt,
+                d.DurationMs))
             .ToListAsync(ct)
             .ConfigureAwait(false);
 
         return TypedResults.Ok(deliveries);
+    }
+
+    private static async Task<IResult> GetAllWebhookDeliveriesAsync(
+        string? status,
+        int? limit,
+        SymbolonDbContext db,
+        CancellationToken ct)
+    {
+        int max = Math.Clamp(limit ?? 50, 1, 200);
+        var query = db.WebhookDeliveries.AsNoTracking().AsQueryable();
+
+        if (!string.IsNullOrWhiteSpace(status))
+        {
+            string clean = status.Trim();
+            string normalized = clean switch
+            {
+                _ when string.Equals(clean, "delivered", StringComparison.OrdinalIgnoreCase) => "delivered",
+                _ when string.Equals(clean, "failed", StringComparison.OrdinalIgnoreCase) => "failed",
+                _ when string.Equals(clean, "dead_letter", StringComparison.OrdinalIgnoreCase) => "dead_letter",
+                _ when string.Equals(clean, "pending", StringComparison.OrdinalIgnoreCase) => "pending",
+                _ => clean
+            };
+            query = query.Where(d => d.Status == normalized);
+        }
+
+        var list = await query
+            .OrderByDescending(d => d.CreatedAt)
+            .Take(max)
+            .Select(d => new WebhookDeliveryDto(
+                d.Id,
+                d.SubscriptionId,
+                d.EventType,
+                d.Status,
+                d.StatusCode,
+                d.Attempts,
+                d.DeliveredAt,
+                d.LastError,
+                d.CreatedAt,
+                d.DurationMs))
+            .ToListAsync(ct)
+            .ConfigureAwait(false);
+
+        return TypedResults.Ok(list);
+    }
+
+    private static async Task<IResult> ReplayWebhookDeliveryAsync(
+        string id,
+        IWebhookDispatcher dispatcher,
+        CancellationToken ct)
+    {
+        var result = await dispatcher.ReplayDeliveryAsync(id, ct).ConfigureAwait(false);
+        if (result is null)
+        {
+            return TypedResults.NotFound(new { message = $"Delivery {id} not found or subscription is missing." });
+        }
+
+        return TypedResults.Ok(result);
     }
 }

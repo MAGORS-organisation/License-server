@@ -2,7 +2,7 @@
 
 [![Platform](https://img.shields.io/badge/.NET-10.0%20LTS-512BD4?logo=dotnet)](https://dotnet.microsoft.com/)
 [![Language](https://img.shields.io/badge/C%23-14.0-239120?logo=csharp)](https://learn.microsoft.com/dotnet/csharp/)
-[![Tests](https://img.shields.io/badge/tests-256%20passed%20(+13%20Python%2C%20+11%20Wasm)-brightgreen)](#výsledky-testovania)
+[![Tests](https://img.shields.io/badge/tests-280%20passed%20(+13%20Python%2C%20+11%20Wasm)-brightgreen)](#výsledky-testovania)
 [![License: AGPL-3.0](https://img.shields.io/badge/license-AGPL--3.0-blue.svg)](LICENSE)
 [![License: Apache-2.0](https://img.shields.io/badge/client%20SDK-Apache--2.0-blue.svg)](LICENSES/Apache-2.0.txt)
 [![CRA Compliant](https://img.shields.io/badge/CRA%20Compliance-EU%202024%2F2847-success)](SECURITY.md)
@@ -130,6 +130,14 @@ Rieši to, čo dnešné cloud-first platformy ponúkajú iba ako obmedzený dopl
     - **lmgrd Log Analytics & Right-Sizing KPI Engine**: Hĺbková analýza záznamov `lmgrd.log` (`OUT`, `IN`, `DENIED`), výpočet reálnej krivky súbehu sedadiel, identifikácia špičiek a inteligentný odhad optimálnej kapacity s bezpečnostným kreditovým prečerpaním zabraňujúci zbytočnému preplácaniu licencií.
     - **Keygen.sh Importer**: Bezproblémový import používateľov, politík a licencií priamo z cloudových JSON exportov platformy Keygen.sh.
     - **CLI & Web / Retro FoxPro TUI**: Príkazy `symbolon migrate flexnet|options|log|keygen`, nové navigačné menu a dedikované zobrazenie `view-migrate` v riadiacom paneli s interaktívnymi šablónami.
+29. **Enterprise Webhook & Event Notification Engine (HMAC-SHA256, Slack/Teams Integration, Dead-Letter Queue & Automated License Expiration Lifecycle)**
+    - **Kryptografické HMAC-SHA256 Podpisy & Anti-Replay Ochrana**: Hlavička `X-Symbolon-Signature: t={ts},v1={hex}` s konštantno-časovým overovaním (`FixedTimeEquals`) a toleranciou časového posunu proti replay útokom.
+    - **Natívne Formátovače pre Slack & Microsoft Teams**: Automatické prispôsobenie payloadov pre štandardný JSON, Slack Incoming Webhooks (farebné bloky podľa závažnosti udalosti) a Microsoft Teams Connector karty (MessageCards).
+    - **Asynchrónna Bounded Fronta & Background Worker**: Bounded Channel `IWebhookQueue` zaručujúci nulovú latenciu licenčných operácií a spoľahlivé spracovanie na pozadí s evidenciou dĺžky trvania `DurationMs`.
+    - **Dead-Letter Queue (DLQ) & Okamžitý Replay**: Automatické označenie zlyhaných doručení po vyčerpaní pokusov a dedikovaný endpoint `POST /admin/v1/webhooks/deliveries/{id}/replay` s filtrovaním podľa stavu.
+    - **Engine pre Životný Cyklus Licencií (`LicenseLifecycleEngine`)**: Automatické monitorovanie a vyhodnocovanie expirácie licencií (`ExpiringSoon`, `SoftGrace`, `HardGrace`, `Expired`, `Perpetual`) s generovaním systémových alertov (`license.expiring_soon`, `license.grace_entered`, `license.expired`).
+    - **Udalosťami Riadené Notifikácie (Event Hooking)**: Automatické odosielanie notifikácií pri zamietnutí sedadiel (`lease.denied`), detekcii bezpečnostných anomálií a klonovania (`fraud.detected`) a nízkom stave kreditových peňaženiek (`token.threshold_low`).
+    - **CLI & Web Dashboard**: Kompletná sada príkazov `symbolon webhooks list|create|delete|test|deliveries|replay|lifecycle`, živý KPI panel doručení, filter pre DLQ a manuálna kontrola expirácií.
 
 ---
 
@@ -361,19 +369,19 @@ Všetkých 10 testovacích projektov má 100% úspešnosť testov bez zlyhania:
 Passed!  - Failed: 0, Passed: 28, Skipped: 0, Total: 28 - Symbolon.Crypto.Tests.dll
 Passed!  - Failed: 0, Passed: 37, Skipped: 0, Total: 37 - Symbolon.Format.Tests.dll
 Passed!  - Failed: 0, Passed: 16, Skipped: 0, Total: 16 - Symbolon.Protocol.Tests.dll
-Passed!  - Failed: 0, Passed: 39, Skipped: 0, Total: 39 - Symbolon.Domain.Tests.dll
+Passed!  - Failed: 0, Passed: 56, Skipped: 0, Total: 56 - Symbolon.Domain.Tests.dll
 Passed!  - Failed: 0, Passed:  9, Skipped: 0, Total:  9 - Symbolon.Relay.Tests.dll
 Passed!  - Failed: 0, Passed: 11, Skipped: 0, Total: 11 - Symbolon.Client.Tests.dll
-Passed!  - Failed: 0, Passed: 23, Skipped: 0, Total: 23 - Symbolon.Cli.Tests.dll
-Passed!  - Failed: 0, Passed: 10, Skipped: 0, Total: 10 - Symbolon.Data.Tests.dll
+Passed!  - Failed: 0, Passed: 24, Skipped: 0, Total: 24 - Symbolon.Cli.Tests.dll
+Passed!  - Failed: 0, Passed: 13, Skipped: 0, Total: 13 - Symbolon.Data.Tests.dll
 Passed!  - Failed: 0, Passed:  8, Skipped: 0, Total:  8 - Symbolon.Operator.Tests.dll
-Passed!  - Failed: 0, Passed: 75, Skipped: 0, Total: 75 - Symbolon.ControlPlane.Tests.dll
+Passed!  - Failed: 0, Passed: 78, Skipped: 0, Total: 78 - Symbolon.ControlPlane.Tests.dll
 
 Viacjazyčné SDK & WebAssembly testovacie sady:
 Passed!  - Failed: 0, Passed: 13, Skipped: 0, Total: 13 - Python SDK (unittest)
 Passed!  - Failed: 0, Passed: 11, Skipped: 0, Total: 11 - WebAssembly / WebCrypto SDK (node:test)
 
-Celkovo: 280 úspešných automatizovaných testov (256 .NET + 13 Python + 11 Node/Wasm), 0 zlyhaní, 0 chýb.
+Celkovo: 304 úspešných automatizovaných testov (280 .NET + 13 Python + 11 Node/Wasm), 0 zlyhaní, 0 chýb.
 ```
 
 ---

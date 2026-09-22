@@ -55,7 +55,11 @@ builder.Services.AddScoped<Symbolon.Domain.Tokens.ITokenEngine, Symbolon.Domain.
 builder.Services.AddScoped<ILeaseTokenIssuer>(sp =>
     new ControlPlaneLeaseTokenIssuer(sp.GetRequiredService<ISignatureProvider>()));
 builder.Services.AddHttpClient();
+builder.Services.AddSingleton<Symbolon.Domain.Webhooks.IWebhookQueue, Symbolon.Domain.Webhooks.WebhookQueue>();
+builder.Services.AddScoped<Symbolon.Domain.Webhooks.IWebhookStore, Symbolon.Data.Stores.EfWebhookStore>();
+builder.Services.AddSingleton<Symbolon.Domain.Lifecycle.LicenseLifecycleEngine>();
 builder.Services.AddSingleton<Symbolon.ControlPlane.Webhooks.IWebhookDispatcher, Symbolon.ControlPlane.Webhooks.WebhookDispatcher>();
+builder.Services.AddHostedService<Symbolon.ControlPlane.Services.WebhookBackgroundService>();
 builder.Services.AddSingleton<Symbolon.ControlPlane.Queuing.IQueueManager, Symbolon.ControlPlane.Queuing.QueueManager>();
 builder.Services.AddScoped<Symbolon.ControlPlane.Alerting.IAlertService, Symbolon.ControlPlane.Alerting.AlertService>();
 builder.Services.AddSingleton<Symbolon.Relay.Mesh.IRelayMeshCoordinator>(_ =>
@@ -223,6 +227,7 @@ app.MapSsoEndpoints();
 app.MapKmsEndpoints();
 app.MapTokenEndpoints();
 app.MapMigrationEndpoints();
+app.MapLicenseLifecycleEndpoints().RequireAuthorization().RequireRateLimiting("admin");
 
 // SPA Fallback
 app.MapFallbackToFile("index.html");

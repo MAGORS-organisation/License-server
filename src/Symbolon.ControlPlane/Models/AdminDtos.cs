@@ -178,7 +178,9 @@ public sealed record SigningKeyDto(
 public sealed record CreateWebhookDto(
     [Required] string Url,
     IReadOnlyList<string>? Events,
-    string? Secret);
+    string? Secret,
+    string? Name = null,
+    string? Format = null);
 
 public sealed record WebhookSubscriptionDto(
     string Id,
@@ -186,7 +188,11 @@ public sealed record WebhookSubscriptionDto(
     string Url,
     IReadOnlyList<string> Events,
     bool IsActive,
-    DateTimeOffset CreatedAt);
+    DateTimeOffset CreatedAt,
+    string? Name = null,
+    string? Format = null,
+    int FailureCount = 0,
+    DateTimeOffset? LastDeliveredAt = null);
 #pragma warning restore CA1054, CA1056
 
 public sealed record WebhookDeliveryDto(
@@ -198,7 +204,8 @@ public sealed record WebhookDeliveryDto(
     int Attempts,
     DateTimeOffset? DeliveredAt,
     string? LastError,
-    DateTimeOffset CreatedAt);
+    DateTimeOffset CreatedAt,
+    long DurationMs = 0);
 
 public sealed record WebhookTestResultDto(
     bool Success,

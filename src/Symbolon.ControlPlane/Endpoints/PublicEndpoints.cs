@@ -12,6 +12,7 @@ using Symbolon.Data;
 using Symbolon.Data.Entities;
 using Symbolon.Domain;
 using Symbolon.Domain.Security;
+using Symbolon.Domain.Webhooks;
 using Symbolon.Format;
 using Symbolon.Protocol;
 using Symbolon.Protocol.Tracing;
@@ -181,6 +182,16 @@ public static class PublicEndpoints
                 license.TenantId,
                 fraudAssessment.Description ?? "Security anomaly detected during seat checkout.",
                 ct).ConfigureAwait(false);
+
+            await webhooks.PublishEventAsync(WebhookEventTypes.FraudDetected, new
+            {
+                licenseId = license.Id,
+                tenantId = license.TenantId,
+                riskType = fraudAssessment.RiskType ?? "fraud_detected",
+                description = fraudAssessment.Description,
+                clientIp,
+                fingerprint
+            }, license.TenantId, ct).ConfigureAwait(false);
         }
 
         int quantity = dto.Quantity ?? 1;
@@ -254,6 +265,17 @@ public static class PublicEndpoints
 
         metrics.RecordCheckoutDenied(license.Id);
         await alertService.RecordDenialSpikeAsync(license.Id, license.TenantId, result.Reason ?? "seat-pool-exhausted", ct).ConfigureAwait(false);
+
+        await webhooks.PublishEventAsync(WebhookEventTypes.LeaseDenied, new
+        {
+            licenseId = license.Id,
+            tenantId = license.TenantId,
+            customerRef = license.CustomerRef,
+            fingerprint,
+            reason = result.Reason ?? "seat-pool-exhausted",
+            requestedQuantity = quantity,
+            maxSeats = license.MaxSeats
+        }, license.TenantId, ct).ConfigureAwait(false);
 
         await webhooks.PublishEventAsync("seat.denied", new
         {

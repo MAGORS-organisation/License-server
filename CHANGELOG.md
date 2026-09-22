@@ -10,6 +10,34 @@ a projekt striktne dodržiava [Sémantické Verziovanie (Semantic Versioning 2.0
 ## [Unreleased]
 
 ### Pridané (Added)
+- **Enterprise Webhook & Event Notification Engine (HMAC-SHA256, Slack/Teams Integration, Dead-Letter Queue & Automated License Expiration Lifecycle)**:
+  - **Kryptografické HMAC-SHA256 Podpisy & Anti-Replay Ochrana (`WebhookSecurity`)**:
+    - Generovanie štandardizovanej podpisovej hlavičky `X-Symbolon-Signature: t={timestamp},v1={hex_signature}`.
+    - Ochrana proti útokom typu replay s validáciou časovej odchýlky (time drift tolerance default 5 minút).
+    - Bezpečné overovanie podpisov v konštantnom čase pomocou `CryptographicOperations.FixedTimeEquals`.
+  - **Formátovacie Adaptéry pre Slack & Microsoft Teams (`WebhookAdapters`)**:
+    - Natívne formátovanie pre Standard JSON (`SymbolonWebhookPayload`), Slack Incoming Webhooks (farebné bloky podľa závažnosti udalosti: červená pre odmietnutia a podvody `#E01E5A`, jantárová pre expirácie a nízky stav tokenov `#ECB22E`, zelená pre vydania a vrátenia `#2EB67D`), a Microsoft Teams Connector (Office 365 Connector MessageCards).
+  - **Asynchrónna Bounded Fronta & Background Dispatcher (`IWebhookQueue`, `WebhookBackgroundService`)**:
+    - Pamäťovo ohraničený `Channel<WebhookEvent>` pre nulovú latenciu licenčných operácií.
+    - Background worker streamujúci udalosti s perzistenciou do databázy cez `EfWebhookStore`, meraním dĺžky volania `DurationMs`, inkrementáciou chýb a označovaním zlyhaných doručení do Dead-Letter Queue (DLQ).
+  - **Dead-Letter Queue (DLQ) & Manuálny Replay Endpoint**:
+    - Automatické presunutie do stavu `dead_letter` po 3 neúspešných pokusoch.
+    - Endpoint `POST /admin/v1/webhooks/deliveries/{id}/replay` pre okamžité zopakovanie zlyhanej správy.
+    - Filtrovanie doručení podľa stavu cez `GET /admin/v1/webhooks/deliveries?status=delivered|failed|dead_letter`.
+  - **Engine pre Automatizáciu Životného Cyklu Licencií (`LicenseLifecycleEngine`)**:
+    - Vyhodnocovanie stavu licencií: `Perpetual`, `ActiveNormal`, `ExpiringSoon` (konfigurovateľný horizont, default 14 dní), `SoftGrace` (ochranná lehota so zachovaným prístupom), `HardGrace`, `Expired`.
+    - Generovanie a odosielanie lifecycle eventov: `license.expiring_soon`, `license.grace_entered`, `license.expired`.
+    - Endpointy `GET /admin/v1/lifecycle/expiring` a `POST /admin/v1/lifecycle/evaluate`.
+  - **Prepojenie Licenčných Udalostí (Event Hooking)**:
+    - Napojenie na zamietnutie sedadiel (`lease.denied` a spätne kompatibilné `seat.denied`), detekciu anomálií a klonovania (`fraud.detected`), a nízke stavy kreditových peňaženiek (`token.threshold_low`).
+  - **CLI Príkazy pre Webhooky a Životný Cyklus (`Symbolon.Cli.Commands.WebhookCommands`)**:
+    - `symbolon webhooks list`, `create`, `delete`, `test`, `deliveries`, `replay`, `lifecycle`.
+  - **Web Dashboard & Retro FoxPro TUI Rozšírenie**:
+    - Aktualizovaný panel `view-webhooks` s KPI kartami (Aktívne, Doručené, Zlyhania, DLQ), filtrom histórie doručení a tlačidlom pre manuálnu kontrolu expirácií.
+    - Nový modálny dialóg s podporou pre zadanie názvu, výber formátu (JSON / Slack / Teams) a rozšírených typov udalostí.
+    - Retro FoxPro TUI navigácia s priamym prístupom cez `W` a klávesovou skratkou `F8`.
+  - **Testovacie Pokrytie**:
+    - 280 .NET testov (všetkých 10 projektov na 100% pass rate), 13 Python testov, 11 Wasm testov (celkovo 304 testov).
 - **Enterprise Migration Engine & Transpiler (FlexNet/FLEXlm, Options.opt, lmgrd Log Analytics & Keygen Importer)**:
   - **FlexNet License File Parser (`FlexNetLicenseParser`)**:
     - Robustné spracovanie súborov `license.dat` / `*.lic` pre servery, daemony a licenčné atribúty (`SERVER`, `DAEMON`/`VENDOR`, `FEATURE`, `INCREMENT`, `PACKAGE`, `UPGRADE`).

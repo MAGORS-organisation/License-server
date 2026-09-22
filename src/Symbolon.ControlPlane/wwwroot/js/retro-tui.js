@@ -79,6 +79,7 @@
                 <li class="retro-menu-item" onclick="switchRetroView('view-wasm')" tabindex="0"><span class="hotkey">W</span>asm</li>
                 <li class="retro-menu-item" onclick="switchRetroView('view-tokens')" tabindex="0">Tok<span class="hotkey">e</span>ny</li>
                 <li class="retro-menu-item" onclick="switchRetroView('view-migrate')" tabindex="0">M<span class="hotkey">i</span>grácia</li>
+                <li class="retro-menu-item" onclick="switchRetroView('view-webhooks')" tabindex="0"><span class="hotkey">W</span>ebhooky</li>
                 <li class="retro-menu-item" onclick="switchRetroView('view-system')" tabindex="0"><span class="hotkey">S</span>úlad CRA</li>
                 <li class="retro-menu-item" onclick="openModal('modal-auth-config')" tabindex="0">K<span class="hotkey">o</span>nfigurácia</li>
             </ul>

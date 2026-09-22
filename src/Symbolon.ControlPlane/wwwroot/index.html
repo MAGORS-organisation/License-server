@@ -413,31 +413,109 @@
 
             <!-- VIEW: Webhooky -->
             <section id="view-webhooks" class="view-section">
-                <div class="table-card">
+                <!-- Webhooks KPI Grid -->
+                <div class="kpi-grid">
+                    <div class="kpi-card">
+                        <div class="kpi-label">
+                            <span>Aktívne Webhooky</span>
+                            <span>🔔</span>
+                        </div>
+                        <div class="kpi-value" id="kpi-wh-active" style="color: var(--accent-blue);">0</div>
+                        <div class="kpi-subtext">registrované integrácie</div>
+                    </div>
+                    <div class="kpi-card">
+                        <div class="kpi-label">
+                            <span>Doručené (Úspech)</span>
+                            <span>✅</span>
+                        </div>
+                        <div class="kpi-value" id="kpi-wh-delivered" style="color: var(--accent-emerald);">0</div>
+                        <div class="kpi-subtext">úspešné HTTP 2xx volania</div>
+                    </div>
+                    <div class="kpi-card">
+                        <div class="kpi-label">
+                            <span>Zlyhania / Chyby</span>
+                            <span>⚠️</span>
+                        </div>
+                        <div class="kpi-value" id="kpi-wh-failed" style="color: var(--accent-rose);">0</div>
+                        <div class="kpi-subtext">zlyhané pokusy o doručenie</div>
+                    </div>
+                    <div class="kpi-card">
+                        <div class="kpi-label">
+                            <span>Dead-Letter Queue (DLQ)</span>
+                            <span>📬</span>
+                        </div>
+                        <div class="kpi-value" id="kpi-wh-dlq" style="color: var(--accent-purple, #a855f7);">0</div>
+                        <div class="kpi-subtext">správy vyžadujúce manuálny replay</div>
+                    </div>
+                </div>
+
+                <!-- Subscriptions Card -->
+                <div class="table-card" style="margin-bottom: 24px;">
                     <div class="table-header">
                         <div>
-                            <div class="table-title">🔔 Outbound Webhooky (Udalosťami riadené notifikácie)</div>
+                            <div class="table-title">🔔 Registrované Webhook Odbery (Slack, Teams, Custom CRM)</div>
                             <div style="font-size: 12px; color: var(--text-secondary); margin-top: 4px;">
-                                Asynchrónne HTTP POST volania s HMAC-SHA256 podpismi v hlavičke <code>X-Symbolon-Signature</code>.
+                                Asynchrónne HTTP POST volania s HMAC-SHA256 podpismi v hlavičke <code>X-Symbolon-Signature: t=...,v1=...</code>.
                             </div>
                         </div>
-                        <div class="table-actions">
+                        <div class="table-actions" style="display: flex; gap: 8px;">
+                            <button class="btn btn-secondary btn-sm" onclick="evaluateLicenseLifecycle()" title="Vyhodnotí blížiacu sa expiráciu licencií a odošle webhook alerty">▶ Kontrola Expirácií</button>
+                            <button class="btn btn-secondary btn-sm" onclick="loadWebhooks(); loadGlobalDeliveries();">🔄 Obnoviť</button>
                             <button class="btn btn-primary btn-sm" onclick="openModal('modal-create-webhook')">+ Pridať Webhook</button>
                         </div>
                     </div>
                     <table>
                         <thead>
                             <tr>
+                                <th>Názov</th>
+                                <th>Formát</th>
                                 <th>Cieľová URL</th>
                                 <th>Odoberané Udalosti</th>
+                                <th>Posledné Doručenie</th>
                                 <th>Stav</th>
-                                <th>Vytvorený</th>
                                 <th>Akcie</th>
                             </tr>
                         </thead>
                         <tbody id="webhooks-table-body">
                             <tr>
-                                <td colspan="5" style="text-align: center; color: var(--text-muted); padding: 24px;">Načítavam webhooky...</td>
+                                <td colspan="7" style="text-align: center; color: var(--text-muted); padding: 24px;">Načítavam webhooky...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Global Deliveries & DLQ Table Card -->
+                <div class="table-card">
+                    <div class="table-header">
+                        <div>
+                            <div class="table-title">📜 História Doručenia Správ &amp; Dead-Letter Queue (DLQ)</div>
+                            <div style="font-size: 12px; color: var(--text-secondary); margin-top: 4px;">
+                                Auditný log všetkých odoslaných webhookov s možnosťou okamžitého zopakovania (replay) zlyhaných správ.
+                            </div>
+                        </div>
+                        <div class="table-actions" style="display: flex; gap: 6px;">
+                            <button class="btn btn-secondary btn-sm active" id="btn-filter-all" onclick="filterDeliveries('')">Všetky</button>
+                            <button class="btn btn-secondary btn-sm" id="btn-filter-delivered" onclick="filterDeliveries('delivered')">Doručené</button>
+                            <button class="btn btn-secondary btn-sm" id="btn-filter-failed" onclick="filterDeliveries('failed')">Zlyhané</button>
+                            <button class="btn btn-secondary btn-sm" id="btn-filter-dlq" onclick="filterDeliveries('dead_letter')">DLQ</button>
+                        </div>
+                    </div>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Delivery ID</th>
+                                <th>Udalosť</th>
+                                <th>HTTP Kód</th>
+                                <th>Trvanie</th>
+                                <th>Pokusy</th>
+                                <th>Stav</th>
+                                <th>Čas / Chyba</th>
+                                <th>Akcie</th>
+                            </tr>
+                        </thead>
+                        <tbody id="global-deliveries-table-body">
+                            <tr>
+                                <td colspan="8" style="text-align: center; color: var(--text-muted); padding: 24px;">Načítavam históriu doručení...</td>
                             </tr>
                         </tbody>
                     </table>
@@ -1552,8 +1630,20 @@
             </div>
             <form id="form-create-webhook">
                 <div class="form-group">
+                    <label class="form-label" for="wh-name">Názov Odberateľa / Cieľa</label>
+                    <input type="text" class="form-control" id="wh-name" placeholder="napr. Slack #license-alerts, Teams Ops, CRM Sync">
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="wh-format">Formát Správy &amp; Integrácia</label>
+                    <select class="form-control" id="wh-format">
+                        <option value="json" selected>Standard JSON (Symbolon HMAC-SHA256)</option>
+                        <option value="slack">Slack Webhook (Incoming Webhook / Rich Blocks)</option>
+                        <option value="teams">Microsoft Teams (Adaptive Cards / Office 365 Connector)</option>
+                    </select>
+                </div>
+                <div class="form-group">
                     <label class="form-label" for="wh-url">Cieľová HTTP/HTTPS URL</label>
-                    <input type="url" class="form-control" id="wh-url" required placeholder="https://crm.example.com/api/webhooks/symbolon">
+                    <input type="url" class="form-control" id="wh-url" required placeholder="https://hooks.slack.com/services/... alebo https://crm.example.com/api/webhooks">
                 </div>
                 <div class="form-group">
                     <label class="form-label" for="wh-secret">Zdieľaný HMAC Tajný Kľúč (voliteľné, predvolene auto-generovaný)</label>
@@ -1561,11 +1651,18 @@
                 </div>
                 <div class="form-group">
                     <label class="form-label">Udalosti na odoberanie</label>
-                    <div style="display: flex; flex-direction: column; gap: 6px; font-size: 13px; color: var(--text-secondary); margin-top: 6px;">
+                    <div style="display: flex; flex-direction: column; gap: 6px; font-size: 13px; color: var(--text-secondary); margin-top: 6px; max-height: 180px; overflow-y: auto; padding-right: 4px;">
                         <label style="cursor: pointer;"><input type="checkbox" id="wh-ev-all" checked> <strong>* (Všetky udalosti)</strong></label>
-                        <label style="cursor: pointer;"><input type="checkbox" class="wh-ev-item" value="license.created"> license.created (Vystavenie licencie)</label>
+                        <label style="cursor: pointer;"><input type="checkbox" class="wh-ev-item" value="license.created"> license.created (Vystavenie novej licencie)</label>
+                        <label style="cursor: pointer;"><input type="checkbox" class="wh-ev-item" value="license.expiring_soon"> license.expiring_soon (Blížiaca sa expirácia)</label>
+                        <label style="cursor: pointer;"><input type="checkbox" class="wh-ev-item" value="license.grace_entered"> license.grace_entered (Vstup do ochrannej lehoty)</label>
+                        <label style="cursor: pointer;"><input type="checkbox" class="wh-ev-item" value="license.expired"> license.expired (Licencia expirovala)</label>
+                        <label style="cursor: pointer;"><input type="checkbox" class="wh-ev-item" value="lease.denied"> lease.denied (Zamietnutie licencie / prečerpanie)</label>
+                        <label style="cursor: pointer;"><input type="checkbox" class="wh-ev-item" value="lease.borrowed"> lease.borrowed (Zapožičanie offline licencie)</label>
+                        <label style="cursor: pointer;"><input type="checkbox" class="wh-ev-item" value="lease.returned"> lease.returned (Vrátenie offline licencie)</label>
+                        <label style="cursor: pointer;"><input type="checkbox" class="wh-ev-item" value="fraud.detected"> fraud.detected (Detekcia podvodu / klonovanie)</label>
+                        <label style="cursor: pointer;"><input type="checkbox" class="wh-ev-item" value="token.threshold_low"> token.threshold_low (Nízky zostatok tokenov)</label>
                         <label style="cursor: pointer;"><input type="checkbox" class="wh-ev-item" value="license.revoked"> license.revoked (Revokácia licencie)</label>
-                        <label style="cursor: pointer;"><input type="checkbox" class="wh-ev-item" value="seat.denied"> seat.denied (Upsell signál / vyčerpanie sedadiel)</label>
                         <label style="cursor: pointer;"><input type="checkbox" class="wh-ev-item" value="machine.activated"> machine.activated (Aktivácia stanice)</label>
                         <label style="cursor: pointer;"><input type="checkbox" class="wh-ev-item" value="machine.deactivated"> machine.deactivated (Deaktivácia stanice)</label>
                         <label style="cursor: pointer;"><input type="checkbox" class="wh-ev-item" value="key.rotated"> key.rotated (Rotácia podpisového kľúča)</label>

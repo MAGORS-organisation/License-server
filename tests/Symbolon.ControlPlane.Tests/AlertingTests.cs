@@ -24,6 +24,11 @@ public sealed class AlertingTests
         {
             return Task.FromResult(new WebhookTestResultDto(true, 200, "ok", 10, null));
         }
+
+        public Task<WebhookDeliveryDto?> ReplayDeliveryAsync(string deliveryId, CancellationToken ct = default)
+        {
+            return Task.FromResult<WebhookDeliveryDto?>(null);
+        }
     }
 
     [Fact]

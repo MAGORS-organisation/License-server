@@ -10,6 +10,7 @@ using Microsoft.Extensions.Hosting;
 using Symbolon.ControlPlane.Models;
 using Symbolon.Data;
 using Symbolon.Data.Entities;
+using Symbolon.Domain.Webhooks;
 
 namespace Symbolon.ControlPlane.Webhooks;
 
@@ -17,6 +18,7 @@ public interface IWebhookDispatcher
 {
     Task PublishEventAsync(string eventType, object payload, string? tenantId = null, CancellationToken ct = default);
     Task<WebhookTestResultDto> TestPingAsync(string subscriptionId, CancellationToken ct = default);
+    Task<WebhookDeliveryDto?> ReplayDeliveryAsync(string deliveryId, CancellationToken ct = default);
 }
 
 #pragma warning disable CA1054, CA1031 // Uri parameter and exception catching for resilient network resolution
@@ -192,24 +194,24 @@ public sealed class WebhookDispatcher : IWebhookDispatcher
             }
 
             var now = _timeProvider.GetUtcNow();
-            var envelope = new
-            {
-                id = $"evt_{Guid.NewGuid():N}",
-                type = eventType,
-                timestamp = now,
-                data = payload
-            };
-
-            string payloadJson = JsonSerializer.Serialize(envelope, JsonOptions);
+            string eventId = $"evt_{Guid.NewGuid():N}";
+            var domainEvt = new WebhookEvent(
+                eventId,
+                eventType,
+                tenantId ?? "ten_default",
+                now,
+                payload);
 
             foreach (var sub in subscriptions)
             {
                 // Check if subscribed
-                var subscribedEvents = JsonSerializer.Deserialize<List<string>>(sub.EventsJson) ?? [];
+                var subscribedEvents = JsonSerializer.Deserialize<List<string>>(sub.EventsJson, JsonOptions) ?? [];
                 if (!subscribedEvents.Contains("*") && !subscribedEvents.Contains(eventType, StringComparer.OrdinalIgnoreCase))
                 {
                     continue;
                 }
+
+                string payloadJson = WebhookAdapters.FormatPayload(sub.Format, domainEvt, sub.Name);
 
                 string deliveryId = $"del_{Guid.NewGuid():N}";
                 var delivery = new WebhookDeliveryEntity
@@ -234,38 +236,52 @@ public sealed class WebhookDispatcher : IWebhookDispatcher
                     continue;
                 }
 
+                var sw = Stopwatch.StartNew();
                 try
                 {
                     long unixSeconds = now.ToUnixTimeSeconds();
-                    string signature = ComputeSignature(sub.Secret, unixSeconds, payloadJson);
+                    string signature = WebhookSecurity.ComputeSignature(sub.Secret, unixSeconds, payloadJson);
+                    string sigHeader = WebhookSecurity.BuildSignatureHeader(sub.Secret, unixSeconds, payloadJson);
 
                     using var request = new HttpRequestMessage(HttpMethod.Post, sub.Url);
                     request.Headers.Add("User-Agent", "Symbolon-Webhook/1.0");
                     request.Headers.Add("X-Symbolon-Event", eventType);
                     request.Headers.Add("X-Symbolon-Delivery", deliveryId);
                     request.Headers.Add("X-Symbolon-Timestamp", unixSeconds.ToString(System.Globalization.CultureInfo.InvariantCulture));
-                    request.Headers.Add("X-Symbolon-Signature", $"sha256={signature}");
+                    request.Headers.Add("X-Symbolon-Signature", sigHeader);
+                    request.Headers.Add("X-Symbolon-Signature-256", $"sha256={signature}");
                     request.Content = new StringContent(payloadJson, Encoding.UTF8, "application/json");
 
                     using var response = await _httpClient.SendAsync(request, ct).ConfigureAwait(false);
+                    sw.Stop();
+                    delivery.DurationMs = sw.ElapsedMilliseconds;
                     delivery.StatusCode = (int)response.StatusCode;
+
                     if (response.IsSuccessStatusCode)
                     {
                         delivery.Status = "delivered";
                         delivery.DeliveredAt = _timeProvider.GetUtcNow();
+                        sub.FailureCount = 0;
+                        sub.LastDeliveredAt = delivery.DeliveredAt;
                     }
                     else
                     {
-                        delivery.Status = "failed";
+                        delivery.Status = delivery.Attempts >= 3 ? "dead_letter" : "failed";
                         delivery.LastError = $"HTTP {(int)response.StatusCode}: {response.ReasonPhrase}";
                         delivery.NextAttemptAt = _timeProvider.GetUtcNow().AddMinutes(1);
+                        sub.FailureCount++;
+                        if (sub.FailureCount >= 10) sub.IsActive = false;
                     }
                 }
                 catch (Exception ex)
                 {
-                    delivery.Status = "failed";
+                    sw.Stop();
+                    delivery.DurationMs = sw.ElapsedMilliseconds;
+                    delivery.Status = delivery.Attempts >= 3 ? "dead_letter" : "failed";
                     delivery.LastError = ex.Message;
                     delivery.NextAttemptAt = _timeProvider.GetUtcNow().AddMinutes(1);
+                    sub.FailureCount++;
+                    if (sub.FailureCount >= 10) sub.IsActive = false;
                     _logger.LogWarning(ex, "Failed to deliver webhook {DeliveryId} to {Url}", deliveryId, sub.Url);
                 }
 
@@ -302,37 +318,47 @@ public sealed class WebhookDispatcher : IWebhookDispatcher
         }
 
         var now = _timeProvider.GetUtcNow();
-        var envelope = new
-        {
-            id = $"evt_{Guid.NewGuid():N}",
-            type = "test.ping",
-            timestamp = now,
-            data = new
+        var domainEvt = new WebhookEvent(
+            $"evt_test_{Guid.NewGuid():N}",
+            WebhookEventTypes.TestPing,
+            sub.TenantId,
+            now,
+            new
             {
                 message = "Symbolon test webhook ping",
                 subscriptionId = sub.Id,
-                url = sub.Url
-            }
-        };
+                url = sub.Url,
+                name = sub.Name,
+                format = sub.Format
+            });
 
-        string payloadJson = JsonSerializer.Serialize(envelope, JsonOptions);
+        string payloadJson = WebhookAdapters.FormatPayload(sub.Format, domainEvt, sub.Name);
         long unixSeconds = now.ToUnixTimeSeconds();
-        string signature = ComputeSignature(sub.Secret, unixSeconds, payloadJson);
+        string signature = WebhookSecurity.ComputeSignature(sub.Secret, unixSeconds, payloadJson);
+        string sigHeader = WebhookSecurity.BuildSignatureHeader(sub.Secret, unixSeconds, payloadJson);
 
         var sw = Stopwatch.StartNew();
         try
         {
             using var request = new HttpRequestMessage(HttpMethod.Post, sub.Url);
             request.Headers.Add("User-Agent", "Symbolon-Webhook/1.0");
-            request.Headers.Add("X-Symbolon-Event", "test.ping");
+            request.Headers.Add("X-Symbolon-Event", WebhookEventTypes.TestPing);
             request.Headers.Add("X-Symbolon-Delivery", $"del_test_{Guid.NewGuid():N}");
             request.Headers.Add("X-Symbolon-Timestamp", unixSeconds.ToString(System.Globalization.CultureInfo.InvariantCulture));
-            request.Headers.Add("X-Symbolon-Signature", $"sha256={signature}");
+            request.Headers.Add("X-Symbolon-Signature", sigHeader);
+            request.Headers.Add("X-Symbolon-Signature-256", $"sha256={signature}");
             request.Content = new StringContent(payloadJson, Encoding.UTF8, "application/json");
 
             using var response = await _httpClient.SendAsync(request, ct).ConfigureAwait(false);
             sw.Stop();
             string body = await response.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
+
+            if (response.IsSuccessStatusCode)
+            {
+                sub.FailureCount = 0;
+                sub.LastDeliveredAt = _timeProvider.GetUtcNow();
+                await db.SaveChangesAsync(ct).ConfigureAwait(false);
+            }
 
             return new WebhookTestResultDto(
                 response.IsSuccessStatusCode,
@@ -353,17 +379,100 @@ public sealed class WebhookDispatcher : IWebhookDispatcher
         }
     }
 
+    public async Task<WebhookDeliveryDto?> ReplayDeliveryAsync(string deliveryId, CancellationToken ct = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(deliveryId);
+
+        using var scope = _scopeFactory.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<SymbolonDbContext>();
+
+        var delivery = await db.WebhookDeliveries
+            .Include(d => d.Subscription)
+            .FirstOrDefaultAsync(d => d.Id == deliveryId, ct)
+            .ConfigureAwait(false);
+
+        if (delivery is null || delivery.Subscription is null)
+        {
+            return null;
+        }
+
+        var sub = delivery.Subscription;
+        if (!WebhookSecurityValidator.IsSafeWebhookUrl(sub.Url, _isDevelopment, _allowLocalWebhooks))
+        {
+            delivery.Status = "failed";
+            delivery.LastError = "SSRF security check failed for target URL.";
+            await db.SaveChangesAsync(ct).ConfigureAwait(false);
+            return ToDeliveryDto(delivery);
+        }
+
+        var now = _timeProvider.GetUtcNow();
+        long unixSeconds = now.ToUnixTimeSeconds();
+        string signature = WebhookSecurity.ComputeSignature(sub.Secret, unixSeconds, delivery.PayloadJson);
+        string sigHeader = WebhookSecurity.BuildSignatureHeader(sub.Secret, unixSeconds, delivery.PayloadJson);
+
+        delivery.Attempts++;
+        var sw = Stopwatch.StartNew();
+        try
+        {
+            using var request = new HttpRequestMessage(HttpMethod.Post, sub.Url);
+            request.Headers.Add("User-Agent", "Symbolon-Webhook/1.0");
+            request.Headers.Add("X-Symbolon-Event", delivery.EventType);
+            request.Headers.Add("X-Symbolon-Delivery", delivery.Id);
+            request.Headers.Add("X-Symbolon-Timestamp", unixSeconds.ToString(System.Globalization.CultureInfo.InvariantCulture));
+            request.Headers.Add("X-Symbolon-Signature", sigHeader);
+            request.Headers.Add("X-Symbolon-Signature-256", $"sha256={signature}");
+            request.Headers.Add("X-Symbolon-Replay", "true");
+            request.Content = new StringContent(delivery.PayloadJson, Encoding.UTF8, "application/json");
+
+            using var response = await _httpClient.SendAsync(request, ct).ConfigureAwait(false);
+            sw.Stop();
+            delivery.DurationMs = sw.ElapsedMilliseconds;
+            delivery.StatusCode = (int)response.StatusCode;
+
+            if (response.IsSuccessStatusCode)
+            {
+                delivery.Status = "delivered";
+                delivery.DeliveredAt = _timeProvider.GetUtcNow();
+                delivery.LastError = null;
+                sub.FailureCount = 0;
+                sub.LastDeliveredAt = delivery.DeliveredAt;
+            }
+            else
+            {
+                delivery.Status = "dead_letter";
+                delivery.LastError = $"Replay failed: HTTP {(int)response.StatusCode}: {response.ReasonPhrase}";
+            }
+        }
+        catch (Exception ex)
+        {
+            sw.Stop();
+            delivery.DurationMs = sw.ElapsedMilliseconds;
+            delivery.Status = "dead_letter";
+            delivery.LastError = $"Replay exception: {ex.Message}";
+        }
+
+        await db.SaveChangesAsync(ct).ConfigureAwait(false);
+        return ToDeliveryDto(delivery);
+    }
+
     public static string ComputeSignature(string secret, long timestamp, string payloadJson)
     {
-        ArgumentNullException.ThrowIfNull(secret);
-        ArgumentNullException.ThrowIfNull(payloadJson);
+        return WebhookSecurity.ComputeSignature(secret, timestamp, payloadJson);
+    }
 
-        string stringToSign = $"{timestamp}.{payloadJson}";
-        byte[] keyBytes = Encoding.UTF8.GetBytes(secret);
-        byte[] dataBytes = Encoding.UTF8.GetBytes(stringToSign);
-
-        byte[] hash = HMACSHA256.HashData(keyBytes, dataBytes);
-        return Convert.ToHexString(hash).ToLowerInvariant();
+    private static WebhookDeliveryDto ToDeliveryDto(WebhookDeliveryEntity d)
+    {
+        return new WebhookDeliveryDto(
+            d.Id,
+            d.SubscriptionId,
+            d.EventType,
+            d.Status,
+            d.StatusCode,
+            d.Attempts,
+            d.DeliveredAt,
+            d.LastError,
+            d.CreatedAt,
+            d.DurationMs);
     }
 }
 #pragma warning restore CA1031

@@ -277,5 +277,21 @@ public sealed class CliCommandsTests
             }
         }
     }
+
+    [Fact]
+    public async Task WebhooksCommand_HelpAndSubcommands_Work()
+    {
+        // 1. Root help for webhooks
+        int helpCode = await Program.Main(["webhooks", "--help"]);
+        helpCode.Should().Be(0);
+
+        // 2. Webhook list without running server returns exit code 1 gracefully
+        int listCode = await Program.Main(["webhooks", "list", "--server", "http://127.0.0.1:59999"]);
+        listCode.Should().Be(1);
+
+        // 3. Deliveries log without running server returns exit code 1 gracefully
+        int delCode = await Program.Main(["webhooks", "deliveries", "--server", "http://127.0.0.1:59999"]);
+        delCode.Should().Be(1);
+    }
 }
 
