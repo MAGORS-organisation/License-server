@@ -11,6 +11,9 @@ using System.Threading.RateLimiting;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// Enforce §9.3 Rule 4: Plaintext PKCS#8 private keys are forbidden in Production
+Symbolon.ControlPlane.Security.ProductionKeySafetyGuard.EnforceSafetyRules(builder.Configuration, builder.Environment);
+
 // DB Configuration
 string? connStr = builder.Configuration.GetConnectionString("SymbolonDb");
 builder.Services.AddDbContext<SymbolonDbContext>(options =>
@@ -66,6 +69,7 @@ builder.Services.AddSingleton<Symbolon.Domain.Enforcement.IEbpfEnforcementEngine
 builder.Services.AddSingleton<Symbolon.Domain.Security.IFraudDetectionService, Symbolon.Domain.Security.FraudDetectionService>();
 builder.Services.AddSingleton<Symbolon.ControlPlane.Security.Sso.SsoSessionManager>();
 builder.Services.AddSingleton<Symbolon.ControlPlane.Security.Sso.SsoEngine>();
+builder.Services.AddSingleton<Symbolon.ControlPlane.Security.KmsHierarchyManager>();
 builder.Services.AddScoped<LeaseEngine>();
 
 // Rate Limiting (STRIDE T11, T12, SEC-05: Partitioned by Client IP / Admin Key)
@@ -214,6 +218,7 @@ app.MapReplicationEndpoints();
 app.MapEbpfEndpoints();
 app.MapScimEndpoints();
 app.MapSsoEndpoints();
+app.MapKmsEndpoints();
 
 // SPA Fallback
 app.MapFallbackToFile("index.html");

@@ -51,6 +51,7 @@ internal static class Program
                 "EBPF" => await Commands.EbpfCommands.HandleEbpfAsync(args[1..]).ConfigureAwait(false),
                 "ATTESTATION" => await Commands.AttestationCommands.HandleAttestationAsync(args[1..]).ConfigureAwait(false),
                 "K8S" or "OPERATOR" => await Commands.K8sCommands.HandleK8sAsync(args[1..]).ConfigureAwait(false),
+                "KMS" => await HandleKmsAsync(args[1..]).ConfigureAwait(false),
                 _ => UnknownCommand(args[0])
             };
         }
@@ -77,11 +78,13 @@ internal static class Program
         }
     }
 
+    private static Task<int> HandleKmsAsync(string[] args) => Commands.KmsCommands.HandleKmsAsync(args);
+
     private static int HandleKeys(string[] args)
     {
         if (args.Length == 0 || args[0] is "-h" or "--help")
         {
-            Console.WriteLine("Použitie: symbolon keys <generate|export-jwks|split|combine> [options]");
+            Console.WriteLine("Použitie: symbolon keys <generate|export-jwks|split|combine|envelope|hierarchy> [options]");
             return 0;
         }
 
@@ -91,9 +94,15 @@ internal static class Program
             "EXPORT-JWKS" => HandleKeysExportJwks(args[1..]),
             "SPLIT" => HandleKeysSplit(args[1..]),
             "COMBINE" => HandleKeysCombine(args[1..]),
+            "ENVELOPE" => HandleKeysEnvelope(args[1..]),
+            "HIERARCHY" => HandleKeysHierarchy(args[1..]),
             _ => UnknownCommand(args[0])
         };
     }
+
+    private static int HandleKeysEnvelope(string[] args) => Commands.KmsCommands.HandleEnvelopeEncrypt(args);
+
+    private static int HandleKeysHierarchy(string[] args) => Commands.KmsCommands.HandleHierarchyVerify();
 
     private static int HandleKeysGenerate(string[] args)
     {
@@ -660,6 +669,8 @@ internal static class Program
               keys export-jwks --keys <file1,file2> [--out file]
               keys split --in <key-file> -k <prax> -n <podielov> [--out-dir <dir>]
               keys combine --shares <s1,s2,...> [--out <file>]
+              keys envelope [--in <key>] [--passphrase <p>] [--out <file>] Zašifrovanie privátneho kľúča AES-256-GCM obálkou
+              keys hierarchy                            Overenie 3-úrovňovej hierarchie kľúčov (Root ➜ Product ➜ Lease)
               license keygen [--prefix SYM]
               license issue --customer <id> --seats <n> [--out file]
               license inspect <file.symlic>
@@ -676,6 +687,7 @@ internal static class Program
               ebpf status|attach|violations [options]   eBPF kernel socket enforcement a BPF map monitoring
               attestation verify [options]              Verifikácia hardvérovej TPM 2.0 / Enclave citácie
               k8s crd|export-license|generate-cluster   Kubernetes Operator CRD a GitOps licenčné manifesty
+              kms status [--provider <env|azure|aws|pkcs11>] Stav Cloud KMS / HSM a správa hardvérových kľúčov
             """);
     }
 }

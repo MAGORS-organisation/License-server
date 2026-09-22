@@ -44,6 +44,8 @@
         { id: 'sub-products', label: 'Katalóg produktov', hotkey: 'K', action: () => alert('Katalóg chránených aplikácií') },
         { id: 'sub-policies', label: 'Licenčné politiky', hotkey: 'P', action: () => alert('Šablóny licenčných politík') },
         { id: 'sub-jwks', label: 'Verejné kľúče (JWKS)', hotkey: 'V', action: () => { if (typeof openJwksModal === 'function') openJwksModal(); } },
+        { id: 'sub-kms', label: 'Cloud KMS & HSM Stav', hotkey: 'M', action: () => { switchRetroView('view-keys'); if (typeof loadKmsHierarchy === 'function') loadKmsHierarchy(); } },
+        { id: 'sub-hierarchy', label: '3-Úrovňová Hierarchia (§9.3)', hotkey: '3', action: () => { switchRetroView('view-keys'); if (typeof verifyKeyHierarchy === 'function') verifyKeyHierarchy(); } },
         { id: 'sub-rates', label: 'Sadzby & zaokrúhľovanie', hotkey: 'S', action: () => alert('Nastavenie sadzieb vyťaženia') },
         { id: 'sub-nodes', label: 'Hardvérové odtlačky', hotkey: 'H', action: () => alert('Zoznam autorizovaných HW fingerprintov') }
     ];

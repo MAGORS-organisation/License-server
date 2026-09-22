@@ -67,6 +67,7 @@ async function refreshAllData() {
         loadDashboardKPIs(),
         loadLicenses(),
         loadSigningKeys(),
+        loadKmsHierarchy(),
         loadAuditLogs(),
         loadWebhooks(),
         loadApiKeys(),
@@ -312,6 +313,131 @@ async function loadSigningKeys() {
         }).join("");
     } catch (err) {
         console.error("Error loading signing keys", err);
+    }
+}
+
+// Cloud KMS & Key Hierarchy (§9.3)
+async function loadKmsHierarchy() {
+    try {
+        const [kmsRes, hierRes] = await Promise.all([
+            fetch("/admin/v1/kms/status"),
+            fetch("/admin/v1/keys/hierarchy")
+        ]);
+
+        if (kmsRes.ok) {
+            const kms = await kmsRes.json();
+            const badge = document.getElementById("kms-status-badge");
+            const typeElem = document.getElementById("kms-provider-type");
+            const detailsElem = document.getElementById("kms-provider-details");
+
+            if (badge) {
+                badge.className = kms.isHealthy ? "badge badge-active" : "badge badge-revoked";
+                badge.textContent = kms.isHealthy ? "ONLINE / HEALTHY" : "OFFLINE";
+            }
+            if (typeElem) {
+                typeElem.textContent = `${kms.providerType || "Envelope"} (${kms.keysCount || 0} kľúčov)`;
+            }
+            if (detailsElem) {
+                detailsElem.textContent = kms.details || "AES-256-GCM šifrovaná obálka";
+            }
+        }
+
+        if (hierRes.ok) {
+            const chain = await hierRes.json();
+            const container = document.getElementById("hierarchy-cards-container");
+            if (!container) return;
+
+            const tiers = [
+                {
+                    title: "Tier 1: Root Key Anchor",
+                    subtitle: "Master Trust Anchor (Offline / Hardware)",
+                    cert: chain.rootCertificate,
+                    color: "var(--accent-emerald)",
+                    badgeText: "Root Anchor",
+                    icon: "👑"
+                },
+                {
+                    title: "Tier 2: Product Authority",
+                    subtitle: "Intermediate CA pre produktové balíky",
+                    cert: chain.productCertificate,
+                    color: "var(--accent-blue)",
+                    badgeText: "Product Authority",
+                    icon: "📦"
+                },
+                {
+                    title: "Tier 3: Leaf Lease Key",
+                    subtitle: "Efemerálny kľúč pre cluster nodes a sedadlá",
+                    cert: chain.leaseCertificate,
+                    color: "var(--accent-purple)",
+                    badgeText: "Lease Leaf",
+                    icon: "🔑"
+                }
+            ];
+
+            container.innerHTML = tiers.map(t => {
+                const c = t.cert;
+                if (!c) return "";
+                const from = c.validFrom ? new Date(c.validFrom).toLocaleDateString() : "—";
+                const until = c.validUntil ? new Date(c.validUntil).toLocaleDateString() : "—";
+                const sigSnippet = c.signature ? `${c.signature.substring(0, 18)}...` : "—";
+
+                return `
+                    <div style="background:var(--bg-secondary); border:1px solid ${t.color}; border-radius:8px; padding:16px; display:flex; flex-direction:column; gap:8px;">
+                        <div style="display:flex; justify-content:space-between; align-items:center;">
+                            <span style="font-weight:700; font-size:14px; color:var(--text-primary);">${t.icon} ${t.title}</span>
+                            <span class="badge" style="background:${t.color}22; color:${t.color}; border:1px solid ${t.color};">${t.badgeText}</span>
+                        </div>
+                        <div style="font-size:11px; color:var(--text-muted);">${t.subtitle}</div>
+                        <div style="margin-top:6px; font-size:12px; font-family:monospace;">
+                            <div><strong style="color:var(--text-secondary);">Key ID:</strong> <span style="color:var(--text-primary);">${escapeHtml(c.subjectKeyId)}</span></div>
+                            <div><strong style="color:var(--text-secondary);">Issuer ID:</strong> <span style="color:var(--text-primary);">${escapeHtml(c.issuerKeyId)}</span></div>
+                            <div><strong style="color:var(--text-secondary);">Platnosť:</strong> <span style="color:var(--text-primary);">${from} – ${until}</span></div>
+                            <div><strong style="color:var(--text-secondary);">Podpis:</strong> <span style="color:var(--text-muted);">${escapeHtml(sigSnippet)}</span></div>
+                        </div>
+                    </div>
+                `;
+            }).join("");
+        }
+    } catch (err) {
+        console.error("Error loading KMS & Hierarchy info", err);
+    }
+}
+
+async function verifyKeyHierarchy() {
+    try {
+        const res = await fetch("/admin/v1/keys/hierarchy/verify", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" }
+        });
+        if (!res.ok) {
+            showToast("Chyba overenia hierarchie: HTTP " + res.status, "error");
+            return;
+        }
+        const data = await res.json();
+        const pill = document.getElementById("hierarchy-status-pill");
+        const meta = document.getElementById("hierarchy-verification-meta");
+
+        if (data.isValid) {
+            if (pill) {
+                pill.className = "badge badge-active";
+                pill.textContent = "✓ Hierarchia Platná & Overená";
+            }
+            if (meta) {
+                meta.textContent = `Overené: Root (${data.rootKeyId}) ➜ Product ➜ Lease`;
+            }
+            showToast("Kryptografická hierarchia kľúčov (Root ➜ Product ➜ Lease) je 100% platná!", "success");
+        } else {
+            if (pill) {
+                pill.className = "badge badge-revoked";
+                pill.textContent = "✗ Neplatná Hierarchia";
+            }
+            if (meta) {
+                meta.textContent = `Zlyhanie: ${data.failureReason}`;
+            }
+            showToast("Verifikácia hierarchie zlyhala: " + data.failureReason, "error");
+        }
+    } catch (err) {
+        showToast("Zlyhalo volanie verifikácie hierarchie: " + err.message, "error");
     }
 }
 

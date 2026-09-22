@@ -126,5 +126,21 @@ public sealed class Es256SignatureProvider : ISignatureProvider
         };
     }
 
+    public byte[] ExportPrivateKeyBytes()
+    {
+        if (!_canSign)
+        {
+            throw new InvalidOperationException("Key does not contain private material.");
+        }
+        return _key.ExportPkcs8PrivateKey();
+    }
+
+    public static Es256SignatureProvider ImportPkcs8(ReadOnlySpan<byte> pkcs8Bytes, string kid)
+    {
+        var ecdsa = ECDsa.Create();
+        ecdsa.ImportPkcs8PrivateKey(pkcs8Bytes, out _);
+        return new Es256SignatureProvider(ecdsa, kid, canSign: true);
+    }
+
     public void Dispose() => _key.Dispose();
 }

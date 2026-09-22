@@ -10,6 +10,36 @@ a projekt striktne dodržiava [Sémantické Verziovanie (Semantic Versioning 2.0
 ## [Unreleased]
 
 ### Pridané (Added)
+- **Enterprise Cloud KMS / Hardware HSM Integrácia & 3-Úrovňová Hierarchia Kľúčov (§9.3)**:
+  - **Cloud KMS & Hardware HSM Provideri (`Symbolon.Crypto.Kms`)**:
+    - Abstraktné rozhranie `IKmsProvider` pre hardvérovú izoláciu kľúčov a kryptografické operácie s asynchrónnym health checkom a enumeráciou kľúčov.
+    - Implementácie poskytovateľov: `AzureKeyVaultKmsProvider` (Azure Key Vault REST HSM), `AwsKmsProvider` (AWS KMS Sign API), `MockHardwareHsmProvider` (PKCS#11 HSM emulácia pre testovacie a vývojové prostredia) a `EncryptedEnvelopeKmsProvider`.
+  - **AES-256-GCM Šifrovaná Obálka s Kľúčovou Deriváciou PBKDF2 (`EncryptedEnvelopeKeyStore`)**:
+    - Ochrana citlivých privátnych kľúčov (PKCS#8) pomocou symetrického šifrovania AES-256-GCM s 12-bajtovým kryptografickým noncom a 16-bajtovým autentifikačným tagom.
+    - Odolné odvodzovanie šifrovacieho kľúča pomocou PBKDF2 s 100 000 iteráciami SHA-256 a kryptografickým saltom (32 bajtov).
+    - Serializácia a deserializácia do štandardného PEM formátu: `-----BEGIN ENCRYPTED SYMBOLON KEY-----` / `-----END ENCRYPTED SYMBOLON KEY-----`.
+  - **3-Úrovňová Hierarchia Kľúčov a Digitálnych Certifikátov (`Symbolon.Crypto.Hierarchy`)**:
+    - Striktné oddelenie rolí podľa §9.3 bezpečnostnej špecifikácie:
+      - **Tier 1 (Root Master Anchor)**: Offline/Cold kľúč s platnosťou 10 rokov, slúži výhradne na podpisovanie certifikátov intermediate autorít.
+      - **Tier 2 (Product Authority)**: Intermediate autorita pre konkrétnu produktovú líniu (platnosť 2 roky), podpisuje efemerálne kľúče.
+      - **Tier 3 (Lease Leaf Key)**: Efemerálny kľúč viazaný na uzol klastra alebo sedadlo (platnosť 30 dní).
+    - Modely `KeyHierarchyChain`, `SignedKeyCertificate`, `KeyChainVerificationResult` a overovací motor `KeyHierarchyEngine`.
+    - Kryptografická verifikácia celého reťazca dôvery vrátane overenia správnosti rolí, časových prekryvov platností a digitálnych podpisov ECDSA.
+  - **Production Key Safety Guard (§9.3 Pravidlo 4 Fail-Fast)**:
+    - Striktná kontrola pred štartom servera v `ProductionKeySafetyGuard`: odmietnutie nábehu servera v produkcii (`ASPNETCORE_ENVIRONMENT=Production`), pokiaľ sú v konfiguračných súboroch alebo prostredí nájdené nezašifrované privátne kľúče v čistom texte (plaintext).
+  - **REST API Endpointy pre KMS a Hierarchiu**:
+    - `GET /admin/v1/kms/status`: Diagnostika stavu pripojenia, typu poskytovateľa a evidovaných kľúčov.
+    - `GET /admin/v1/keys/hierarchy`: Získanie aktívneho 3-úrovňového reťazca certifikátov.
+    - `POST /admin/v1/keys/hierarchy/verify`: Kryptografická verifikácia reťazca certifikátov voči Root kotve.
+  - **CLI Príkazy pre KMS a Obálkové Šifrovanie**:
+    - `symbolon kms status [--provider <env|azure|aws|pkcs11>]`: Zobrazenie stavu Cloud KMS / HSM.
+    - `symbolon keys envelope [--in <file>] [--passphrase <p>] [--out <file>]`: Šifrovanie PKCS#8 privátneho kľúča AES-256-GCM obálkou.
+    - `symbolon keys hierarchy`: Vizuálny výpis a kryptografická verifikácia 3-úrovňového stromu kľúčov (Root ➜ Product ➜ Lease).
+  - **Web TUI & Retro FoxPro TUI Integrácia**:
+    - Nové karty v zobrazení `view-keys` pre Cloud KMS stav a vizualizáciu reťazca dôvery s tlačidlom okamžitého overenia.
+    - Rozšírené kaskádové menu Retro FoxPro TUI o skratky `Č ➜ M` (KMS status) a `Č ➜ 3` (3-úrovňová hierarchia).
+  - **Testovacie Pokrytie**:
+    - 15 nových unit a integračných testov v `EncryptedEnvelopeKeyStoreTests`, `KeyHierarchyTests` a `KmsAndHierarchyApiTests` (celkovo 231 .NET testov a 255 testov celkovo, 100% pass rate, 0 varovaní).
 - **WebAssembly & In-Browser Offline License Validator SDK (`@symbolon/validator`)**:
   - **W3C WebCrypto API Kryptografické Overovanie (NIST P-256 / ES256)**:
     - Zero-dependency klientsky validátor bežiaci 100% v prehliadači, Node.js a hybridných prostrediach (Electron, Tauri, React, Vue, Angular).

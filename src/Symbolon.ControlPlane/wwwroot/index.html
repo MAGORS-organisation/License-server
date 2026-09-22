@@ -216,6 +216,45 @@
 
             <!-- VIEW 3: Signing Keys -->
             <section id="view-keys" class="view-section">
+                <!-- KMS & Hardware HSM Status KPI Grid -->
+                <div class="kpi-grid">
+                    <div class="kpi-card" style="grid-column: span 2;">
+                        <div class="kpi-label">
+                            <span>Cloud KMS / Hardware HSM Provider (§9.3)</span>
+                            <span id="kms-status-badge" class="badge badge-active">Načítavam...</span>
+                        </div>
+                        <div class="kpi-value" id="kms-provider-type" style="font-size: 20px; font-family: monospace; color: var(--accent-blue);">LocalEnvelope (AES-256-GCM)</div>
+                        <div class="kpi-subtext" id="kms-provider-details">PBKDF2 100,000 iterácií · Zero-Plaintext Storage Guard aktívny</div>
+                    </div>
+                    <div class="kpi-card">
+                        <div class="kpi-label">
+                            <span>3-Úrovňová Hierarchia</span>
+                            <span>🏛️</span>
+                        </div>
+                        <div style="margin-top: 10px; display: flex; gap: 8px;">
+                            <button class="btn btn-secondary btn-sm" onclick="loadKmsHierarchy()">🔄 Obnoviť</button>
+                            <button class="btn btn-primary btn-sm" onclick="verifyKeyHierarchy()">✓ Overiť</button>
+                        </div>
+                        <div class="kpi-subtext" id="hierarchy-verification-meta">Root ➜ Product ➜ Lease</div>
+                    </div>
+                </div>
+
+                <!-- 3-Tier Key Hierarchy Visual Flow Card -->
+                <div class="table-card" style="margin-bottom: 24px;">
+                    <div class="table-header">
+                        <div>
+                            <div class="table-title">🏛️ Reťazec Dôvery: 3-Úrovňová Hierarchia Podpisových Kľúčov (§9.3)</div>
+                            <div style="font-size: 12px; color: var(--text-secondary); margin-top: 4px;">
+                                Oddelenie zodpovednosti: Root Anchor (Offline/Cold) ➜ Intermediate Product Authority ➜ Ephemeral Lease Key (Leaf).
+                            </div>
+                        </div>
+                        <div id="hierarchy-status-pill" class="badge badge-active">Hierarchia Platná</div>
+                    </div>
+                    <div id="hierarchy-cards-container" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; padding: 16px;">
+                        <div style="text-align: center; color: var(--text-muted); padding: 16px; grid-column: 1 / -1;">Načítavam certifikáty hierarchie...</div>
+                    </div>
+                </div>
+
                 <div class="table-card">
                     <div class="table-header">
                         <div class="table-title">Kryptografické Podpisové Kľúče & JWKS (RFC 9964)</div>

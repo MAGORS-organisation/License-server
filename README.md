@@ -2,7 +2,7 @@
 
 [![Platform](https://img.shields.io/badge/.NET-10.0%20LTS-512BD4?logo=dotnet)](https://dotnet.microsoft.com/)
 [![Language](https://img.shields.io/badge/C%23-14.0-239120?logo=csharp)](https://learn.microsoft.com/dotnet/csharp/)
-[![Tests](https://img.shields.io/badge/tests-216%20passed%20(+13%20Python%2C%20+11%20Wasm)-brightgreen)](#výsledky-testovania)
+[![Tests](https://img.shields.io/badge/tests-231%20passed%20(+13%20Python%2C%20+11%20Wasm)-brightgreen)](#výsledky-testovania)
 [![License: AGPL-3.0](https://img.shields.io/badge/license-AGPL--3.0-blue.svg)](LICENSE)
 [![License: Apache-2.0](https://img.shields.io/badge/client%20SDK-Apache--2.0-blue.svg)](LICENSES/Apache-2.0.txt)
 [![CRA Compliant](https://img.shields.io/badge/CRA%20Compliance-EU%202024%2F2847-success)](SECURITY.md)
@@ -108,6 +108,15 @@ Rieši to, čo dnešné cloud-first platformy ponúkajú iba ako obmedzený dopl
     - Kryptografické overovanie digitálnych podpisov **NIST P-256 (ES256)** cez štandardné rozhranie **W3C WebCrypto API** (`crypto.subtle.verify`) bez nutnosti kontaktu s licenčným serverom.
     - **Web Node-Locking**: Generovanie stabilného hardvérového odtlačku prehliadača (`generateBrowserFingerprint`) kombinujúceho 2D Canvas rendering, WebGL informácie, parametre displeja a systémové prostredie.
     - Interaktívny in-browser validačný portál integrovaný priamo v Retro FoxPro Web TUI (`view-wasm`) aj samostatný jedno-súborový offline portál (`sdk/wasm/index.html`).
+26. **Enterprise Cloud KMS / Hardware HSM Integrácia & 3-Úrovňová Hierarchia Kľúčov (§9.3)**
+    - **Cloud KMS & Hardware HSM**: Podpora pre **Azure Key Vault**, **AWS KMS**, **Hardware HSM (PKCS#11)** a **Encrypted Envelope Store**.
+    - **Envelope Encryption**: Ochrana privátnych kľúčov šifrovanou obálkou **AES-256-GCM** s kľúčovou deriváciou **PBKDF2 (100 000 iterácií SHA-256)** a PEM armor serializáciou (`-----BEGIN ENCRYPTED SYMBOLON KEY-----`).
+    - **3-Úrovňová Hierarchia Kľúčov (Root ➜ Product ➜ Lease)**:
+      - *Tier 1 (Root Master Anchor)*: Offline/Cold kľúč s dlhodobou platnosťou (10 rokov).
+      - *Tier 2 (Intermediate Product Authority)*: Zabezpečuje vydávanie licencií pre konkrétne produktové línie (2 roky).
+      - *Tier 3 (Ephemeral Lease Key)*: Efemerálny kľúč pre klastrové uzly a sedadlá (30 dní).
+    - **Production Key Safety Guard (§9.3 Pravidlo 4)**: Fail-fast overenie pri štarte servera – odmietnutie štartu v produkčnom prostredí (`ASPNETCORE_ENVIRONMENT=Production`) pri detekcii nezašifrovaných privátnych kľúčov v bežných súboroch či premenných.
+    - **CLI & Web TUI**: Príkazy `symbolon kms status`, `symbolon keys envelope`, `symbolon keys hierarchy` a interaktívna vizualizácia reťazca dôvery v Retro FoxPro Web TUI.
 
 ---
 
@@ -351,7 +360,7 @@ Viacjazyčné SDK & WebAssembly testovacie sady:
 Passed!  - Failed: 0, Passed: 13, Skipped: 0, Total: 13 - Python SDK (unittest)
 Passed!  - Failed: 0, Passed: 11, Skipped: 0, Total: 11 - WebAssembly / WebCrypto SDK (node:test)
 
-Celkovo: 240 úspešných automatizovaných testov (216 .NET + 13 Python + 11 Node/Wasm), 0 zlyhaní, 0 chýb.
+Celkovo: 255 úspešných automatizovaných testov (231 .NET + 13 Python + 11 Node/Wasm), 0 zlyhaní, 0 chýb.
 ```
 
 ---
