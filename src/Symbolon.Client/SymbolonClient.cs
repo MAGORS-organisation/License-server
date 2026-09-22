@@ -1,7 +1,9 @@
+using System.Diagnostics;
 using System.Net.Http.Json;
 using Microsoft.Extensions.Logging;
 using Symbolon.Format;
 using Symbolon.Protocol;
+using Symbolon.Protocol.Tracing;
 
 namespace Symbolon.Client;
 
@@ -59,6 +61,9 @@ public sealed class SymbolonClient : IDisposable
         IReadOnlyList<string>? features = null,
         CancellationToken ct = default)
     {
+        using var activity = SymbolonTracing.ActivitySource.StartActivity(SymbolonTracing.OpCheckout);
+        activity?.SetTag(SymbolonTracing.TagLicenseId, _options.LicenseKey);
+
         var checkoutDto = new CheckoutRequestDto
         {
             LicenseKey = _options.LicenseKey,
@@ -78,11 +83,13 @@ public sealed class SymbolonClient : IDisposable
         }
         catch (Exception ex) when (ex is HttpRequestException or TimeoutException)
         {
+            activity?.SetStatus(ActivityStatusCode.Error, ex.Message);
             return SeatLease.Denied($"Offline: {ex.Message}");
         }
 
         if (!response.IsSuccessStatusCode)
         {
+            activity?.SetStatus(ActivityStatusCode.Error, $"HTTP {(int)response.StatusCode}");
             return SeatLease.Denied($"Denied: Server returned {(int)response.StatusCode}");
         }
 
@@ -92,8 +99,11 @@ public sealed class SymbolonClient : IDisposable
 
         if (body is null || string.IsNullOrWhiteSpace(body.LeaseId) || string.IsNullOrWhiteSpace(body.Token))
         {
+            activity?.SetStatus(ActivityStatusCode.Error, "Malformed server response");
             return SeatLease.Denied("Malformed server response");
         }
+
+        activity?.SetTag(SymbolonTracing.TagLeaseId, body.LeaseId);
 
         // Verify the token if trusted keys are configured
         if (_verifier is not null)
@@ -106,10 +116,12 @@ public sealed class SymbolonClient : IDisposable
 
             if (!verifyResult.IsValid)
             {
+                activity?.SetStatus(ActivityStatusCode.Error, "Token verification failed");
                 return SeatLease.Denied($"Token verification failed: {verifyResult.FailureReason}");
             }
         }
 
+        activity?.SetStatus(ActivityStatusCode.Ok);
         return new SeatLease(
             acquired: true,
             reason: null,
@@ -137,6 +149,10 @@ public sealed class SymbolonClient : IDisposable
             throw new ArgumentOutOfRangeException(nameof(days), "Days must be between 1 and 30.");
         }
 
+        using var activity = SymbolonTracing.ActivitySource.StartActivity(SymbolonTracing.OpBorrow);
+        activity?.SetTag(SymbolonTracing.TagLeaseId, leaseId);
+        activity?.SetTag(SymbolonTracing.TagBorrowDays, days);
+
         var dto = new BorrowRequestDto(days);
         var response = await _http.PostAsJsonAsync(
             new Uri($"v1/leases/{leaseId}/borrow", UriKind.Relative),
@@ -146,12 +162,16 @@ public sealed class SymbolonClient : IDisposable
 
         if (!response.IsSuccessStatusCode)
         {
+            activity?.SetStatus(ActivityStatusCode.Error, $"HTTP {(int)response.StatusCode}");
             return null;
         }
 
-        return await response.Content.ReadFromJsonAsync(
+        var result = await response.Content.ReadFromJsonAsync(
             SymbolonProtocolJsonContext.Default.BorrowResponseDto,
             ct).ConfigureAwait(false);
+
+        activity?.SetStatus(ActivityStatusCode.Ok);
+        return result;
     }
 
     /// <summary>
@@ -161,9 +181,21 @@ public sealed class SymbolonClient : IDisposable
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(leaseId);
 
+        using var activity = SymbolonTracing.ActivitySource.StartActivity(SymbolonTracing.OpReturnBorrowed);
+        activity?.SetTag(SymbolonTracing.TagLeaseId, leaseId);
+
         var response = await _http.DeleteAsync(
             new Uri($"v1/leases/{leaseId}", UriKind.Relative),
             ct).ConfigureAwait(false);
+
+        if (response.IsSuccessStatusCode)
+        {
+            activity?.SetStatus(ActivityStatusCode.Ok);
+        }
+        else
+        {
+            activity?.SetStatus(ActivityStatusCode.Error, $"HTTP {(int)response.StatusCode}");
+        }
 
         return response.IsSuccessStatusCode;
     }

@@ -1,7 +1,9 @@
+using System.Diagnostics;
 using System.Net.Http.Json;
 using System.Security.Cryptography;
 using Microsoft.Extensions.Logging;
 using Symbolon.Protocol;
+using Symbolon.Protocol.Tracing;
 
 namespace Symbolon.Client;
 
@@ -131,6 +133,9 @@ public sealed partial class SeatLease : IAsyncDisposable, IDisposable
     {
         if (LeaseId is null) return;
 
+        using var activity = SymbolonTracing.ActivitySource.StartActivity(SymbolonTracing.OpRenew);
+        activity?.SetTag(SymbolonTracing.TagLeaseId, LeaseId);
+
         var renewDto = new RenewRequestDto
         {
             ClientSeq = _clientSeq,
@@ -163,9 +168,11 @@ public sealed partial class SeatLease : IAsyncDisposable, IDisposable
                         State = SeatState.Active;
                     }
                 }
+                activity?.SetStatus(ActivityStatusCode.Ok);
             }
             else
             {
+                activity?.SetStatus(ActivityStatusCode.Error, $"HTTP {(int)response.StatusCode}");
                 HandleRenewalFailure($"Server returned {(int)response.StatusCode}");
             }
         }

@@ -1234,6 +1234,9 @@ async function loadMeshAndAlerts() {
 
     // 6. Active Borrowed Seats (Offline Roaming)
     await loadBorrowedSeats();
+
+    // 7. OpenTelemetry Distributed Traces
+    await loadDistributedTraces();
 }
 
 function fillSampleTpmQuote() {
@@ -1502,6 +1505,46 @@ async function returnBorrowedSeat(leaseId) {
         }
     } catch (err) {
         showToast("Chyba komunikácie so serverom: " + err.message, "error");
+    }
+}
+
+// 7. OpenTelemetry Distributed Traces Waterfall
+async function loadDistributedTraces() {
+    const tbody = document.getElementById("distributed-traces-table-body");
+    if (!tbody) return;
+
+    try {
+        const res = await fetch("/admin/v1/traces/recent");
+        if (!res.ok) {
+            tbody.innerHTML = `<tr><td colspan="7" style="text-align: center; color: var(--accent-rose); padding: 18px;">Chyba pri načítaní stôp (HTTP ${res.status})</td></tr>`;
+            return;
+        }
+
+        const traces = await res.json();
+        if (!traces || traces.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="7" style="text-align: center; color: var(--text-muted); padding: 18px;">Žiadne zaznamenané stopy. Vykonajte checkout alebo obnovu licencie pre vygenerovanie W3C stopy.</td></tr>`;
+            return;
+        }
+
+        tbody.innerHTML = traces.map(t => {
+            const timeStr = new Date(t.startTime).toLocaleTimeString();
+            const statusClass = t.status === "OK" ? "badge-active" : (t.status === "ERROR" ? "badge-danger" : "badge-secondary");
+            const tagsFormatted = Object.entries(t.tags || {})
+                .map(([k, v]) => `<span style="display:inline-block; font-family: monospace; font-size: 11px; background: rgba(255,255,255,0.06); padding: 2px 6px; border-radius: 4px; margin: 1px 2px;"><strong>${escapeHtml(k.replace("symbolon.", ""))}</strong>: ${escapeHtml(String(v))}</span>`)
+                .join(" ");
+
+            return `<tr>
+                <td style="font-family: monospace; font-size: 12px; color: var(--text-secondary);">${escapeHtml(timeStr)}</td>
+                <td><strong style="color: var(--accent-cyan); font-family: monospace;">${escapeHtml(t.name)}</strong></td>
+                <td style="font-family: monospace; font-size: 11px; color: var(--text-muted); max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${escapeHtml(t.traceId)}">${escapeHtml(t.traceId)}</td>
+                <td style="font-family: monospace; font-size: 11px; color: var(--text-muted);">${escapeHtml(t.spanId)}</td>
+                <td><span style="font-family: monospace; font-size: 12px; font-weight: 600; color: ${t.durationMs > 100 ? 'var(--accent-amber)' : 'var(--accent-emerald)'};">${t.durationMs.toFixed(1)} ms</span></td>
+                <td><span class="badge ${statusClass}">${escapeHtml(t.status)}</span></td>
+                <td>${tagsFormatted || '<span style="color:var(--text-muted);">-</span>'}</td>
+            </tr>`;
+        }).join("");
+    } catch (err) {
+        tbody.innerHTML = `<tr><td colspan="7" style="text-align: center; color: var(--accent-rose); padding: 18px;">Chyba komunikácie: ${escapeHtml(err.message)}</td></tr>`;
     }
 }
 

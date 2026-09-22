@@ -10,6 +10,16 @@ a projekt striktne dodržiava [Sémantické Verziovanie (Semantic Versioning 2.0
 ## [Unreleased]
 
 ### Pridané (Added)
+- **OpenTelemetry Distribuované Trasovanie & W3C TraceContext (`System.Diagnostics.ActivitySource`)**:
+  - **Centrálny ActivitySource (`SymbolonTracing`)**: Globálny zdroj trasovania pre celú platformu (`symbolon.checkout`, `symbolon.renew`, `symbolon.release`, `symbolon.borrow`, `symbolon.return_borrowed`, `symbolon.fraud_check`, `symbolon.replication.sync`, `symbolon.ebpf.enforce`, `symbolon.keys.split`, `symbolon.keys.combine`) s bohatými štandardizovanými tagmi a stavmi chýb/úspechu.
+  - **W3C TraceContext Propagácia (`W3cTraceContext`)**: Generovanie, parsovanie a automatická propagácia hlavičiek `traceparent` (`00-{trace_id}-{span_id}-{flags}`) a `tracestate` naprieč .NET Client SDK, Python SDK, Rust SDK, ControlPlane a Relay.
+  - **Živý Diagnostický Buffer Stôp (`SymbolonTraceBuffer`) & Admin API**: Kruhový zberateľ stôp pre diagnostiku v reálnom čase s endpointom `GET /admin/v1/traces/recent` (W3C trace ID, span ID, trvanie, stav a tagy).
+  - **Retro FoxPro Web TUI Waterfall**: Nová karta a tabuľka v ovládacom paneli (`view-system`) vizualizujúca distribuované stopy, ich latencie v milisekundách a štruktúru atribútov v reálnom čase.
+- **Shamir's Secret Sharing ($k$-of-$n$ Prahová Obnova Kľúčov pri Havárii)**:
+  - **Konečné Pole Galois Field $GF(2^8)$ (`GaloisField256`)**: Striktná a deterministická aritmetika nad poľom $GF(2^8)$ s ireducibilným polynómom AES/Rijndael $x^8 + x^4 + x^3 + x + 1$ (`0x11B`), log/exp a inverznými tabuľkami pre násobenie a delenie, a Hornerovou schémou vyhodnocovania polynómov.
+  - **Prahové Delenie a Lagrangeova Rekonštrukcia (`ShamirSecretSharing`)**: Delenie master podpisových kľúčov (ES256, ML-DSA-65) do $n$ podielov s prahom $k$ ($2 \le k \le n \le 255$). Rekonštrukcia pomocou Lagrangeových bázových polynómov v bode $x = 0$ s overením integrity cez kryptografický kontrolný súčet SHA-256 MAC.
+  - **Token & PEM Serializácia Podielov (`SecretShare`)**: Kompaktný tokenový formát `SYMBOLON-SHARE-v1-{k}-{n}-{x}-{Base64Url}` vhodný do príkazového riadka a štandardný PEM formát `-----BEGIN SYMBOLON SECRET SHARE-----`.
+  - **CLI Príkazy `symbolon keys split` & `combine`**: `symbolon keys split --in <key> -k <prah> -n <podielov> [--out-dir <dir>]` a `symbolon keys combine --shares <s1,s2,...> [--out <file>]`.
 - **License Borrowing & Roaming (Offline Výpožičky pre Poľné Zariadenia)**:
   - **.NET Client SDK (`SymbolonClient`, `SeatLease`)**: Metódy `BorrowSeatAsync(leaseId, days)` a `ReturnBorrowedSeatAsync(leaseId)`. Stav `SeatState.Borrowed`, automatické pozastavenie heartbeat slučky počas trvania roaming výpožičky (1–30 dní) a zachovanie licencie pri ukončení aplikácie.
   - **Python SDK (`SymbolonClient`, `SeatLease`)**: Implementované funkcie `borrow_seat(lease, days)` a `return_borrowed_seat(lease_id)` s bezpečným context managerom zabraňujúcim uvoľneniu pri offline roaming stave.

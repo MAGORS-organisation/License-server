@@ -3,9 +3,11 @@ using System.Globalization;
 using System.Net.Http.Json;
 using System.Net.Sockets;
 using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
 using Symbolon.Client;
 using Symbolon.Crypto;
+using Symbolon.Crypto.SecretSharing;
 using Symbolon.Format;
 using Symbolon.Protocol;
 
@@ -78,7 +80,7 @@ internal static class Program
     {
         if (args.Length == 0 || args[0] is "-h" or "--help")
         {
-            Console.WriteLine("Použitie: symbolon keys <generate|export-jwks> [options]");
+            Console.WriteLine("Použitie: symbolon keys <generate|export-jwks|split|combine> [options]");
             return 0;
         }
 
@@ -86,6 +88,8 @@ internal static class Program
         {
             "GENERATE" => HandleKeysGenerate(args[1..]),
             "EXPORT-JWKS" => HandleKeysExportJwks(args[1..]),
+            "SPLIT" => HandleKeysSplit(args[1..]),
+            "COMBINE" => HandleKeysCombine(args[1..]),
             _ => UnknownCommand(args[0])
         };
     }
@@ -168,6 +172,159 @@ internal static class Program
         else
         {
             Console.WriteLine(json);
+        }
+
+        return 0;
+    }
+
+    private static int HandleKeysSplit(string[] args)
+    {
+        string? inPath = GetArg(args, "--in");
+        string? thresholdStr = GetArg(args, "--threshold") ?? GetArg(args, "-k") ?? "3";
+        string? sharesStr = GetArg(args, "--shares") ?? GetArg(args, "-n") ?? "5";
+        string? outDir = GetArg(args, "--out-dir");
+        string? format = GetArg(args, "--format") ?? "token";
+
+        if (string.IsNullOrWhiteSpace(inPath) || !File.Exists(inPath))
+        {
+            Console.Error.WriteLine("Chyba: Parameter --in <subor_kluca> je povinný a súbor musí existovať.");
+            return 1;
+        }
+
+        if (!byte.TryParse(thresholdStr, NumberStyles.Integer, CultureInfo.InvariantCulture, out byte k) || k < 2)
+        {
+            Console.Error.WriteLine("Chyba: Prah (-k / --threshold) musí byť celé číslo >= 2.");
+            return 1;
+        }
+
+        if (!byte.TryParse(sharesStr, NumberStyles.Integer, CultureInfo.InvariantCulture, out byte n) || n < k)
+        {
+            Console.Error.WriteLine($"Chyba: Počet podielov (-n / --shares) musí byť celé číslo >= {k} a <= 255.");
+            return 1;
+        }
+
+        byte[] secretBytes = File.ReadAllBytes(inPath);
+        var shares = ShamirSecretSharing.Split(secretBytes, k, n);
+
+        Console.ForegroundColor = ConsoleColor.Green;
+        Console.WriteLine($"[OK] Kľúč '{Path.GetFileName(inPath)}' úspešne rozdelený na {n} podielov s prahom k={k} (Shamir's Secret Sharing).");
+        Console.ResetColor();
+
+        bool isPem = string.Equals(format, "pem", StringComparison.OrdinalIgnoreCase);
+
+        if (!string.IsNullOrWhiteSpace(outDir))
+        {
+            Directory.CreateDirectory(outDir);
+            for (int i = 0; i < shares.Length; i++)
+            {
+                string shareFileName = Path.Combine(outDir, $"share_{shares[i].Index}.{(isPem ? "pem" : "share")}");
+                string content = isPem ? shares[i].ToPem() : shares[i].ToToken();
+                File.WriteAllText(shareFileName, content);
+                Console.WriteLine($"  -> Zapísaný podiel {shares[i].Index}: {shareFileName}");
+            }
+        }
+        else
+        {
+            Console.WriteLine("Vygenerované podiely tajomstva:");
+            for (int i = 0; i < shares.Length; i++)
+            {
+                Console.WriteLine($"--- Podiel #{shares[i].Index} ---");
+                Console.WriteLine(isPem ? shares[i].ToPem() : shares[i].ToToken());
+            }
+        }
+
+        return 0;
+    }
+
+    private static int HandleKeysCombine(string[] args)
+    {
+        string? sharesParam = GetArg(args, "--shares");
+        string? inDir = GetArg(args, "--in-dir");
+        string? outPath = GetArg(args, "--out");
+
+        var collectedTokens = new List<string>();
+
+        if (!string.IsNullOrWhiteSpace(sharesParam))
+        {
+            var parts = sharesParam.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+            foreach (var part in parts)
+            {
+                if (File.Exists(part))
+                {
+                    collectedTokens.Add(File.ReadAllText(part).Trim());
+                }
+                else
+                {
+                    collectedTokens.Add(part);
+                }
+            }
+        }
+
+        if (!string.IsNullOrWhiteSpace(inDir) && Directory.Exists(inDir))
+        {
+            foreach (var file in Directory.GetFiles(inDir, "*.*"))
+            {
+                if (file.EndsWith(".share", StringComparison.OrdinalIgnoreCase) || file.EndsWith(".pem", StringComparison.OrdinalIgnoreCase))
+                {
+                    collectedTokens.Add(File.ReadAllText(file).Trim());
+                }
+            }
+        }
+
+        if (collectedTokens.Count == 0)
+        {
+            Console.Error.WriteLine("Chyba: Je potrebné zadať aspoň k podielov pomocou --shares <subory_alebo_tokeny> alebo --in-dir <adresar>.");
+            return 1;
+        }
+
+        var shares = new List<SecretShare>();
+        foreach (var tokenStr in collectedTokens)
+        {
+            if (SecretShare.TryParse(tokenStr, out var share) && share is not null)
+            {
+                shares.Add(share);
+            }
+            else
+            {
+                Console.ForegroundColor = ConsoleColor.Yellow;
+                Console.WriteLine($"Varovanie: Reťazec nemožno rozparsovať ako platný podiel tajomstva: {tokenStr[..Math.Min(20, tokenStr.Length)]}...");
+                Console.ResetColor();
+            }
+        }
+
+        byte[] recoveredSecret;
+        try
+        {
+            recoveredSecret = ShamirSecretSharing.Combine(shares);
+        }
+        catch (Exception ex) when (ex is CryptographicException or InvalidOperationException or ArgumentException)
+        {
+            Console.ForegroundColor = ConsoleColor.Red;
+            Console.Error.WriteLine($"[CHYBA] Rekonštrukcia zlyhala: {ex.Message}");
+            Console.ResetColor();
+            return 1;
+        }
+
+        Console.ForegroundColor = ConsoleColor.Green;
+        Console.WriteLine($"[OK] Kľúč úspešne zrekonštruovaný z {shares.Count} platných podielov (Kontrolný súčet SHA-256 OVERENÝ).");
+        Console.ResetColor();
+
+        if (!string.IsNullOrWhiteSpace(outPath))
+        {
+            File.WriteAllBytes(outPath, recoveredSecret);
+            Console.WriteLine($"  -> Zrekonštruovaný kľúč zapísaný do: {outPath}");
+        }
+        else
+        {
+            Console.WriteLine("Zrekonštruované dáta (UTF-8 / Hex):");
+            try
+            {
+                Console.WriteLine(Encoding.UTF8.GetString(recoveredSecret));
+            }
+            catch (DecoderFallbackException)
+            {
+                Console.WriteLine(Convert.ToHexString(recoveredSecret));
+            }
         }
 
         return 0;
@@ -500,6 +657,8 @@ internal static class Program
               setup | wizard                            Spustí interaktívneho inštalačného sprievodcu (TUI)
               keys generate --alg <ES256|ML-DSA-65> --kid <id> [--out file]
               keys export-jwks --keys <file1,file2> [--out file]
+              keys split --in <key-file> -k <prax> -n <podielov> [--out-dir <dir>]
+              keys combine --shares <s1,s2,...> [--out <file>]
               license keygen [--prefix SYM]
               license issue --customer <id> --seats <n> [--out file]
               license inspect <file.symlic>

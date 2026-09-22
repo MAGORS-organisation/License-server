@@ -13,6 +13,13 @@ from .models import LeaseToken, SymbolonException, SeatAllocationDenied
 from .fingerprint import get_hardware_components, compute_canonical_fingerprint
 
 
+def _generate_w3c_traceparent() -> str:
+    """Generates a compliant W3C traceparent header: 00-{trace_id}-{span_id}-01."""
+    trace_id = f"{random.getrandbits(128):032x}"
+    span_id = f"{random.getrandbits(64):016x}"
+    return f"00-{trace_id}-{span_id}-01"
+
+
 class SeatLease:
     """Represents an acquired floating seat lease. Supports Python context manager."""
 
@@ -151,7 +158,14 @@ class SymbolonClient:
     def release_seat(self, lease_id: str) -> None:
         """Frees the seat on the server."""
         url = f"{self.server_url}/v1/leases/{lease_id}"
-        req = urllib.request.Request(url, method="DELETE")
+        req = urllib.request.Request(
+            url,
+            headers={
+                "User-Agent": "Symbolon-Python-SDK/1.0",
+                "traceparent": _generate_w3c_traceparent(),
+            },
+            method="DELETE",
+        )
         try:
             with urllib.request.urlopen(req, timeout=self.timeout) as res:
                 pass
@@ -228,6 +242,7 @@ class SymbolonClient:
             headers={
                 "Content-Type": "application/json",
                 "User-Agent": "Symbolon-Python-SDK/1.0",
+                "traceparent": _generate_w3c_traceparent(),
             },
             method="POST",
         )

@@ -1,7 +1,9 @@
 using System.Collections.Concurrent;
+using System.Diagnostics;
 using System.Globalization;
 using System.Net;
 using Microsoft.Extensions.Logging;
+using Symbolon.Protocol.Tracing;
 
 namespace Symbolon.Domain.Security;
 
@@ -38,6 +40,9 @@ public sealed partial class FraudDetectionService : IFraudDetectionService
     {
         ArgumentNullException.ThrowIfNull(accessEvent);
 
+        using var activity = SymbolonTracing.ActivitySource.StartActivity(SymbolonTracing.OpFraudCheck);
+        activity?.SetTag(SymbolonTracing.TagLicenseId, accessEvent.LicenseId);
+
         var currentLocation = accessEvent.Location ?? ResolveGeoLocation(accessEvent.IpAddress);
         var effectiveEvent = accessEvent.Location is null && currentLocation is not null
             ? accessEvent with { Location = currentLocation }
@@ -49,6 +54,9 @@ public sealed partial class FraudDetectionService : IFraudDetectionService
         {
             RecordAnomaly(vmCloneResult, effectiveEvent);
             _lastHardwareAccess[effectiveEvent.FingerprintHash] = effectiveEvent;
+            activity?.SetTag(SymbolonTracing.TagVmCloning, true);
+            activity?.SetTag(SymbolonTracing.TagFraudRisk, vmCloneResult.RiskLevel.ToString());
+            activity?.SetStatus(ActivityStatusCode.Error, "VM Cloning Detected");
             return Task.FromResult(vmCloneResult);
         }
 
@@ -58,12 +66,17 @@ public sealed partial class FraudDetectionService : IFraudDetectionService
         {
             RecordAnomaly(travelResult, effectiveEvent);
             UpdateTracking(effectiveEvent);
+            activity?.SetTag(SymbolonTracing.TagVelocityKmh, travelResult.VelocityKmH);
+            activity?.SetTag(SymbolonTracing.TagFraudRisk, travelResult.RiskLevel.ToString());
+            activity?.SetStatus(ActivityStatusCode.Error, "Impossible Travel Velocity");
             return Task.FromResult(travelResult);
         }
 
         // Access is legitimate / within physical bounds
         UpdateTracking(effectiveEvent);
 
+        activity?.SetTag(SymbolonTracing.TagFraudRisk, FraudRiskLevel.None.ToString());
+        activity?.SetStatus(ActivityStatusCode.Ok);
         return Task.FromResult(new FraudAssessmentResult(
             IsSuspicious: false,
             RiskLevel: FraudRiskLevel.None,

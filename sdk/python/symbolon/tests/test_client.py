@@ -63,6 +63,20 @@ class TestSymbolonPythonSdk(unittest.TestCase):
         self.assertEqual(recorded_payloads[1]["clientSeq"], 1)
         self.assertEqual(lease.seq, 2)
 
+    def test_w3c_traceparent_format_and_injection(self):
+        from symbolon.client import _generate_w3c_traceparent
+        tp = _generate_w3c_traceparent()
+        self.assertTrue(tp.startswith("00-"))
+        parts = tp.split("-")
+        self.assertEqual(len(parts), 4)
+        self.assertEqual(parts[0], "00")
+        self.assertEqual(len(parts[1]), 32)
+        self.assertEqual(len(parts[2]), 16)
+        self.assertEqual(parts[3], "01")
+        # Validate hex format
+        int(parts[1], 16)
+        int(parts[2], 16)
+
 
 if __name__ == "__main__":
     unittest.main()

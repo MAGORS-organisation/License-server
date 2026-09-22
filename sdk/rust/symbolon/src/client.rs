@@ -77,3 +77,13 @@ fn rand_u64() -> u64 {
         .map(|d| d.as_nanos() as u64)
         .unwrap_or(42)
 }
+
+/// Generates a standard W3C traceparent header: 00-{trace_id}-{span_id}-01.
+pub fn generate_w3c_traceparent() -> String {
+    use std::time::{SystemTime, UNIX_EPOCH};
+    let now = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|d| d.as_nanos())
+        .unwrap_or(42);
+    format!("00-{:032x}-{:016x}-01", now, (now >> 64) as u64)
+}

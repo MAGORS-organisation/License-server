@@ -20,6 +20,8 @@ namespace Symbolon.Protocol;
 [JsonSerializable(typeof(BorrowResponseDto))]
 [JsonSerializable(typeof(QueuedResponseDto))]
 [JsonSerializable(typeof(ServerTelemetryDto))]
+[JsonSerializable(typeof(Symbolon.Protocol.Tracing.TraceSpanDto))]
+[JsonSerializable(typeof(List<Symbolon.Protocol.Tracing.TraceSpanDto>))]
 public sealed partial class SymbolonProtocolJsonContext : JsonSerializerContext
 {
 }

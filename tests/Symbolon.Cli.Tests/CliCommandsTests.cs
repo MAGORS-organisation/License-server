@@ -107,4 +107,69 @@ public sealed class CliCommandsTests
         int missingLeaseCode = await Program.Main(["license", "return"]);
         missingLeaseCode.Should().Be(1);
     }
+
+    [Fact]
+    public async Task KeysSplit_And_KeysCombine_Workflow_Succeeds()
+    {
+        string tempDir = Path.Combine(Path.GetTempPath(), $"sss_test_{Guid.NewGuid():N}");
+        Directory.CreateDirectory(tempDir);
+
+        string originalKeyFile = Path.Combine(tempDir, "master.key");
+        string recoveredKeyFile = Path.Combine(tempDir, "recovered.key");
+        string sharesDir = Path.Combine(tempDir, "shares");
+
+        byte[] secret = "SYMBOLON-HIGH-SECURITY-MASTER-PQC-KEY-TEST-2026"u8.ToArray();
+        await File.WriteAllBytesAsync(originalKeyFile, secret);
+
+        try
+        {
+            // 1. Split into 5 shares with threshold k=3
+            int splitCode = await Program.Main([
+                "keys", "split",
+                "--in", originalKeyFile,
+                "-k", "3",
+                "-n", "5",
+                "--out-dir", sharesDir,
+                "--format", "token"
+            ]);
+            splitCode.Should().Be(0);
+
+            Directory.Exists(sharesDir).Should().BeTrue();
+            var shareFiles = Directory.GetFiles(sharesDir, "*.share");
+            shareFiles.Length.Should().Be(5);
+
+            // 2. Combine using a subset of 3 shares (shares 1, 3, 5)
+            string share1 = Path.Combine(sharesDir, "share_1.share");
+            string share3 = Path.Combine(sharesDir, "share_3.share");
+            string share5 = Path.Combine(sharesDir, "share_5.share");
+
+            int combineCode = await Program.Main([
+                "keys", "combine",
+                "--shares", $"{share1},{share3},{share5}",
+                "--out", recoveredKeyFile
+            ]);
+            combineCode.Should().Be(0);
+
+            File.Exists(recoveredKeyFile).Should().BeTrue();
+            byte[] recoveredBytes = await File.ReadAllBytesAsync(recoveredKeyFile);
+            recoveredBytes.Should().Equal(secret);
+
+            // 3. Combine with insufficient shares (only 2 shares when k=3) must fail
+            string failRecoveredFile = Path.Combine(tempDir, "fail.key");
+            int failCode = await Program.Main([
+                "keys", "combine",
+                "--shares", $"{share1},{share3}",
+                "--out", failRecoveredFile
+            ]);
+            failCode.Should().Be(1);
+            File.Exists(failRecoveredFile).Should().BeFalse();
+        }
+        finally
+        {
+            if (Directory.Exists(tempDir))
+            {
+                try { Directory.Delete(tempDir, true); } catch { /* ignore */ }
+            }
+        }
+    }
 }

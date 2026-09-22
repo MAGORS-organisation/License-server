@@ -2,7 +2,7 @@
 
 [![Platform](https://img.shields.io/badge/.NET-10.0%20LTS-512BD4?logo=dotnet)](https://dotnet.microsoft.com/)
 [![Language](https://img.shields.io/badge/C%23-14.0-239120?logo=csharp)](https://learn.microsoft.com/dotnet/csharp/)
-[![Tests](https://img.shields.io/badge/tests-173%20passed%20(+12%20Python)-brightgreen)](#výsledky-testovania)
+[![Tests](https://img.shields.io/badge/tests-194%20passed%20(+13%20Python)-brightgreen)](#výsledky-testovania)
 [![License: AGPL-3.0](https://img.shields.io/badge/license-AGPL--3.0-blue.svg)](LICENSE)
 [![License: Apache-2.0](https://img.shields.io/badge/client%20SDK-Apache--2.0-blue.svg)](LICENSES/Apache-2.0.txt)
 [![CRA Compliant](https://img.shields.io/badge/CRA%20Compliance-EU%202024%2F2847-success)](SECURITY.md)
@@ -80,6 +80,14 @@ Rieši to, čo dnešné cloud-first platformy ponúkajú iba ako obmedzený dopl
     - Pokročilá detekcia podvodov v reálnom čase pomocou Haversine vzorca ($v = \Delta d / \Delta t$) odhaľujúca fyzikálne nemožné geografické skoky ($> 900 \text{ km/h}$) na vzdialenosti $> 100 \text{ km}$.
     - Detekcia klonovania virtuálnych strojov (VM snapshot replay) pri simultánnom pripojení identického hardvérového fingerprintu (SMBIOS UUID, MAC) z rôznych verejných IP podsietí.
     - Automatické spúšťanie bezpečnostných výstrah cez `IAlertService`, zápis do kryptografického audit ledgeru a živý monitorovací radar v Retro TUI Web Dashboarde.
+20. **OpenTelemetry Distribuované Trasovanie (W3C TraceContext)**
+    - Natívna podpora pre `System.Diagnostics.ActivitySource` naprieč celým stackom (`symbolon.checkout`, `symbolon.renew`, `symbolon.borrow`, `symbolon.fraud_check`, `symbolon.keys.split`, `symbolon.ebpf`).
+    - Automatická propagácia hlavičiek `traceparent` a `tracestate` cez .NET Client SDK, Python SDK, Rust SDK, ControlPlane a Relay.
+    - Živý kruhový diagnostický buffer (`SymbolonTraceBuffer`) a vizualizácia stôp v reálnom čase na Web TUI (`/admin/v1/traces/recent`).
+21. **Shamir's Secret Sharing ($k$-of-$n$ Prahová Obnova Kľúčov pri Havárii)**
+    - Informačno-teoreticky bezpečné delenie master podpisových kľúčov (ES256, ML-DSA-65) nad konečným poľom Galois Field $GF(2^8)$ s AES polynómom `0x11B`.
+    - Rekonštrukcia kľúča z ľubovoľných $k$ z $n$ podielov pomocou Lagrangeovej interpolácie s kryptografickým SHA-256 MAC overením integrity.
+    - CLI príkazy `symbolon keys split` a `symbolon keys combine` s podporou Base64Url tokenov aj štandardného PEM formátu.
 
 ---
 
@@ -304,17 +312,17 @@ dotnet run --project src/Symbolon.Cli -- doctor --file license.symlic --key ./my
 Všetkých 9 projektov má 100% úspešnosť testov bez zlyhania:
 
 ```text
-Passed!  - Failed: 0, Passed:  9, Skipped: 0, Total:  9 - Symbolon.Crypto.Tests.dll
+Passed!  - Failed: 0, Passed: 19, Skipped: 0, Total: 19 - Symbolon.Crypto.Tests.dll
 Passed!  - Failed: 0, Passed: 37, Skipped: 0, Total: 37 - Symbolon.Format.Tests.dll
-Passed!  - Failed: 0, Passed:  8, Skipped: 0, Total:  8 - Symbolon.Protocol.Tests.dll
+Passed!  - Failed: 0, Passed: 16, Skipped: 0, Total: 16 - Symbolon.Protocol.Tests.dll
 Passed!  - Failed: 0, Passed: 24, Skipped: 0, Total: 24 - Symbolon.Domain.Tests.dll
 Passed!  - Failed: 0, Passed:  9, Skipped: 0, Total:  9 - Symbolon.Relay.Tests.dll
 Passed!  - Failed: 0, Passed: 11, Skipped: 0, Total: 11 - Symbolon.Client.Tests.dll
-Passed!  - Failed: 0, Passed: 20, Skipped: 0, Total: 20 - Symbolon.Cli.Tests.dll
+Passed!  - Failed: 0, Passed: 21, Skipped: 0, Total: 21 - Symbolon.Cli.Tests.dll
 Passed!  - Failed: 0, Passed:  7, Skipped: 0, Total:  7 - Symbolon.Data.Tests.dll
-Passed!  - Failed: 0, Passed: 48, Skipped: 0, Total: 48 - Symbolon.ControlPlane.Tests.dll
+Passed!  - Failed: 0, Passed: 50, Skipped: 0, Total: 50 - Symbolon.ControlPlane.Tests.dll
 
-Celkovo: 173 úspešných testov v .NET (+ 12 unit testov v Pythone), 0 zlyhaní, 0 chýb. Trvanie: ~8 sekúnd.
+Celkovo: 194 úspešných testov v .NET (+ 13 unit testov v Pythone), 0 zlyhaní, 0 chýb. Trvanie: ~8 sekúnd.
 ```
 
 ---

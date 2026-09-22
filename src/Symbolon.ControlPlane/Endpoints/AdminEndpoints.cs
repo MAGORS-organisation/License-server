@@ -60,6 +60,9 @@ public static class AdminEndpoints
         group.MapGet("/leases/borrowed", GetBorrowedSeatsAsync).WithName("GetBorrowedSeats");
         group.MapPost("/leases/{id}/return", ReturnBorrowedSeatAdminAsync).WithName("ReturnBorrowedSeatAdmin");
 
+        // Distributed Tracing Explorer
+        group.MapGet("/traces/recent", GetRecentTraces).WithName("GetRecentTraces");
+
         group.AddEndpointFilter(async (invocationContext, next) =>
         {
             var http = invocationContext.HttpContext;
@@ -894,5 +897,11 @@ public static class AdminEndpoints
         }
 
         return TypedResults.Ok(new { success = released, leaseId = id });
+    }
+
+    private static IResult GetRecentTraces(
+        Observability.SymbolonTraceBuffer traceBuffer)
+    {
+        return TypedResults.Ok(traceBuffer.GetRecentSpans());
     }
 }

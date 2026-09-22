@@ -1,4 +1,5 @@
 using System.Buffers.Text;
+using System.Diagnostics;
 using System.Globalization;
 using System.Security.Cryptography;
 using System.Text;
@@ -13,6 +14,7 @@ using Symbolon.Domain;
 using Symbolon.Domain.Security;
 using Symbolon.Format;
 using Symbolon.Protocol;
+using Symbolon.Protocol.Tracing;
 
 namespace Symbolon.ControlPlane.Endpoints;
 
@@ -90,6 +92,10 @@ public static class PublicEndpoints
         IFraudDetectionService fraudDetection,
         CancellationToken ct)
     {
+        using var activity = SymbolonTracing.ActivitySource.StartActivity(SymbolonTracing.OpCheckout);
+        activity?.SetTag(SymbolonTracing.TagLicenseId, dto.LicenseKey);
+        activity?.SetTag(SymbolonTracing.TagSeatCount, dto.Quantity);
+
         string? idempotencyKey = context.Request.Headers["Idempotency-Key"].FirstOrDefault();
         byte[] rawKeyBytes = Encoding.UTF8.GetBytes(dto.LicenseKey.Trim());
         byte[] lookup = SHA256.HashData(rawKeyBytes)[..4];
@@ -202,6 +208,8 @@ public static class PublicEndpoints
 
             var alloc = result.Allocations[0];
             var entitlements = dto.Features ?? ["core"];
+            activity?.SetTag(SymbolonTracing.TagLeaseId, alloc.LeaseId ?? string.Empty);
+            activity?.SetStatus(ActivityStatusCode.Ok);
             return TypedResults.Ok(new CheckoutResponseDto
             {
                 LeaseId = alloc.LeaseId ?? string.Empty,
@@ -268,9 +276,13 @@ public static class PublicEndpoints
         Observability.SymbolonMetrics metrics,
         CancellationToken ct)
     {
+        using var activity = SymbolonTracing.ActivitySource.StartActivity(SymbolonTracing.OpRenew);
+        activity?.SetTag(SymbolonTracing.TagLeaseId, id);
+
         string? fp = dto.ResolveFingerprintHash();
         if (string.IsNullOrWhiteSpace(fp))
         {
+            activity?.SetStatus(ActivityStatusCode.Error, "Missing Fingerprint");
             return TypedResults.Problem(
                 statusCode: StatusCodes.Status400BadRequest,
                 title: "Missing Fingerprint",
@@ -289,6 +301,7 @@ public static class PublicEndpoints
         if (result.IsSuccess && result.Allocation is not null && result.Token is not null)
         {
             metrics.RecordLeaseRenewed();
+            activity?.SetStatus(ActivityStatusCode.Ok);
             return TypedResults.Ok(new RenewResponseDto
             {
                 Token = result.Token,
@@ -297,6 +310,7 @@ public static class PublicEndpoints
             });
         }
 
+        activity?.SetStatus(ActivityStatusCode.Error, result.Reason);
         return result.Reason switch
         {
             "stale-sequence" => TypedResults.Problem(
@@ -330,6 +344,9 @@ public static class PublicEndpoints
         Observability.SymbolonMetrics metrics,
         CancellationToken ct)
     {
+        using var activity = SymbolonTracing.ActivitySource.StartActivity(SymbolonTracing.OpRelease);
+        activity?.SetTag(SymbolonTracing.TagLeaseId, id);
+
         var seat = await db.Seats.FirstOrDefaultAsync(s => s.LeaseId == id, ct).ConfigureAwait(false);
         string? licenseId = seat?.LicenseId;
 
@@ -341,6 +358,11 @@ public static class PublicEndpoints
             {
                 await queueManager.TryPromoteNextAsync(licenseId, ct).ConfigureAwait(false);
             }
+            activity?.SetStatus(ActivityStatusCode.Ok);
+        }
+        else
+        {
+            activity?.SetStatus(ActivityStatusCode.Error, "Release failed");
         }
         return TypedResults.Ok(new ReleaseResponseDto { Success = released });
     }
@@ -353,6 +375,10 @@ public static class PublicEndpoints
         TimeProvider time,
         CancellationToken ct)
     {
+        using var activity = SymbolonTracing.ActivitySource.StartActivity(SymbolonTracing.OpBorrow);
+        activity?.SetTag(SymbolonTracing.TagLeaseId, id);
+        activity?.SetTag(SymbolonTracing.TagBorrowDays, dto.Days);
+
         var seat = await db.Seats
             .Include(s => s.License)
             .FirstOrDefaultAsync(s => s.LeaseId == id, ct)
@@ -360,6 +386,7 @@ public static class PublicEndpoints
 
         if (seat is null)
         {
+            activity?.SetStatus(ActivityStatusCode.Error, "Lease Not Found");
             return TypedResults.Problem(statusCode: 404, title: "Lease Not Found", type: ProblemTypes.LeaseUnknown);
         }
 
@@ -383,6 +410,7 @@ public static class PublicEndpoints
         };
 
         string token = tokenIssuer.Issue(alloc);
+        activity?.SetStatus(ActivityStatusCode.Ok);
         return TypedResults.Ok(new BorrowResponseDto(seat.LeaseId!, borrowedUntil, token));
     }
 

@@ -799,6 +799,37 @@
                         </p>
                     </div>
                 </div>
+
+                <!-- OpenTelemetry Distributed Traces Explorer -->
+                <div class="table-card" style="margin-top: 20px;">
+                    <div class="table-header">
+                        <div>
+                            <div class="table-title">🛰️ OpenTelemetry Distribuované Stopy (W3C TraceContext Waterfall)</div>
+                            <div class="table-subtitle">Živý diagnostický zberateľ stôp (checkout, renew, borrow, fraud_check, sss, ebpf) v reálnom čase</div>
+                        </div>
+                        <div class="table-actions">
+                            <button class="btn btn-secondary btn-sm" onclick="loadDistributedTraces()">Obnoviť Stopy</button>
+                        </div>
+                    </div>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Časová Pečiatka</th>
+                                <th>Operácia (Span Name)</th>
+                                <th>Trace ID (W3C)</th>
+                                <th>Span ID</th>
+                                <th>Trvanie</th>
+                                <th>Stav</th>
+                                <th>Atribúty / Tagy</th>
+                            </tr>
+                        </thead>
+                        <tbody id="distributed-traces-table-body">
+                            <tr>
+                                <td colspan="7" style="text-align: center; color: var(--text-muted); padding: 18px;">Načítavam distribuované stopy...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
             </section>
 
         </main>

@@ -43,6 +43,7 @@ builder.Services.AddSingleton<ISignatureProvider>(es256Key);
 // Services
 builder.Services.AddSingleton<TimeProvider>(TimeProvider.System);
 builder.Services.AddSingleton<Symbolon.ControlPlane.Observability.SymbolonMetrics>();
+builder.Services.AddSingleton<Symbolon.ControlPlane.Observability.SymbolonTraceBuffer>();
 builder.Services.AddScoped<Symbolon.ControlPlane.Security.KeyManager>();
 builder.Services.AddScoped<ISeatStore, EfSeatStore>();
 builder.Services.AddScoped<IAuditLedger, EfAuditLedger>();
