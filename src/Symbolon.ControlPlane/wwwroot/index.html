@@ -582,6 +582,51 @@
                             </div>
                         </div>
                     </div>
+                <!-- Active-Active Geo-Replication (CRDT & Vector Clocks) -->
+                <div class="table-card" style="margin-top: 20px;">
+                    <div class="table-header">
+                        <div>
+                            <div class="table-title">🌍 Active-Active Multi-Region Geo-Replication (CRDT &amp; Vector Clocks)</div>
+                            <div class="table-subtitle">Kauzálne vektorové hodiny, PN-Counter CRDT a bezkolízne disjoint alokácie naprieč dátovými centrami</div>
+                        </div>
+                        <div class="table-actions">
+                            <button class="btn btn-secondary btn-sm" onclick="loadGeoReplicationStatus()">Obnoviť Klastre</button>
+                        </div>
+                    </div>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Región</th>
+                                <th>Typ</th>
+                                <th>Endpoint</th>
+                                <th>Disjoint Rozsah Sedadiel</th>
+                                <th>Vektorový Čas (Clock)</th>
+                                <th>Stav Replikácie</th>
+                            </tr>
+                        </thead>
+                        <tbody id="geo-replication-table-body">
+                            <tr>
+                                <td><strong>eu-central-1</strong></td>
+                                <td><span class="badge badge-active">Lokálny uzol</span></td>
+                                <td>/v1/replication</td>
+                                <td>1 - 100 (100 sedadiel)</td>
+                                <td><code id="geo-local-clock">eu-central-1: 1</code></td>
+                                <td><span class="badge badge-active">Aktívny</span></td>
+                            </tr>
+                        </tbody>
+                    </table>
+                    <div style="padding: 12px 16px; background: rgba(0,0,0,0.15); border-top: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; font-size: 13px;">
+                        <div>
+                            <strong>Globálna CRDT Kapacita:</strong>
+                            <span id="geo-global-capacity" style="color: var(--accent-emerald); font-weight: bold; margin-left: 8px;">300 sedadiel</span>
+                            <span style="color: var(--text-muted); margin-left: 8px;">(Lokálne obsadené: <span id="geo-local-allocated">0</span>, Globálne: <span id="geo-global-allocated">0</span>)</span>
+                        </div>
+                        <div>
+                            <span class="badge badge-secondary" style="font-family: monospace;">HMAC-SHA256 Signed</span>
+                            <span class="badge badge-secondary" style="font-family: monospace; margin-left: 4px;">Anti-Replay 5m</span>
+                        </div>
+                    </div>
+                </div>
                 </div>
             </section>
 

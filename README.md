@@ -2,7 +2,7 @@
 
 [![Platform](https://img.shields.io/badge/.NET-10.0%20LTS-512BD4?logo=dotnet)](https://dotnet.microsoft.com/)
 [![Language](https://img.shields.io/badge/C%23-14.0-239120?logo=csharp)](https://learn.microsoft.com/dotnet/csharp/)
-[![Tests](https://img.shields.io/badge/tests-127%20passed%20(+3%20Python)-brightgreen)](#výsledky-testovania)
+[![Tests](https://img.shields.io/badge/tests-142%20passed%20(+3%20Python)-brightgreen)](#výsledky-testovania)
 [![License: AGPL-3.0](https://img.shields.io/badge/license-AGPL--3.0-blue.svg)](LICENSE)
 [![License: Apache-2.0](https://img.shields.io/badge/client%20SDK-Apache--2.0-blue.svg)](LICENSES/Apache-2.0.txt)
 [![CRA Compliant](https://img.shields.io/badge/CRA%20Compliance-EU%202024%2F2847-success)](SECURITY.md)
@@ -60,6 +60,10 @@ Rieši to, čo dnešné cloud-first platformy ponúkajú iba ako obmedzený dopl
     - Štandardizované balíčky OCI Image Manifest v1 pre air-gapped Kubernetes repozitáre (`symbolon oci pack/verify`).
 14. **Jednookenné Desktop Prostredie & Živá Telemetria**
     - Kompletná správa servera v jedinom okne s priebežným monitoringom systémových zdrojov (CPU, RAM, DISK, NET, IP, Používateľ) v reálnom čase.
+15. **Multi-Region Geo-Replication (Active-Active CRDT)**
+    - Kauzálne vektorové hodiny (Vector Clocks), stavový PN-Counter CRDT a autonómne disjoint prideľovanie sedadiel bez centrálneho distribuovaného zámku.
+    - Okamžité bezkolízne lokálne checkouts v EU, US aj AP regiónoch s automatickým zliatím po obnovení spojenia (partition healing) a HMAC-SHA256 autentifikáciou.
+    - Kompletná CLI správa (`symbolon cluster status/sync`) a živá vizualizácia v Retro TUI dashboarde.
 
 ---
 

@@ -54,6 +54,13 @@ builder.Services.AddSingleton<Symbolon.ControlPlane.Queuing.IQueueManager, Symbo
 builder.Services.AddScoped<Symbolon.ControlPlane.Alerting.IAlertService, Symbolon.ControlPlane.Alerting.AlertService>();
 builder.Services.AddSingleton<Symbolon.Relay.Mesh.IRelayMeshCoordinator>(_ =>
     new Symbolon.Relay.Mesh.RelayMeshCoordinator("cp_primary_cluster", Enumerable.Range(1, 100)));
+builder.Services.AddSingleton<Symbolon.Domain.Replication.IGeoReplicationEngine>(_ =>
+{
+    var engine = new Symbolon.Domain.Replication.GeoReplicationEngine("eu-central-1", seatRangeStart: 1, seatRangeEnd: 100);
+    engine.RegisterPeer("us-east-1", "https://us.symbolon.internal/v1/replication", 101, 200);
+    engine.RegisterPeer("ap-southeast-1", "https://ap.symbolon.internal/v1/replication", 201, 300);
+    return engine;
+});
 builder.Services.AddScoped<LeaseEngine>();
 
 // Rate Limiting (STRIDE T11, T12, SEC-05: Partitioned by Client IP / Admin Key)
@@ -195,6 +202,7 @@ app.MapApiKeyEndpoints().RequireAuthorization("SuperAdminOnly").RequireRateLimit
 app.MapWebhookEndpoints().RequireAuthorization().RequireRateLimiting("admin");
 app.MapRelaySyncEndpoints().RequireRateLimiting("relay");
 app.MapOfflineEndpoints();
+app.MapReplicationEndpoints();
 
 // SPA Fallback
 app.MapFallbackToFile("index.html");

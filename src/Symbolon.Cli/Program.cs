@@ -44,6 +44,7 @@ internal static class Program
                 "VERIFY-ARTIFACT" or "VERIFY" => await Commands.ComplianceCommands.HandleVerifyArtifactAsync(args[1..]).ConfigureAwait(false),
                 "OCI" => await Commands.OciCommands.HandleOciAsync(args[1..]).ConfigureAwait(false),
                 "MESH" => await Commands.MeshCommands.HandleMeshAsync(args[1..]).ConfigureAwait(false),
+                "CLUSTER" => await Commands.ClusterCommands.HandleClusterAsync(args[1..]).ConfigureAwait(false),
                 "ATTESTATION" => await Commands.AttestationCommands.HandleAttestationAsync(args[1..]).ConfigureAwait(false),
                 _ => UnknownCommand(args[0])
             };
@@ -429,6 +430,7 @@ internal static class Program
               verify-artifact <cesta> [--checksum <sha256>]  Vypočíta a overí integritu súboru (SHA-256/512)
               oci pack|verify [options]                 Vytvorenie a verifikácia OCI Cryptographic License Bundles
               mesh status [--node <id>]                 Zobrazenie konsenzu a topológie Relay Mesh klastra
+              cluster status|sync [options]             Multi-regiónová geo-replikácia, vektorové hodiny a CRDT status
               attestation verify [options]              Verifikácia hardvérovej TPM 2.0 / Enclave citácie
             """);
     }

@@ -7,6 +7,18 @@ a projekt striktne dodržiava [Sémantické Verziovanie (Semantic Versioning 2.0
 
 ---
 
+## [Unreleased]
+
+### Pridané (Added)
+- **Multi-Region Geo-Replication (Active-Active CRDT)**:
+  - **Kauzálne Vektorové Hodiny (`VectorClock`)**: Deterministické rozlišovanie kauzálnych a súbežných zmien naprieč geografickými regiónmi (`eu-central-1`, `us-east-1`, `ap-southeast-1`).
+  - **Stavový PN-Counter CRDT (`PnCounter`)**: Komutatívne, asociatívne a idempotentné zlučovanie globálnych kapacít a alokovaných sedadiel bez potreby centrálneho distribuovaného zámku.
+  - **Disjoint Seat Allocation & LWW-OR-Set (`GeoReplicationEngine`)**: Autonómne bezkolízne prideľovanie sedadiel v každom regióne aj počas úplného sieťového rozpadu (network partition) s automatickým uzdravením (partition healing).
+  - **Kryptografická Medziklastrová Autentifikácia (`ReplicationSecurity`)**: Overovanie replikačných správ pomocou HMAC-SHA256 s ochranou proti replay útokom cez časové okno (anti-replay window).
+  - **HTTP Replikácia API (`ReplicationEndpoints`)**: Endpointy `POST /v1/replication/sync`, `GET /v1/replication/status` a `POST /v1/replication/peers` pre výmenu deliet.
+  - **CLI Príkaz `symbolon cluster`**: `symbolon cluster status` pre zobrazenie topológie, vektorových hodín a CRDT kapacít; `symbolon cluster sync` pre manuálny on-demand delta sync.
+  - **Retro Web TUI Integrácia**: Nová vizualizačná karta Active-Active Geo-Replikácie v zobrazení `view-mesh` zobrazujúca vektorový čas a stav jednotlivých regiónov v reálnom čase.
+
 ## [1.0.0] - 2026-09-22
 
 Prvé oficiálne vydanie produkčnej platformy Symbolon — podnikový open-source licenčný server s podporou vysoko-dostupných plávajúcich (floating) licencií, post-kvantovej kryptografie (PQC), on-premise relay uzlov, air-gap sietí a Zero-Trust klastrov.

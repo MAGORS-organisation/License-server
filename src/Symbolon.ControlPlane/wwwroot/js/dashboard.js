@@ -1222,6 +1222,9 @@ async function loadMeshAndAlerts() {
     } catch {
         // Silent failover
     }
+
+    // 3. Geo-Replication Status (Active-Active CRDT)
+    await loadGeoReplicationStatus();
 }
 
 function fillSampleTpmQuote() {
@@ -1287,6 +1290,63 @@ function verifyTpmQuoteInBrowser() {
         resBox.style.border = "1px solid var(--accent-rose)";
         resBox.style.color = "var(--accent-rose)";
         resBox.innerHTML = "❌ Chyba pri syntaktickej analýze JSON: " + escapeHtml(err.message);
+    }
+}
+
+async function loadGeoReplicationStatus() {
+    try {
+        const res = await fetch("/v1/replication/status");
+        if (!res.ok) return;
+        const data = await res.json();
+
+        const localClockEl = document.getElementById("geo-local-clock");
+        const capEl = document.getElementById("geo-global-capacity");
+        const localAllocEl = document.getElementById("geo-local-allocated");
+        const globalAllocEl = document.getElementById("geo-global-allocated");
+        const tbody = document.getElementById("geo-replication-table-body");
+
+        if (capEl) capEl.textContent = `${data.totalDisjointCapacity || 300} sedadiel`;
+        if (localAllocEl) localAllocEl.textContent = data.localAllocatedSeats || 0;
+        if (globalAllocEl) globalAllocEl.textContent = data.globalAllocatedSeats || 0;
+
+        if (localClockEl && data.localClock && data.localClock.versions) {
+            const clockPairs = Object.entries(data.localClock.versions).map(([r, c]) => `${r}: ${c}`);
+            localClockEl.textContent = clockPairs.join(", ") || `${data.localRegionId}: 1`;
+        }
+
+        if (tbody) {
+            let html = `
+                <tr>
+                    <td><strong>${escapeHtml(data.localRegionId)}</strong></td>
+                    <td><span class="badge badge-active">Lokálny uzol</span></td>
+                    <td>/v1/replication</td>
+                    <td>1 - 100 (100 sedadiel)</td>
+                    <td><code>${escapeHtml(JSON.stringify(data.localClock?.versions || {}))}</code></td>
+                    <td><span class="badge badge-active">Aktívny</span></td>
+                </tr>
+            `;
+            if (data.peers && data.peers.length > 0) {
+                data.peers.forEach(p => {
+                    const statusBadge = p.isHealthy
+                        ? `<span class="badge badge-active">Synchronizovaný</span>`
+                        : `<span class="badge badge-revoked">Nedostupný</span>`;
+                    const count = p.seatRangeEnd - p.seatRangeStart + 1;
+                    html += `
+                        <tr>
+                            <td><strong>${escapeHtml(p.regionId)}</strong></td>
+                            <td><span class="badge badge-secondary">Vzdialený Peer</span></td>
+                            <td>${escapeHtml(p.endpoint)}</td>
+                            <td>${p.seatRangeStart} - ${p.seatRangeEnd} (${count} sedadiel)</td>
+                            <td><code>lastSeen: ${new Date(p.lastSeen).toLocaleTimeString()}</code></td>
+                            <td>${statusBadge}</td>
+                        </tr>
+                    `;
+                });
+            }
+            tbody.innerHTML = html;
+        }
+    } catch {
+        // Silent failover
     }
 }
 
