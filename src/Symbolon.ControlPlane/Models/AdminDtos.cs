@@ -96,13 +96,26 @@ public sealed record ActivationResponseDto(
     string State,
     DateTimeOffset ActivatedAt);
 
-public sealed record BorrowRequestDto(
-    [Range(1, 30)] int Days);
-
-public sealed record BorrowResponseDto(
+public sealed record BorrowedSeatAdminDto(
     string LeaseId,
+    string LicenseId,
+    int SeatNo,
+    string? MachineId,
     DateTimeOffset BorrowedUntil,
-    string Token);
+    double HoursRemaining);
+
+public sealed record FraudRadarAdminDto(
+    string Id,
+    string LicenseId,
+    string? UserId,
+    string? MachineId,
+    string? IpAddress,
+    string RiskType,
+    string RiskLevel,
+    string Description,
+    double? VelocityKmH,
+    double? DistanceKm,
+    DateTimeOffset Timestamp);
 
 public sealed record RegisterRelayDto(
     [Required] string Name,

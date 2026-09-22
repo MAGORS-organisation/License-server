@@ -2,7 +2,7 @@
 
 [![Platform](https://img.shields.io/badge/.NET-10.0%20LTS-512BD4?logo=dotnet)](https://dotnet.microsoft.com/)
 [![Language](https://img.shields.io/badge/C%23-14.0-239120?logo=csharp)](https://learn.microsoft.com/dotnet/csharp/)
-[![Tests](https://img.shields.io/badge/tests-155%20passed%20(+8%20Python)-brightgreen)](#výsledky-testovania)
+[![Tests](https://img.shields.io/badge/tests-173%20passed%20(+12%20Python)-brightgreen)](#výsledky-testovania)
 [![License: AGPL-3.0](https://img.shields.io/badge/license-AGPL--3.0-blue.svg)](LICENSE)
 [![License: Apache-2.0](https://img.shields.io/badge/client%20SDK-Apache--2.0-blue.svg)](LICENSES/Apache-2.0.txt)
 [![CRA Compliant](https://img.shields.io/badge/CRA%20Compliance-EU%202024%2F2847-success)](SECURITY.md)
@@ -72,6 +72,14 @@ Rieši to, čo dnešné cloud-first platformy ponúkajú iba ako obmedzený dopl
 17. **Cross-Platform Release Matrix & Multi-Arch Distribúcia**
     - Plnohodnotná podpora a samostatné single-file balíčky pre 6 cieľových platforiem: `linux-x64`, `linux-arm64`, `win-x64`, `win-arm64`, `osx-x64`, `osx-arm64`.
     - Plne automatizovaný GitHub Actions release pipeline (`.github/workflows/release.yml`) s generovaním `SHA256SUMS.txt`, CycloneDX v1.6 SBOM a GitHub Releases.
+18. **License Borrowing & Roaming (Offline Výpožičky pre Poľné Zariadenia)**
+    - Možnosť dlhodobého zapožičania sedadla (1–30 dní) pre offline stanice, terénne notebooky a inžinierske aplikácie bez sieťového pripojenia.
+    - Automatické pozastavenie periodických heartbeatov v .NET a Python SDK; ukončenie behu aplikácie zachováva offline licenciu aktívnu.
+    - CLI podpora (`symbolon license borrow`, `symbolon license return`) a správa výpožičiek v Retro TUI s možnosťou manuálneho predčasného uvoľnenia.
+19. **Anti-Fraud & Impossible Travel Velocity / VM Cloning Detection**
+    - Pokročilá detekcia podvodov v reálnom čase pomocou Haversine vzorca ($v = \Delta d / \Delta t$) odhaľujúca fyzikálne nemožné geografické skoky ($> 900 \text{ km/h}$) na vzdialenosti $> 100 \text{ km}$.
+    - Detekcia klonovania virtuálnych strojov (VM snapshot replay) pri simultánnom pripojení identického hardvérového fingerprintu (SMBIOS UUID, MAC) z rôznych verejných IP podsietí.
+    - Automatické spúšťanie bezpečnostných výstrah cez `IAlertService`, zápis do kryptografického audit ledgeru a živý monitorovací radar v Retro TUI Web Dashboarde.
 
 ---
 
@@ -299,14 +307,14 @@ Všetkých 9 projektov má 100% úspešnosť testov bez zlyhania:
 Passed!  - Failed: 0, Passed:  9, Skipped: 0, Total:  9 - Symbolon.Crypto.Tests.dll
 Passed!  - Failed: 0, Passed: 37, Skipped: 0, Total: 37 - Symbolon.Format.Tests.dll
 Passed!  - Failed: 0, Passed:  8, Skipped: 0, Total:  8 - Symbolon.Protocol.Tests.dll
-Passed!  - Failed: 0, Passed:  6, Skipped: 0, Total:  6 - Symbolon.Domain.Tests.dll
+Passed!  - Failed: 0, Passed: 24, Skipped: 0, Total: 24 - Symbolon.Domain.Tests.dll
 Passed!  - Failed: 0, Passed:  9, Skipped: 0, Total:  9 - Symbolon.Relay.Tests.dll
-Passed!  - Failed: 0, Passed:  5, Skipped: 0, Total:  5 - Symbolon.Client.Tests.dll
-Passed!  - Failed: 0, Passed: 10, Skipped: 0, Total: 10 - Symbolon.Cli.Tests.dll
+Passed!  - Failed: 0, Passed: 11, Skipped: 0, Total: 11 - Symbolon.Client.Tests.dll
+Passed!  - Failed: 0, Passed: 20, Skipped: 0, Total: 20 - Symbolon.Cli.Tests.dll
 Passed!  - Failed: 0, Passed:  7, Skipped: 0, Total:  7 - Symbolon.Data.Tests.dll
-Passed!  - Failed: 0, Passed: 36, Skipped: 0, Total: 36 - Symbolon.ControlPlane.Tests.dll
+Passed!  - Failed: 0, Passed: 48, Skipped: 0, Total: 48 - Symbolon.ControlPlane.Tests.dll
 
-Celkovo: 127 úspešných testov v .NET (+ 3 unit testy v Pythone), 0 zlyhaní, 0 chýb. Trvanie: ~6 sekúnd.
+Celkovo: 173 úspešných testov v .NET (+ 12 unit testov v Pythone), 0 zlyhaní, 0 chýb. Trvanie: ~8 sekúnd.
 ```
 
 ---

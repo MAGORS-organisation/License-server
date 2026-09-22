@@ -108,6 +108,41 @@ public sealed record ReleaseResponseDto
     public required bool Success { get; init; }
 }
 
+public sealed record BorrowRequestDto
+{
+    [Range(1, 30)]
+    [JsonPropertyName("days")]
+    public int Days { get; init; }
+
+    public BorrowRequestDto() { }
+
+    public BorrowRequestDto(int days)
+    {
+        Days = days;
+    }
+}
+
+public sealed record BorrowResponseDto
+{
+    [JsonPropertyName("leaseId")]
+    public string LeaseId { get; init; } = string.Empty;
+
+    [JsonPropertyName("borrowedUntil")]
+    public DateTimeOffset BorrowedUntil { get; init; }
+
+    [JsonPropertyName("token")]
+    public string Token { get; init; } = string.Empty;
+
+    public BorrowResponseDto() { }
+
+    public BorrowResponseDto(string leaseId, DateTimeOffset borrowedUntil, string token)
+    {
+        LeaseId = leaseId;
+        BorrowedUntil = borrowedUntil;
+        Token = token;
+    }
+}
+
 public sealed record QueuedResponseDto
 {
     [JsonPropertyName("ticket")]

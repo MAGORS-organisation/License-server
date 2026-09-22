@@ -10,6 +10,17 @@ a projekt striktne dodržiava [Sémantické Verziovanie (Semantic Versioning 2.0
 ## [Unreleased]
 
 ### Pridané (Added)
+- **License Borrowing & Roaming (Offline Výpožičky pre Poľné Zariadenia)**:
+  - **.NET Client SDK (`SymbolonClient`, `SeatLease`)**: Metódy `BorrowSeatAsync(leaseId, days)` a `ReturnBorrowedSeatAsync(leaseId)`. Stav `SeatState.Borrowed`, automatické pozastavenie heartbeat slučky počas trvania roaming výpožičky (1–30 dní) a zachovanie licencie pri ukončení aplikácie.
+  - **Python SDK (`SymbolonClient`, `SeatLease`)**: Implementované funkcie `borrow_seat(lease, days)` a `return_borrowed_seat(lease_id)` s bezpečným context managerom zabraňujúcim uvoľneniu pri offline roaming stave.
+  - **CLI Rozšírenie (`Symbolon.Cli`)**: Príkazy `symbolon license borrow --lease <id> --days <n>` a `symbolon license return --lease <id>`.
+  - **Administrátorský Manažment Výpožičiek**: Endpointy `GET /admin/v1/leases/borrowed` a `POST /admin/v1/leases/{id}/return` na sledovanie a manuálne predčasné vrátenie sedadiel.
+  - **Retro TUI Správa Výpožičiek**: Nová interaktívna karta v ovládacom paneli zobrazujúca aktívne offline licencie, zostávajúci čas do expirácie a možnosť okamžitého uvoľnenia.
+- **Anti-Fraud & Impossible Travel Velocity / VM Cloning Detection (`IFraudDetectionService`)**:
+  - **Impossible Travel Velocity Check**: Výpočet rýchlosti presunu ($v = \Delta d / \Delta t$) pomocou Haversine vzorca na sfére Zeme s detekciou anomálií prekračujúcich rýchlosť dopravných lietadiel ($> 900 \text{ km/h}$) na vzdialenosti $> 100 \text{ km}$.
+  - **Detekcia Klonovania VM Snapshotov**: Monitorovanie a okamžitá detekcia duplikovaného hardvérového fingerprintu (SMBIOS UUID, MAC) pristupujúceho z rôznych verejných IP podsietí v rámci aktívneho lease okna.
+  - **Automatické Bezpečnostné Alerty (`IAlertService`)**: Automatické generovanie výstrah `impossible_travel` a `vm_cloning`, záznam do kryptografického audit ledgeru a notifikácia cez webhooky.
+  - **Retro TUI Bezpečnostný Radar**: Nová monitorovacia karta v reálnom čase vizualizujúca zachytené incidenty, vypočítanú rýchlosť, vzdialenosť a podozrivé IP adresy.
 - **Multi-Region Geo-Replication (Active-Active CRDT)**:
   - **Kauzálne Vektorové Hodiny (`VectorClock`)**: Deterministické rozlišovanie kauzálnych a súbežných zmien naprieč geografickými regiónmi (`eu-central-1`, `us-east-1`, `ap-southeast-1`).
   - **Stavový PN-Counter CRDT (`PnCounter`)**: Komutatívne, asociatívne a idempotentné zlučovanie globálnych kapacít a alokovaných sedadiel bez potreby centrálneho distribuovaného zámku.

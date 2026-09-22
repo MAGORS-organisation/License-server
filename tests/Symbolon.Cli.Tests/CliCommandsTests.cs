@@ -84,4 +84,27 @@ public sealed class CliCommandsTests
             if (File.Exists(tempSbom)) try { File.Delete(tempSbom); } catch { /* ignore */ }
         }
     }
+
+    [Fact]
+    public async Task LicenseBorrowCommand_Validation_ReturnsExpectedCodes()
+    {
+        // 1. Missing lease parameter
+        int missingLeaseCode = await Program.Main(["license", "borrow"]);
+        missingLeaseCode.Should().Be(1);
+
+        // 2. Invalid days parameter
+        int invalidDaysCode = await Program.Main(["license", "borrow", "--lease", "lse_123", "--days", "0"]);
+        invalidDaysCode.Should().Be(1);
+
+        int tooManyDaysCode = await Program.Main(["license", "borrow", "--lease", "lse_123", "--days", "45"]);
+        tooManyDaysCode.Should().Be(1);
+    }
+
+    [Fact]
+    public async Task LicenseReturnCommand_Validation_ReturnsExpectedCodes()
+    {
+        // Missing lease parameter
+        int missingLeaseCode = await Program.Main(["license", "return"]);
+        missingLeaseCode.Should().Be(1);
+    }
 }

@@ -1228,6 +1228,12 @@ async function loadMeshAndAlerts() {
 
     // 4. eBPF Kernel Enforcement (Linux)
     await loadEbpfStatusAndViolations();
+
+    // 5. Anti-Fraud Radar (Impossible Travel & VM Cloning)
+    await loadFraudRadar();
+
+    // 6. Active Borrowed Seats (Offline Roaming)
+    await loadBorrowedSeats();
 }
 
 function fillSampleTpmQuote() {
@@ -1398,6 +1404,104 @@ async function loadEbpfStatusAndViolations() {
         }
     } catch {
         // Silent failover
+    }
+}
+
+async function loadFraudRadar() {
+    try {
+        const res = await fetch("/admin/v1/fraud/radar");
+        if (!res.ok) return;
+        const anomalies = await res.json();
+        const tbody = document.getElementById("fraud-radar-table-body");
+        if (!tbody) return;
+
+        if (anomalies.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="7" style="text-align: center; color: var(--text-muted); padding: 18px;">Žiadne bezpečnostné anomálie nezaznamenané. Všetky prístupy sú v rámci fyzikálnych limitov.</td></tr>`;
+            return;
+        }
+
+        tbody.innerHTML = anomalies.map(a => {
+            const time = new Date(a.timestamp).toLocaleTimeString();
+            const riskBadge = a.riskLevel === "Critical"
+                ? `<span class="badge badge-revoked">KRITICKÉ</span>`
+                : a.riskLevel === "High"
+                ? `<span class="badge" style="background: var(--accent-amber); color: #000;">VYSOKÉ</span>`
+                : `<span class="badge badge-secondary">${escapeHtml(a.riskLevel)}</span>`;
+
+            const speedDist = a.velocityKmH
+                ? `<strong>${escapeHtml(a.velocityKmH)} km/h</strong> (${escapeHtml(a.distanceKm)} km)`
+                : `<span style="color: var(--text-muted);">-</span>`;
+
+            return `
+                <tr>
+                    <td style="font-size: 12px; color: var(--text-secondary);">${escapeHtml(time)}</td>
+                    <td><strong>${escapeHtml(a.licenseId)}</strong><br><small style="color: var(--text-muted);">${escapeHtml(a.userId || a.machineId || "N/A")}</small></td>
+                    <td><code>${escapeHtml(a.ipAddress || "N/A")}</code></td>
+                    <td><strong style="color: var(--accent-rose);">${escapeHtml(a.riskType)}</strong></td>
+                    <td>${riskBadge}</td>
+                    <td>${speedDist}</td>
+                    <td style="font-size: 12px; max-width: 320px; line-height: 1.4;">${escapeHtml(a.description)}</td>
+                </tr>
+            `;
+        }).join("");
+    } catch {
+        // Silent failover
+    }
+}
+
+async function loadBorrowedSeats() {
+    try {
+        const res = await fetch("/admin/v1/leases/borrowed");
+        if (!res.ok) return;
+        const seats = await res.json();
+        const tbody = document.getElementById("borrowed-seats-table-body");
+        if (!tbody) return;
+
+        if (seats.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="7" style="text-align: center; color: var(--text-muted); padding: 18px;">Žiadne aktívne zapožičané sedadlá. Všetky licencie bežia v online plávajúcom režime.</td></tr>`;
+            return;
+        }
+
+        tbody.innerHTML = seats.map(s => {
+            const expTime = new Date(s.borrowedUntil).toLocaleString();
+            return `
+                <tr>
+                    <td><code>${escapeHtml(s.leaseId)}</code></td>
+                    <td><strong>${escapeHtml(s.licenseId)}</strong></td>
+                    <td><span class="badge badge-secondary">#${escapeHtml(s.seatNo)}</span></td>
+                    <td><code>${escapeHtml(s.machineId || "field-laptop")}</code></td>
+                    <td style="font-size: 12px; color: var(--text-secondary);">${escapeHtml(expTime)}</td>
+                    <td><strong style="color: var(--accent-cyan);">${escapeHtml(s.hoursRemaining)} hod.</strong></td>
+                    <td>
+                        <button class="btn btn-secondary btn-sm" onclick="returnBorrowedSeat('${escapeHtml(s.leaseId)}')">Vrátiť</button>
+                    </td>
+                </tr>
+            `;
+        }).join("");
+    } catch {
+        // Silent failover
+    }
+}
+
+async function returnBorrowedSeat(leaseId) {
+    if (!confirm(`Naozaj chcete predčasne ukončiť zapožičanie a vrátiť sedadlo pre lease ${leaseId}?`)) {
+        return;
+    }
+
+    try {
+        const res = await fetch(`/admin/v1/leases/${encodeURIComponent(leaseId)}/return`, {
+            method: "POST"
+        });
+
+        if (res.ok) {
+            showToast("Zapožičané sedadlo bolo úspešne uvoľnené.", "success");
+            await loadBorrowedSeats();
+            await loadDashboardKPIs();
+        } else {
+            showToast("Nepodarilo sa uvoľniť sedadlo.", "error");
+        }
+    } catch (err) {
+        showToast("Chyba komunikácie so serverom: " + err.message, "error");
     }
 }
 

@@ -5,7 +5,8 @@ public enum SeatState
     Active,
     GracePeriod,
     Lost,
-    Released
+    Released,
+    Borrowed
 }
 
 public sealed class SeatStateChangedEventArgs : EventArgs

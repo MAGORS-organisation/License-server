@@ -25,7 +25,7 @@ public sealed partial class SeatLease : IAsyncDisposable, IDisposable
     private SeatState _state = SeatState.Active;
     private DateTimeOffset? _graceStartedAt;
 
-    public bool Acquired => _state is SeatState.Active or SeatState.GracePeriod;
+    public bool Acquired => _state is SeatState.Active or SeatState.GracePeriod or SeatState.Borrowed;
     public string? Reason { get; }
     public string? LeaseId { get; }
     public string? Token { get; private set; }
@@ -193,6 +193,65 @@ public sealed partial class SeatLease : IAsyncDisposable, IDisposable
         }
     }
 
+    /// <summary>
+    /// Borrows the current active seat for offline roaming for the specified duration (1-30 days).
+    /// Halts background heartbeats during the offline roaming period.
+    /// </summary>
+    public async Task<bool> BorrowAsync(int days, CancellationToken ct = default)
+    {
+        if (LeaseId is null || _http is null) return false;
+        if (days < 1 || days > 30) throw new ArgumentOutOfRangeException(nameof(days), "Days must be between 1 and 30.");
+
+        // Stop the heartbeat loop as offline devices do not send periodic heartbeats
+        try
+        {
+            await _cts.CancelAsync().ConfigureAwait(false);
+        }
+        catch (ObjectDisposedException)
+        {
+            // already canceled
+        }
+
+        var dto = new BorrowRequestDto(days);
+        var response = await _http.PostAsJsonAsync(
+            new Uri($"v1/leases/{LeaseId}/borrow", UriKind.Relative),
+            dto,
+            SymbolonProtocolJsonContext.Default.BorrowRequestDto,
+            ct).ConfigureAwait(false);
+
+        if (response.IsSuccessStatusCode)
+        {
+            var body = await response.Content.ReadFromJsonAsync(
+                SymbolonProtocolJsonContext.Default.BorrowResponseDto,
+                ct).ConfigureAwait(false);
+
+            if (body is not null)
+            {
+                Token = body.Token;
+                _expiresAt = body.BorrowedUntil;
+                State = SeatState.Borrowed;
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// Explicitly returns a borrowed seat early back to the floating pool.
+    /// </summary>
+    public async Task<bool> ReturnBorrowedAsync(CancellationToken ct = default)
+    {
+        if (LeaseId is null || _http is null) return false;
+
+        State = SeatState.Released;
+        var response = await _http.DeleteAsync(
+            new Uri($"v1/leases/{LeaseId}", UriKind.Relative),
+            ct).ConfigureAwait(false);
+
+        return response.IsSuccessStatusCode;
+    }
+
     private bool _isDisposed;
     private readonly object _disposeLock = new();
 
@@ -225,7 +284,8 @@ public sealed partial class SeatLease : IAsyncDisposable, IDisposable
             }
         }
 
-        if (LeaseId is not null && _state != SeatState.Released)
+        // Do not release lease if the seat is borrowed for offline roaming
+        if (LeaseId is not null && _state != SeatState.Released && _state != SeatState.Borrowed)
         {
             State = SeatState.Released;
             if (_http is not null)
@@ -276,7 +336,8 @@ public sealed partial class SeatLease : IAsyncDisposable, IDisposable
             }
         }
 
-        if (LeaseId is not null && _state != SeatState.Released)
+        // Do not release lease if the seat is borrowed for offline roaming
+        if (LeaseId is not null && _state != SeatState.Released && _state != SeatState.Borrowed)
         {
             State = SeatState.Released;
             if (_http is not null)

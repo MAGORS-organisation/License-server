@@ -1,4 +1,5 @@
 using System.Buffers.Text;
+using System.Globalization;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
@@ -9,6 +10,7 @@ using Symbolon.Crypto;
 using Symbolon.Data;
 using Symbolon.Data.Entities;
 using Symbolon.Domain;
+using Symbolon.Domain.Security;
 using Symbolon.Format;
 using Symbolon.Protocol;
 
@@ -85,6 +87,7 @@ public static class PublicEndpoints
         TimeProvider time,
         Observability.SymbolonMetrics metrics,
         Alerting.IAlertService alertService,
+        IFraudDetectionService fraudDetection,
         CancellationToken ct)
     {
         string? idempotencyKey = context.Request.Headers["Idempotency-Key"].FirstOrDefault();
@@ -140,6 +143,40 @@ public static class PublicEndpoints
         }
 
         string fingerprint = dto.ToFingerprintHash();
+
+        // Anti-Fraud, Impossible Travel & VM Cloning Evaluation
+        string? clientIp = context.Request.Headers["X-Forwarded-For"].FirstOrDefault()
+            ?? context.Connection.RemoteIpAddress?.ToString();
+
+        GeoLocation? explicitLocation = null;
+        if (double.TryParse(context.Request.Headers["X-Geo-Lat"].FirstOrDefault(), CultureInfo.InvariantCulture, out double lat) &&
+            double.TryParse(context.Request.Headers["X-Geo-Lon"].FirstOrDefault(), CultureInfo.InvariantCulture, out double lon))
+        {
+            string city = context.Request.Headers["X-Geo-City"].FirstOrDefault() ?? "Custom";
+            string country = context.Request.Headers["X-Geo-Country"].FirstOrDefault() ?? "Custom";
+            explicitLocation = new GeoLocation(lat, lon, city, country);
+        }
+
+        var fraudEvent = new FraudAccessEvent(
+            LicenseId: license.Id,
+            FingerprintHash: fingerprint,
+            FingerprintComponents: dto.FingerprintComponents,
+            MachineId: dto.MachineId,
+            UserId: dto.UserId,
+            IpAddress: clientIp,
+            Location: explicitLocation,
+            Timestamp: now);
+
+        var fraudAssessment = await fraudDetection.EvaluateAccessAsync(fraudEvent, ct).ConfigureAwait(false);
+        if (fraudAssessment.IsSuspicious)
+        {
+            await alertService.TriggerSecurityAlertAsync(
+                fraudAssessment.RiskType ?? "fraud_detected",
+                license.TenantId,
+                fraudAssessment.Description ?? "Security anomaly detected during seat checkout.",
+                ct).ConfigureAwait(false);
+        }
+
         int quantity = dto.Quantity ?? 1;
         var ttl = TimeSpan.FromSeconds(license.Policy?.LeaseTtlSeconds ?? 600);
 

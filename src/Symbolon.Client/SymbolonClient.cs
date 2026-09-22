@@ -126,6 +126,48 @@ public sealed class SymbolonClient : IDisposable
             log: _log);
     }
 
+    /// <summary>
+    /// Borrows an active floating seat for offline roaming for up to 30 days.
+    /// </summary>
+    public async Task<BorrowResponseDto?> BorrowSeatAsync(string leaseId, int days, CancellationToken ct = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(leaseId);
+        if (days < 1 || days > 30)
+        {
+            throw new ArgumentOutOfRangeException(nameof(days), "Days must be between 1 and 30.");
+        }
+
+        var dto = new BorrowRequestDto(days);
+        var response = await _http.PostAsJsonAsync(
+            new Uri($"v1/leases/{leaseId}/borrow", UriKind.Relative),
+            dto,
+            SymbolonProtocolJsonContext.Default.BorrowRequestDto,
+            ct).ConfigureAwait(false);
+
+        if (!response.IsSuccessStatusCode)
+        {
+            return null;
+        }
+
+        return await response.Content.ReadFromJsonAsync(
+            SymbolonProtocolJsonContext.Default.BorrowResponseDto,
+            ct).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Returns a previously borrowed seat back to the floating pool early.
+    /// </summary>
+    public async Task<bool> ReturnBorrowedSeatAsync(string leaseId, CancellationToken ct = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(leaseId);
+
+        var response = await _http.DeleteAsync(
+            new Uri($"v1/leases/{leaseId}", UriKind.Relative),
+            ct).ConfigureAwait(false);
+
+        return response.IsSuccessStatusCode;
+    }
+
     public void Dispose()
     {
         if (_ownsHttpClient)

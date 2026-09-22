@@ -1,5 +1,6 @@
 using System.Buffers.Text;
 using System.Globalization;
+using System.Net.Http.Json;
 using System.Net.Sockets;
 using System.Security.Cryptography;
 using System.Text.Json;
@@ -36,7 +37,7 @@ internal static class Program
             {
                 "SETUP" or "WIZARD" => await Wizard.SetupWizard.RunAsync().ConfigureAwait(false),
                 "KEYS" => HandleKeys(args[1..]),
-                "LICENSE" => HandleLicense(args[1..]),
+                "LICENSE" => await HandleLicenseAsync(args[1..]).ConfigureAwait(false),
                 "DOCTOR" => await HandleDoctorAsync(args[1..]).ConfigureAwait(false),
                 "IMPORT" => await Commands.MigrationCommands.HandleImportAsync(args[1..]).ConfigureAwait(false),
                 "EXPORT" => await Commands.MigrationCommands.HandleExportAsync(args[1..]).ConfigureAwait(false),
@@ -172,11 +173,11 @@ internal static class Program
         return 0;
     }
 
-    private static int HandleLicense(string[] args)
+    private static async Task<int> HandleLicenseAsync(string[] args)
     {
         if (args.Length == 0 || args[0] is "-h" or "--help")
         {
-            Console.WriteLine("Použitie: symbolon license <keygen|issue|inspect> [options]");
+            Console.WriteLine("Použitie: symbolon license <keygen|issue|inspect|borrow|return> [options]");
             return 0;
         }
 
@@ -185,8 +186,86 @@ internal static class Program
             "KEYGEN" => HandleLicenseKeygen(args[1..]),
             "ISSUE" => HandleLicenseIssue(args[1..]),
             "INSPECT" => HandleLicenseInspect(args[1..]),
+            "BORROW" => await HandleLicenseBorrowAsync(args[1..]).ConfigureAwait(false),
+            "RETURN" => await HandleLicenseReturnAsync(args[1..]).ConfigureAwait(false),
             _ => UnknownCommand(args[0])
         };
+    }
+
+    private static async Task<int> HandleLicenseBorrowAsync(string[] args)
+    {
+        string? serverUrl = GetArg(args, "--server") ?? "http://localhost:5000";
+        string? leaseId = GetArg(args, "--lease");
+        string? daysStr = GetArg(args, "--days") ?? "7";
+
+        if (string.IsNullOrWhiteSpace(leaseId))
+        {
+            Console.Error.WriteLine("Chýba parameter --lease <lease-id>.");
+            return 1;
+        }
+
+        if (!int.TryParse(daysStr, CultureInfo.InvariantCulture, out int days) || days < 1 || days > 30)
+        {
+            Console.Error.WriteLine("Parameter --days musí byť v rozsahu 1 až 30.");
+            return 1;
+        }
+
+        using var http = new HttpClient { BaseAddress = new Uri(serverUrl) };
+        var dto = new BorrowRequestDto(days);
+        var response = await http.PostAsJsonAsync(
+            new Uri($"v1/leases/{leaseId}/borrow", UriKind.Relative),
+            dto,
+            SymbolonProtocolJsonContext.Default.BorrowRequestDto).ConfigureAwait(false);
+
+        if (!response.IsSuccessStatusCode)
+        {
+            Console.ForegroundColor = ConsoleColor.Red;
+            Console.Error.WriteLine($"Zlyhanie zapožičania sedadla: HTTP {(int)response.StatusCode}");
+            Console.ResetColor();
+            return 1;
+        }
+
+        var result = await response.Content.ReadFromJsonAsync(
+            SymbolonProtocolJsonContext.Default.BorrowResponseDto).ConfigureAwait(false);
+
+        Console.ForegroundColor = ConsoleColor.Green;
+        Console.WriteLine($"[OK] Sedadlo pre lease {leaseId} úspešne zapožičané na {days} dní.");
+        Console.ResetColor();
+        if (result is not null)
+        {
+            Console.WriteLine($"  Borrowed Until: {result.BorrowedUntil:yyyy-MM-dd HH:mm:ss 'UTC'}");
+            Console.WriteLine($"  Offline Token:  {result.Token[..Math.Min(32, result.Token.Length)]}...");
+        }
+
+        return 0;
+    }
+
+    private static async Task<int> HandleLicenseReturnAsync(string[] args)
+    {
+        string? serverUrl = GetArg(args, "--server") ?? "http://localhost:5000";
+        string? leaseId = GetArg(args, "--lease");
+
+        if (string.IsNullOrWhiteSpace(leaseId))
+        {
+            Console.Error.WriteLine("Chýba parameter --lease <lease-id>.");
+            return 1;
+        }
+
+        using var http = new HttpClient { BaseAddress = new Uri(serverUrl) };
+        var response = await http.DeleteAsync(new Uri($"v1/leases/{leaseId}", UriKind.Relative)).ConfigureAwait(false);
+
+        if (!response.IsSuccessStatusCode)
+        {
+            Console.ForegroundColor = ConsoleColor.Red;
+            Console.Error.WriteLine($"Zlyhanie vrátenia sedadla: HTTP {(int)response.StatusCode}");
+            Console.ResetColor();
+            return 1;
+        }
+
+        Console.ForegroundColor = ConsoleColor.Green;
+        Console.WriteLine($"[OK] Zapožičané sedadlo {leaseId} bolo úspešne vrátené do plávajúceho fondu.");
+        Console.ResetColor();
+        return 0;
     }
 
     private static int HandleLicenseKeygen(string[] args)
@@ -424,6 +503,8 @@ internal static class Program
               license keygen [--prefix SYM]
               license issue --customer <id> --seats <n> [--out file]
               license inspect <file.symlic>
+              license borrow --lease <id> --days <n> [--server <url>]
+              license return --lease <id> [--server <url>]
               doctor [--server <url>]
               import --file <cesta> --policy <policy-id> [--format <keygen|csv>] [--dry-run]
               export --out <cesta> [--format <json|csv>]

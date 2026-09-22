@@ -679,6 +679,68 @@
                         </tbody>
                     </table>
                 </div>
+
+                <!-- Anti-Fraud & Impossible Travel Radar (Phase 4.0) -->
+                <div class="table-card" style="margin-top: 20px;">
+                    <div class="table-header">
+                        <div>
+                            <div class="table-title">🛡️ Anti-Fraud &amp; Geografický Radar (Impossible Travel &amp; VM Cloning)</div>
+                            <div class="table-subtitle">Detekcia nemožnej rýchlosti presunu (&gt; 900 km/h) a kolízií duplikovaného hardvéru naprieč verejnými IP adresami</div>
+                        </div>
+                        <div class="table-actions">
+                            <button class="btn btn-secondary btn-sm" onclick="loadFraudRadar()">Obnoviť Radar</button>
+                        </div>
+                    </div>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Časová Pečiatka</th>
+                                <th>Licencia / Používateľ</th>
+                                <th>Klient IP</th>
+                                <th>Typ Anomálie</th>
+                                <th>Závažnosť</th>
+                                <th>Rýchlosť / Vzdialenosť</th>
+                                <th>Detail Detekcie</th>
+                            </tr>
+                        </thead>
+                        <tbody id="fraud-radar-table-body">
+                            <tr>
+                                <td colspan="7" style="text-align: center; color: var(--text-muted); padding: 18px;">Žiadne bezpečnostné anomálie nezaznamenané. Všetky prístupy sú v rámci fyzikálnych limitov.</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Active Borrowed Seats / Offline Roaming -->
+                <div class="table-card" style="margin-top: 20px;">
+                    <div class="table-header">
+                        <div>
+                            <div class="table-title">💼 Aktívne Zapožičané Sedadlá (Offline Roaming / Poľné Zariadenia)</div>
+                            <div class="table-subtitle">Prehľad licencií v offline režime (1–30 dní) s možnosťou predčasného administrátorského uvoľnenia</div>
+                        </div>
+                        <div class="table-actions">
+                            <button class="btn btn-secondary btn-sm" onclick="loadBorrowedSeats()">Obnoviť Výpožičky</button>
+                        </div>
+                    </div>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Lease ID</th>
+                                <th>Licencia</th>
+                                <th>Sedadlo #</th>
+                                <th>Zariadenie (Machine ID)</th>
+                                <th>Zapožičané Do (UTC)</th>
+                                <th>Zostávajúci Čas</th>
+                                <th>Administrácia</th>
+                            </tr>
+                        </thead>
+                        <tbody id="borrowed-seats-table-body">
+                            <tr>
+                                <td colspan="7" style="text-align: center; color: var(--text-muted); padding: 18px;">Žiadne aktívne zapožičané sedadlá. Všetky licencie bežia v online plávajúcom režime.</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
             </section>
 
             <!-- VIEW 6: API & Diagnostika -->

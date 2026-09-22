@@ -21,6 +21,7 @@ class SeatLease:
         self.token = token
         self.seq = seq
         self._is_released = False
+        self._is_borrowed = False
 
     @property
     def lease_id(self) -> str:
@@ -34,18 +35,30 @@ class SeatLease:
     def is_active(self) -> bool:
         return not self._is_released
 
+    @property
+    def is_borrowed(self) -> bool:
+        return self._is_borrowed
+
+    def borrow(self, days: int) -> dict:
+        """Borrows this seat for offline use for the specified number of days."""
+        res = self._client.borrow_seat(self, days)
+        self._is_borrowed = True
+        return res
+
     def release(self) -> None:
         """Explicitly releases the allocated floating seat back to the pool."""
         if not self._is_released:
             self._client._stop_heartbeat(self.lease_id)
             self._client.release_seat(self.lease_id)
             self._is_released = True
+            self._is_borrowed = False
 
     def __enter__(self) -> "SeatLease":
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb) -> None:
-        self.release()
+        if not self._is_borrowed:
+            self.release()
 
 
 class SymbolonClient:
@@ -144,6 +157,44 @@ class SymbolonClient:
                 pass
         except Exception:
             pass  # Best effort release
+
+    def borrow_seat(self, lease: Union[SeatLease, str], days: int) -> dict:
+        """Borrows an active seat for offline roaming (1-30 days) and halts background heartbeats."""
+        if days < 1 or days > 30:
+            raise ValueError("Borrow duration must be between 1 and 30 days.")
+
+        if isinstance(lease, SeatLease):
+            lease_id = lease.lease_id
+            self._stop_heartbeat(lease_id)
+        else:
+            lease_id = str(lease)
+            self._stop_heartbeat(lease_id)
+
+        url = f"{self.server_url}/v1/leases/{lease_id}/borrow"
+        payload = {"days": days}
+        res_data = self._post_json(url, payload)
+
+        if isinstance(lease, SeatLease):
+            lease._is_borrowed = True
+            if "token" in res_data:
+                borrowed_exp = (
+                    datetime.fromisoformat(res_data["borrowedUntil"].replace("Z", "+00:00"))
+                    if "borrowedUntil" in res_data
+                    else lease.token.expires_at
+                )
+                lease.token = LeaseToken(
+                    lease_id=lease.token.lease_id,
+                    token_jwt=res_data["token"],
+                    seat_number=lease.token.seat_number,
+                    expires_at=borrowed_exp,
+                    entitlements=lease.token.entitlements,
+                )
+
+        return res_data
+
+    def return_borrowed_seat(self, lease_id: str) -> None:
+        """Returns a borrowed offline seat early back to the floating pool."""
+        self.release_seat(lease_id)
 
     def _start_heartbeat(self, lease: SeatLease, components: Dict[str, str]) -> None:
         stop_event = threading.Event()

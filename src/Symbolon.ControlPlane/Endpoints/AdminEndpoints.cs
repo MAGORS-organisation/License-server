@@ -7,6 +7,7 @@ using Symbolon.ControlPlane.Models;
 using Symbolon.Data;
 using Symbolon.Data.Entities;
 using Symbolon.Domain;
+using Symbolon.Domain.Security;
 using Symbolon.Format;
 
 namespace Symbolon.ControlPlane.Endpoints;
@@ -53,6 +54,11 @@ public static class AdminEndpoints
         // Quotas & Metered Units
         group.MapPost("/licenses/{id}/quotas", SetLicenseQuotaAsync).WithName("SetLicenseQuota");
         group.MapGet("/licenses/{id}/quotas", GetLicenseQuotasAsync).WithName("GetLicenseQuotas");
+
+        // Anti-Fraud Radar & License Borrowing Management
+        group.MapGet("/fraud/radar", GetFraudRadarAsync).WithName("GetFraudRadar");
+        group.MapGet("/leases/borrowed", GetBorrowedSeatsAsync).WithName("GetBorrowedSeats");
+        group.MapPost("/leases/{id}/return", ReturnBorrowedSeatAdminAsync).WithName("ReturnBorrowedSeatAdmin");
 
         group.AddEndpointFilter(async (invocationContext, next) =>
         {
@@ -802,5 +808,91 @@ public static class AdminEndpoints
             .ConfigureAwait(false);
 
         return TypedResults.Ok(quotas);
+    }
+
+    private static Task<IResult> GetFraudRadarAsync(
+        IFraudDetectionService fraudDetection,
+        CancellationToken ct)
+    {
+        var anomalies = fraudDetection.GetRecentAnomalies(50);
+        var dtos = anomalies.Select(a => new FraudRadarAdminDto(
+            a.Id,
+            a.LicenseId,
+            a.UserId,
+            a.MachineId,
+            a.IpAddress,
+            a.RiskType,
+            a.RiskLevel.ToString(),
+            a.Description,
+            a.VelocityKmH,
+            a.DistanceKm,
+            a.Timestamp)).ToList();
+
+        return Task.FromResult<IResult>(TypedResults.Ok(dtos));
+    }
+
+    private static async Task<IResult> GetBorrowedSeatsAsync(
+        HttpContext context,
+        SymbolonDbContext db,
+        TimeProvider time,
+        CancellationToken ct)
+    {
+        var now = time.GetUtcNow();
+        var query = db.Seats
+            .Include(s => s.License)
+            .Where(s => s.BorrowedUntil != null && s.BorrowedUntil > now);
+
+        if (!IsSuperAdmin(context))
+        {
+            string? callerTenant = GetCallerTenantId(context);
+            if (!string.IsNullOrWhiteSpace(callerTenant))
+            {
+                query = query.Where(s => s.License != null && s.License.TenantId == callerTenant);
+            }
+        }
+
+        var seats = await query.ToListAsync(ct).ConfigureAwait(false);
+
+        var dtos = seats.Select(s => new BorrowedSeatAdminDto(
+            s.LeaseId ?? string.Empty,
+            s.LicenseId,
+            s.SeatNo,
+            s.MachineId,
+            s.BorrowedUntil!.Value,
+            Math.Max(0.0, Math.Round((s.BorrowedUntil.Value - now).TotalHours, 1)))).ToList();
+
+        return TypedResults.Ok(dtos);
+    }
+
+    private static async Task<IResult> ReturnBorrowedSeatAdminAsync(
+        string id,
+        HttpContext context,
+        SymbolonDbContext db,
+        LeaseEngine engine,
+        Observability.SymbolonMetrics metrics,
+        CancellationToken ct)
+    {
+        var seat = await db.Seats
+            .Include(s => s.License)
+            .FirstOrDefaultAsync(s => s.LeaseId == id, ct)
+            .ConfigureAwait(false);
+
+        if (seat is null)
+        {
+            return TypedResults.NotFound();
+        }
+
+        if (!IsSuperAdmin(context) && seat.License?.TenantId != GetCallerTenantId(context))
+        {
+            return TypedResults.NotFound();
+        }
+
+        bool released = await engine.ReleaseAsync(id, ct).ConfigureAwait(false);
+        if (released)
+        {
+            metrics.RecordSeatReleased(1);
+        }
+
+        return TypedResults.Ok(new { success = released, leaseId = id });
     }
 }
