@@ -28,6 +28,9 @@ public class SymbolonDbContext : DbContext
     public DbSet<QueueTicketEntity> QueueTickets => Set<QueueTicketEntity>();
     public DbSet<LicenseQuotaEntity> LicenseQuotas => Set<LicenseQuotaEntity>();
     public DbSet<ApiKeyEntity> ApiKeys => Set<ApiKeyEntity>();
+    public DbSet<ScimUserEntity> ScimUsers => Set<ScimUserEntity>();
+    public DbSet<ScimGroupEntity> ScimGroups => Set<ScimGroupEntity>();
+    public DbSet<ScimGroupMemberEntity> ScimGroupMembers => Set<ScimGroupMemberEntity>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -294,6 +297,51 @@ public class SymbolonDbContext : DbContext
             b.HasOne(k => k.Tenant)
              .WithMany()
              .HasForeignKey(k => k.TenantId)
+             .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // SCIM 2.0 User
+        modelBuilder.Entity<ScimUserEntity>(b =>
+        {
+            b.ToTable("scim_users");
+            b.HasKey(u => u.Id);
+            b.Property(u => u.UserName).HasMaxLength(256).IsRequired();
+            b.Property(u => u.ExternalId).HasMaxLength(256);
+            b.Property(u => u.Email).HasMaxLength(256);
+            b.HasIndex(u => new { u.TenantId, u.UserName }).IsUnique();
+            b.HasIndex(u => new { u.TenantId, u.ExternalId });
+            b.HasOne(u => u.Tenant)
+             .WithMany()
+             .HasForeignKey(u => u.TenantId)
+             .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // SCIM 2.0 Group
+        modelBuilder.Entity<ScimGroupEntity>(b =>
+        {
+            b.ToTable("scim_groups");
+            b.HasKey(g => g.Id);
+            b.Property(g => g.DisplayName).HasMaxLength(256).IsRequired();
+            b.Property(g => g.ExternalId).HasMaxLength(256);
+            b.HasIndex(g => new { g.TenantId, g.DisplayName });
+            b.HasOne(g => g.Tenant)
+             .WithMany()
+             .HasForeignKey(g => g.TenantId)
+             .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // SCIM 2.0 Group Member
+        modelBuilder.Entity<ScimGroupMemberEntity>(b =>
+        {
+            b.ToTable("scim_group_members");
+            b.HasKey(m => new { m.GroupId, m.UserId });
+            b.HasOne(m => m.Group)
+             .WithMany(g => g.Members)
+             .HasForeignKey(m => m.GroupId)
+             .OnDelete(DeleteBehavior.Cascade);
+            b.HasOne(m => m.User)
+             .WithMany(u => u.GroupMemberships)
+             .HasForeignKey(m => m.UserId)
              .OnDelete(DeleteBehavior.Cascade);
         });
 

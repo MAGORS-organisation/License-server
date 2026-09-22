@@ -142,6 +142,9 @@ using (var scope = app.Services.CreateScope())
     }
 }
 
+// Eagerly initialize OpenTelemetry trace buffer listener
+_ = app.Services.GetRequiredService<Symbolon.ControlPlane.Observability.SymbolonTraceBuffer>();
+
 app.MapOpenApi();
 
 // Observability & Metrics
@@ -207,6 +210,7 @@ app.MapRelaySyncEndpoints().RequireRateLimiting("relay");
 app.MapOfflineEndpoints();
 app.MapReplicationEndpoints();
 app.MapEbpfEndpoints();
+app.MapScimEndpoints();
 
 // SPA Fallback
 app.MapFallbackToFile("index.html");

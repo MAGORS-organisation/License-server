@@ -207,6 +207,18 @@ public static class PublicEndpoints
             await alertService.CheckCapacityThresholdAsync(license.Id, activeSeats, license.MaxSeats, license.TenantId, ct).ConfigureAwait(false);
 
             var alloc = result.Allocations[0];
+            if (!string.IsNullOrWhiteSpace(dto.UserId) && !string.IsNullOrWhiteSpace(alloc.LeaseId))
+            {
+                var allocatedSeats = await db.Seats
+                    .Where(s => s.LeaseId == alloc.LeaseId)
+                    .ToListAsync(ct)
+                    .ConfigureAwait(false);
+                foreach (var s in allocatedSeats)
+                {
+                    s.ReservedFor = dto.UserId;
+                }
+                await db.SaveChangesAsync(ct).ConfigureAwait(false);
+            }
             var entitlements = dto.Features ?? ["core"];
             activity?.SetTag(SymbolonTracing.TagLeaseId, alloc.LeaseId ?? string.Empty);
             activity?.SetStatus(ActivityStatusCode.Ok);

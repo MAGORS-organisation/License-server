@@ -296,3 +296,44 @@ public sealed class ApiKeyEntity
     public Tenant? Tenant { get; set; }
 }
 
+public sealed class ScimUserEntity
+{
+    public string Id { get; set; } = string.Empty;
+    public string TenantId { get; set; } = string.Empty;
+    public string UserName { get; set; } = string.Empty;
+    public string? ExternalId { get; set; }
+    public string? GivenName { get; set; }
+    public string? FamilyName { get; set; }
+    public string? FormattedName { get; set; }
+    public string? Email { get; set; }
+    public bool Active { get; set; } = true;
+    public DateTimeOffset CreatedAt { get; set; }
+    public DateTimeOffset UpdatedAt { get; set; }
+
+    public Tenant? Tenant { get; set; }
+    public ICollection<ScimGroupMemberEntity> GroupMemberships { get; set; } = new List<ScimGroupMemberEntity>();
+}
+
+public sealed class ScimGroupEntity
+{
+    public string Id { get; set; } = string.Empty;
+    public string TenantId { get; set; } = string.Empty;
+    public string DisplayName { get; set; } = string.Empty;
+    public string? ExternalId { get; set; }
+    public DateTimeOffset CreatedAt { get; set; }
+    public DateTimeOffset UpdatedAt { get; set; }
+
+    public Tenant? Tenant { get; set; }
+    public ICollection<ScimGroupMemberEntity> Members { get; set; } = new List<ScimGroupMemberEntity>();
+}
+
+public sealed class ScimGroupMemberEntity
+{
+    public string GroupId { get; set; } = string.Empty;
+    public string UserId { get; set; } = string.Empty;
+    public DateTimeOffset AddedAt { get; set; }
+
+    public ScimGroupEntity? Group { get; set; }
+    public ScimUserEntity? User { get; set; }
+}
+

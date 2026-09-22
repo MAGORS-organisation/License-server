@@ -75,6 +75,12 @@
                 </a>
             </li>
             <li class="nav-item">
+                <a class="nav-link" data-view="view-scim">
+                    <span class="nav-icon">👥</span>
+                    <span>SCIM 2.0 Identity</span>
+                </a>
+            </li>
+            <li class="nav-item">
                 <a class="nav-link" data-view="view-system">
                     <span class="nav-icon">⚡</span>
                     <span>API &amp; Diagnostika</span>
@@ -740,6 +746,92 @@
                             </tr>
                         </tbody>
                     </table>
+                </div>
+            </section>
+
+            <!-- VIEW SCIM: SCIM 2.0 Podniková Synchronizácia (Okta / Entra ID) -->
+            <section id="view-scim" class="view-section">
+                <div class="kpi-grid">
+                    <div class="kpi-card">
+                        <div class="kpi-label">
+                            <span>Synchronizovaní Používatelia</span>
+                            <span>👥</span>
+                        </div>
+                        <div class="kpi-value" id="kpi-scim-total-users">0</div>
+                        <div class="kpi-subtext">RFC 7643 / RFC 7644</div>
+                    </div>
+                    <div class="kpi-card">
+                        <div class="kpi-label">
+                            <span>Aktívne Účty</span>
+                            <span>✅</span>
+                        </div>
+                        <div class="kpi-value" id="kpi-scim-active-users" style="color: var(--accent-emerald);">0</div>
+                        <div class="kpi-subtext">Oprávnení čerpať licencie</div>
+                    </div>
+                    <div class="kpi-card">
+                        <div class="kpi-label">
+                            <span>Deprovisioned / Pozastavení</span>
+                            <span>🚫</span>
+                        </div>
+                        <div class="kpi-value" id="kpi-scim-deactivated-users" style="color: var(--accent-rose);">0</div>
+                        <div class="kpi-subtext">Zero-Trust uvoľnené sedadlá</div>
+                    </div>
+                    <div class="kpi-card">
+                        <div class="kpi-label">
+                            <span>SCIM 2.0 Konektor</span>
+                            <span>🔗</span>
+                        </div>
+                        <div class="kpi-value" style="font-size: 16px; color: var(--accent-cyan); font-family: monospace;">/scim/v2</div>
+                        <div class="kpi-subtext">Okta · Entra ID · Google</div>
+                    </div>
+                </div>
+
+                <div class="table-card">
+                    <div class="table-header">
+                        <div>
+                            <div class="table-title">👥 Podnikový Adresár Používateľov (SCIM 2.0 Directory Bridge)</div>
+                            <div class="table-subtitle">Automatická synchronizácia z Microsoft Entra ID (Azure AD), Okta a PingFederate s okamžitým odobratím licencií</div>
+                        </div>
+                        <div class="table-actions">
+                            <button class="btn btn-secondary btn-sm" onclick="loadScimDirectory()">Obnoviť Adresár</button>
+                        </div>
+                    </div>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Používateľ (Username)</th>
+                                <th>Celé Meno</th>
+                                <th>Email</th>
+                                <th>Externé ID (IdP GUID)</th>
+                                <th>Skupiny</th>
+                                <th>Stav Účtu</th>
+                                <th>Posledná Synchronizácia</th>
+                                <th>Zero-Trust Akcia</th>
+                            </tr>
+                        </thead>
+                        <tbody id="scim-users-table-body">
+                            <tr>
+                                <td colspan="8" style="text-align: center; color: var(--text-muted); padding: 18px;">Načítavam synchronizovaných používateľov zo SCIM 2.0...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="table-card" style="margin-top: 20px;">
+                    <div class="table-header">
+                        <div class="table-title">⚙️ Konfigurácia Podnikového SCIM 2.0 Endpointu</div>
+                    </div>
+                    <div style="padding: 24px;">
+                        <p style="color: var(--text-secondary); line-height: 1.6; margin-bottom: 12px;">
+                            Pre integráciu s <strong>Microsoft Entra ID (Azure AD)</strong> alebo <strong>Okta</strong> zadajte v administrátorskej konzole vášho poskytovateľa identity (IdP) nasledovné parametre:
+                        </p>
+                        <div style="background: rgba(0,0,0,0.25); border: 1px solid var(--border-color); border-radius: 6px; padding: 16px; font-family: monospace; font-size: 13px; line-height: 1.8; color: var(--accent-amber);">
+                            <div><strong>Tenant URL:</strong> <span id="scim-tenant-url">https://license.symbolon.dev/scim/v2</span></div>
+                            <div><strong>Secret Token:</strong> Bearer váš_administrátorský_api_kľúč (sym_adm_...)</div>
+                            <div><strong>Podporované Metódy:</strong> GET, POST, PUT, PATCH, DELETE</div>
+                            <div><strong>Zero-Trust Deprovisioning:</strong> ÁNO (automatické uvoľnenie floating sedadiel a zrušenie menných alokácií)</div>
+                        </div>
+                    </div>
                 </div>
             </section>
 

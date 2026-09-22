@@ -10,6 +10,25 @@ a projekt striktne dodržiava [Sémantické Verziovanie (Semantic Versioning 2.0
 ## [Unreleased]
 
 ### Pridané (Added)
+- **Enterprise SCIM 2.0 Identity & Group Synchronization Bridge (`RFC 7643`, `RFC 7644`)**:
+  - **Štandardné SCIM 2.0 Endpointy (`/scim/v2`)**:
+    - `GET /scim/v2/ServiceProviderConfig`: RFC 7644 §4 schopnosti poskytovateľa služieb (podpora PATCH, filter do 1000 výsledkov, HTTP Bearer autentifikácia).
+    - `GET /scim/v2/Schemas` & `GET /scim/v2/ResourceTypes`: Schémy pre entity `User` (`urn:ietf:params:scim:schemas:core:2.0:User`) a `Group` (`urn:ietf:params:scim:schemas:core:2.0:Group`).
+    - `Users` CRUD & Filter: `GET /Users` (stránkovanie, filtrovanie `userName eq "..."`, `externalId eq "..."`), `POST /Users` (vytvorenie používateľa s detekciou konfliktov `409 Conflict`), `GET /Users/{id}`, `PUT /Users/{id}`, `PATCH /Users/{id}` a `DELETE /Users/{id}`.
+    - `Groups` CRUD & Member Management: `GET /Groups`, `POST /Groups`, `GET /Groups/{id}`, `PUT /Groups/{id}`, `PATCH /Groups/{id}` (pridávanie a odoberanie členov cez `members[value eq "..."]`), a `DELETE /Groups/{id}`.
+  - **Zero-Trust Automatické Deprovisioning & Okamžité Uvoľnenie Sedadiel**:
+    - Pri deaktivácii používateľa (`active = false` cez SCIM PATCH/PUT) alebo zmazaní (`DELETE /Users/{id}`), server okamžite:
+      1. Identifikuje a uvoľní všetky aktívne plávajúce licenčné sedadlá držané používateľom cez `LeaseEngine.ReleaseAsync(leaseId)`.
+      2. Zruší všetky čakajúce lístky v kapacitnom rade (`QueueTickets`).
+      3. Odoberie menné priradenia z `LicenseUsers` (§4.3).
+      4. Zapíše nemenný auditný záznam `SCIM_USER_DEPROVISIONED` do kryptografického ledgeru.
+      5. Emituje OpenTelemetry trasovaciu stopu `symbolon.scim.deprovision`.
+  - **Kompatibilita s Podnikovými Poskytovateľmi Identity (IdP)**: Plná podpora a interoperabilita s Microsoft Entra ID (Azure AD), Okta, PingFederate a Google Workspace.
+  - **Retro FoxPro Web TUI Rozšírenie**:
+    - Nová sekcia `view-scim` (**👥 SCIM 2.0 Identity**) v navigačnom paneli s KPI ukazovateľmi (celkový počet synchronizovaných používateľov, aktívne účty, deprovisioned účty).
+    - Interaktívna tabuľka podnikového adresára so zoznamom používateľov, externými IdP identifikátormi, skupinami a tlačidlami pre okamžitú deprovisionizáciu/reaktiváciu.
+    - Administrátorský endpoint `GET /admin/v1/scim/users`.
+  - **Testovacie Pokrytie**: 7 nových komplexných end-to-end integračných testov v `ScimApiTests.cs` pokrývajúcich RFC konfiguráciu, filtrovanie používateľov, skupiny, a overenie okamžitého zrušenia sedadiel pri offboardingu zamestnanca.
 - **OpenTelemetry Distribuované Trasovanie & W3C TraceContext (`System.Diagnostics.ActivitySource`)**:
   - **Centrálny ActivitySource (`SymbolonTracing`)**: Globálny zdroj trasovania pre celú platformu (`symbolon.checkout`, `symbolon.renew`, `symbolon.release`, `symbolon.borrow`, `symbolon.return_borrowed`, `symbolon.fraud_check`, `symbolon.replication.sync`, `symbolon.ebpf.enforce`, `symbolon.keys.split`, `symbolon.keys.combine`) s bohatými štandardizovanými tagmi a stavmi chýb/úspechu.
   - **W3C TraceContext Propagácia (`W3cTraceContext`)**: Generovanie, parsovanie a automatická propagácia hlavičiek `traceparent` (`00-{trace_id}-{span_id}-{flags}`) a `tracestate` naprieč .NET Client SDK, Python SDK, Rust SDK, ControlPlane a Relay.

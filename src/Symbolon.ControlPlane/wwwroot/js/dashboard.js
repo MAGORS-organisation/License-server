@@ -4,17 +4,22 @@
 const originalFetch = window.fetch;
 window.fetch = function(url, options = {}) {
     const key = localStorage.getItem("symbolon_api_key");
-    if (key && typeof url === "string" && (url.startsWith("/admin/") || url.startsWith("/v1/"))) {
+    if (key && typeof url === "string" && (url.startsWith("/admin/") || url.startsWith("/v1/") || url.startsWith("/scim/"))) {
         options = { ...options };
         options.headers = options.headers || {};
         if (options.headers instanceof Headers) {
             if (!options.headers.has("X-Api-Key")) {
                 options.headers.set("X-Api-Key", key);
             }
+            if (!options.headers.has("Authorization")) {
+                options.headers.set("Authorization", `Bearer ${key}`);
+            }
         } else if (Array.isArray(options.headers)) {
             options.headers.push(["X-Api-Key", key]);
+            options.headers.push(["Authorization", `Bearer ${key}`]);
         } else {
             options.headers["X-Api-Key"] = key;
+            options.headers["Authorization"] = `Bearer ${key}`;
         }
     }
     return originalFetch(url, options);
@@ -64,7 +69,8 @@ async function refreshAllData() {
         loadWebhooks(),
         loadApiKeys(),
         loadTransparencyRoot(),
-        loadMeshAndAlerts()
+        loadMeshAndAlerts(),
+        loadScimDirectory()
     ]);
 }
 
@@ -1547,6 +1553,130 @@ async function loadDistributedTraces() {
         tbody.innerHTML = `<tr><td colspan="7" style="text-align: center; color: var(--accent-rose); padding: 18px;">Chyba komunikácie: ${escapeHtml(err.message)}</td></tr>`;
     }
 }
+
+// SCIM 2.0 Directory Management
+async function loadScimDirectory() {
+    const tbody = document.getElementById("scim-users-table-body");
+    const totalEl = document.getElementById("kpi-scim-total-users");
+    const activeEl = document.getElementById("kpi-scim-active-users");
+    const deactEl = document.getElementById("kpi-scim-deactivated-users");
+    const urlEl = document.getElementById("scim-tenant-url");
+
+    if (urlEl) {
+        urlEl.textContent = `${window.location.origin}/scim/v2`;
+    }
+
+    try {
+        const res = await fetch("/admin/v1/scim/users");
+        if (!res.ok) {
+            if (tbody) tbody.innerHTML = `<tr><td colspan="8" style="text-align: center; color: var(--accent-amber); padding: 18px;">Pre načítanie SCIM používateľov zadajte platný administrátorský API kľúč.</td></tr>`;
+            return;
+        }
+
+        const users = await res.json();
+        if (!users || users.length === 0) {
+            if (totalEl) totalEl.textContent = "0";
+            if (activeEl) activeEl.textContent = "0";
+            if (deactEl) deactEl.textContent = "0";
+            if (tbody) tbody.innerHTML = `<tr><td colspan="8" style="text-align: center; color: var(--text-muted); padding: 18px;">Žiadni používatelia synchronizovaní cez SCIM 2.0. Nastavte integráciu vo vašom IdP (Okta / Entra ID).</td></tr>`;
+            return;
+        }
+
+        let activeCount = 0;
+        let deactCount = 0;
+        users.forEach(u => {
+            if (u.active) activeCount++;
+            else deactCount++;
+        });
+
+        if (totalEl) totalEl.textContent = users.length;
+        if (activeEl) activeEl.textContent = activeCount;
+        if (deactEl) deactEl.textContent = deactCount;
+
+        if (tbody) {
+            tbody.innerHTML = users.map(u => {
+                const statusBadge = u.active
+                    ? `<span class="badge badge-active">Aktívny</span>`
+                    : `<span class="badge badge-expired" style="background: rgba(244,63,94,0.15); color: var(--accent-rose); border: 1px solid var(--accent-rose);">Pozastavený (Revoked)</span>`;
+
+                const groupsStr = (u.groups && u.groups.length > 0)
+                    ? u.groups.map(g => `<span class="badge badge-secondary" style="margin-right: 4px; font-size: 11px;">${escapeHtml(g)}</span>`).join("")
+                    : `<span style="color: var(--text-muted); font-size: 12px;">-</span>`;
+
+                const actionBtn = u.active
+                    ? `<button class="btn btn-danger btn-sm" onclick="deactivateScimUser('${u.id}', '${escapeHtml(u.userName)}')">🚫 Deaktivovať &amp; Uvoľniť</button>`
+                    : `<button class="btn btn-secondary btn-sm" onclick="reactivateScimUser('${u.id}', '${escapeHtml(u.userName)}')">✅ Obnoviť Účet</button>`;
+
+                const updatedStr = u.updatedAt ? new Date(u.updatedAt).toLocaleString("sk-SK") : "-";
+
+                return `<tr>
+                    <td><strong>${escapeHtml(u.userName)}</strong></td>
+                    <td>${escapeHtml(u.displayName || "-")}</td>
+                    <td>${escapeHtml(u.email || "-")}</td>
+                    <td><code style="font-size: 11px; color: var(--text-muted);">${escapeHtml(u.externalId || u.id)}</code></td>
+                    <td>${groupsStr}</td>
+                    <td>${statusBadge}</td>
+                    <td style="font-size: 12px; color: var(--text-secondary);">${updatedStr}</td>
+                    <td>${actionBtn}</td>
+                </tr>`;
+            }).join("");
+        }
+    } catch (err) {
+        if (tbody) tbody.innerHTML = `<tr><td colspan="8" style="text-align: center; color: var(--accent-rose); padding: 18px;">Chyba komunikácie: ${escapeHtml(err.message)}</td></tr>`;
+    }
+}
+
+async function deactivateScimUser(id, userName) {
+    if (!confirm(`Naozaj chcete okamžite deprovisionovať používateľa '${userName}'?\n\nVšetky jeho aktívne floating licencie budú okamžite uvoľnené a čakajúce fronty zrušené!`)) {
+        return;
+    }
+    try {
+        const res = await fetch(`/scim/v2/Users/${encodeURIComponent(id)}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/scim+json" },
+            body: JSON.stringify({
+                schemas: ["urn:ietf:params:scim:api:messages:2.0:PatchOp"],
+                Operations: [
+                    { op: "replace", path: "active", value: false }
+                ]
+            })
+        });
+        if (res.ok) {
+            showToast(`Používateľ '${userName}' bol deprovisionovaný a všetky jeho licencie uvoľnené.`, "success");
+            await loadScimDirectory();
+            await loadLicenses();
+            await loadAuditLogs();
+        } else {
+            showToast(`Chyba pri deprovisionovaní: ${res.statusText}`, "error");
+        }
+    } catch (e) {
+        showToast("Chyba spojenia: " + e.message, "error");
+    }
+}
+
+async function reactivateScimUser(id, userName) {
+    try {
+        const res = await fetch(`/scim/v2/Users/${encodeURIComponent(id)}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/scim+json" },
+            body: JSON.stringify({
+                schemas: ["urn:ietf:params:scim:api:messages:2.0:PatchOp"],
+                Operations: [
+                    { op: "replace", path: "active", value: true }
+                ]
+            })
+        });
+        if (res.ok) {
+            showToast(`Používateľ '${userName}' bol úspešne reaktivovaný.`, "success");
+            await loadScimDirectory();
+        } else {
+            showToast(`Chyba pri reaktivácii: ${res.statusText}`, "error");
+        }
+    } catch (e) {
+        showToast("Chyba spojenia: " + e.message, "error");
+    }
+}
+
 
 
 

@@ -63,6 +63,9 @@ public static class AdminEndpoints
         // Distributed Tracing Explorer
         group.MapGet("/traces/recent", GetRecentTraces).WithName("GetRecentTraces");
 
+        // SCIM 2.0 Directory Management
+        group.MapGet("/scim/users", GetScimUsersSummaryAsync).WithName("GetScimUsersSummary");
+
         group.AddEndpointFilter(async (invocationContext, next) =>
         {
             var http = invocationContext.HttpContext;
@@ -903,5 +906,42 @@ public static class AdminEndpoints
         Observability.SymbolonTraceBuffer traceBuffer)
     {
         return TypedResults.Ok(traceBuffer.GetRecentSpans());
+    }
+
+    private static async Task<IResult> GetScimUsersSummaryAsync(
+        HttpContext httpContext,
+        SymbolonDbContext db,
+        CancellationToken ct)
+    {
+        string? tenantId = GetEffectiveTenantFilter(httpContext);
+        var query = db.ScimUsers
+            .AsNoTracking()
+            .Include(u => u.GroupMemberships)
+            .ThenInclude(m => m.Group)
+            .AsQueryable();
+
+        if (!string.IsNullOrWhiteSpace(tenantId))
+        {
+            query = query.Where(u => u.TenantId == tenantId);
+        }
+
+        var users = await query
+            .OrderByDescending(u => u.UpdatedAt)
+            .Select(u => new
+            {
+                id = u.Id,
+                userName = u.UserName,
+                externalId = u.ExternalId,
+                displayName = u.FormattedName,
+                email = u.Email,
+                active = u.Active,
+                groups = u.GroupMemberships.Select(g => g.Group != null ? g.Group.DisplayName : g.GroupId).ToList(),
+                createdAt = u.CreatedAt,
+                updatedAt = u.UpdatedAt
+            })
+            .ToListAsync(ct)
+            .ConfigureAwait(false);
+
+        return TypedResults.Ok(users);
     }
 }

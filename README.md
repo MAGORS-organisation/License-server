@@ -2,7 +2,7 @@
 
 [![Platform](https://img.shields.io/badge/.NET-10.0%20LTS-512BD4?logo=dotnet)](https://dotnet.microsoft.com/)
 [![Language](https://img.shields.io/badge/C%23-14.0-239120?logo=csharp)](https://learn.microsoft.com/dotnet/csharp/)
-[![Tests](https://img.shields.io/badge/tests-194%20passed%20(+13%20Python)-brightgreen)](#výsledky-testovania)
+[![Tests](https://img.shields.io/badge/tests-201%20passed%20(+13%20Python)-brightgreen)](#výsledky-testovania)
 [![License: AGPL-3.0](https://img.shields.io/badge/license-AGPL--3.0-blue.svg)](LICENSE)
 [![License: Apache-2.0](https://img.shields.io/badge/client%20SDK-Apache--2.0-blue.svg)](LICENSES/Apache-2.0.txt)
 [![CRA Compliant](https://img.shields.io/badge/CRA%20Compliance-EU%202024%2F2847-success)](SECURITY.md)
@@ -88,6 +88,10 @@ Rieši to, čo dnešné cloud-first platformy ponúkajú iba ako obmedzený dopl
     - Informačno-teoreticky bezpečné delenie master podpisových kľúčov (ES256, ML-DSA-65) nad konečným poľom Galois Field $GF(2^8)$ s AES polynómom `0x11B`.
     - Rekonštrukcia kľúča z ľubovoľných $k$ z $n$ podielov pomocou Lagrangeovej interpolácie s kryptografickým SHA-256 MAC overením integrity.
     - CLI príkazy `symbolon keys split` a `symbolon keys combine` s podporou Base64Url tokenov aj štandardného PEM formátu.
+22. **Enterprise SCIM 2.0 Identity & Group Synchronization Bridge (RFC 7643, RFC 7644)**
+    - Automatická obojsmerná synchronizácia identít a skupín s podnikovými IdP (Microsoft Entra ID / Azure AD, Okta, PingFederate, Google Workspace) cez štandardné rozhranie `/scim/v2`.
+    - **Zero-Trust Automatické Deprovisioning & Okamžitá Revokácia Sedadiel**: Okamžité uvoľnenie všetkých plávajúcich licencií (`LeaseEngine.ReleaseAsync`), zrušenie čakajúcich frontových lístkov a odobratie menných alokácií pri deaktivácii používateľa v IdP.
+    - Retro FoxPro Web TUI integrácia s monitorovaním synchronizovaných používateľov a manuálnym núdzovým riadením.
 
 ---
 
@@ -320,9 +324,9 @@ Passed!  - Failed: 0, Passed:  9, Skipped: 0, Total:  9 - Symbolon.Relay.Tests.d
 Passed!  - Failed: 0, Passed: 11, Skipped: 0, Total: 11 - Symbolon.Client.Tests.dll
 Passed!  - Failed: 0, Passed: 21, Skipped: 0, Total: 21 - Symbolon.Cli.Tests.dll
 Passed!  - Failed: 0, Passed:  7, Skipped: 0, Total:  7 - Symbolon.Data.Tests.dll
-Passed!  - Failed: 0, Passed: 50, Skipped: 0, Total: 50 - Symbolon.ControlPlane.Tests.dll
+Passed!  - Failed: 0, Passed: 57, Skipped: 0, Total: 57 - Symbolon.ControlPlane.Tests.dll
 
-Celkovo: 194 úspešných testov v .NET (+ 13 unit testov v Pythone), 0 zlyhaní, 0 chýb. Trvanie: ~8 sekúnd.
+Celkovo: 201 úspešných testov v .NET (+ 13 unit testov v Pythone), 0 zlyhaní, 0 chýb. Trvanie: ~8 sekúnd.
 ```
 
 ---

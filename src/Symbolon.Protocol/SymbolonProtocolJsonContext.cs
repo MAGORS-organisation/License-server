@@ -22,6 +22,20 @@ namespace Symbolon.Protocol;
 [JsonSerializable(typeof(ServerTelemetryDto))]
 [JsonSerializable(typeof(Symbolon.Protocol.Tracing.TraceSpanDto))]
 [JsonSerializable(typeof(List<Symbolon.Protocol.Tracing.TraceSpanDto>))]
+[JsonSerializable(typeof(Symbolon.Protocol.Scim.ScimUserDto))]
+[JsonSerializable(typeof(List<Symbolon.Protocol.Scim.ScimUserDto>))]
+[JsonSerializable(typeof(Symbolon.Protocol.Scim.ScimListResponseDto<Symbolon.Protocol.Scim.ScimUserDto>))]
+[JsonSerializable(typeof(Symbolon.Protocol.Scim.ScimGroupDto))]
+[JsonSerializable(typeof(List<Symbolon.Protocol.Scim.ScimGroupDto>))]
+[JsonSerializable(typeof(Symbolon.Protocol.Scim.ScimListResponseDto<Symbolon.Protocol.Scim.ScimGroupDto>))]
+[JsonSerializable(typeof(Symbolon.Protocol.Scim.ScimServiceProviderConfigDto))]
+[JsonSerializable(typeof(Symbolon.Protocol.Scim.ScimPatchOpDto))]
+[JsonSerializable(typeof(Symbolon.Protocol.Scim.ScimPatchOperation))]
+[JsonSerializable(typeof(Symbolon.Protocol.Scim.ScimErrorDto))]
+[JsonSerializable(typeof(Symbolon.Protocol.Scim.ScimUserNameDto))]
+[JsonSerializable(typeof(Symbolon.Protocol.Scim.ScimEmailDto))]
+[JsonSerializable(typeof(Symbolon.Protocol.Scim.ScimMemberDto))]
+[JsonSerializable(typeof(Symbolon.Protocol.Scim.ScimMetaDto))]
 public sealed partial class SymbolonProtocolJsonContext : JsonSerializerContext
 {
 }
