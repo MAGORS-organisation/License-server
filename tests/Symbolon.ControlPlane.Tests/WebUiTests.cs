@@ -19,11 +19,13 @@ public sealed class WebUiTests : IClassFixture<ControlPlaneFactory>
         var response = await _client.GetAsync("/");
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
-        string content = await response.Content.ReadAsStringAsync();
+        var content = await response.Content.ReadAsStringAsync();
         Assert.Contains("Symbolon Control Plane", content, StringComparison.Ordinal);
         Assert.Contains("view-overview", content, StringComparison.Ordinal);
         Assert.Contains("view-licenses", content, StringComparison.Ordinal);
         Assert.Contains("view-keys", content, StringComparison.Ordinal);
+        Assert.Contains("view-wasm", content, StringComparison.Ordinal);
+        Assert.Contains("symbolon-validator.js", content, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -48,6 +50,12 @@ public sealed class WebUiTests : IClassFixture<ControlPlaneFactory>
         Assert.Equal(HttpStatusCode.OK, retroJs.StatusCode);
         string retroJsContent = await retroJs.Content.ReadAsStringAsync();
         Assert.Contains("bindKeyboardListeners", retroJsContent, StringComparison.Ordinal);
+
+        var wasmJs = await _client.GetAsync("/js/symbolon-validator.js");
+        Assert.Equal(HttpStatusCode.OK, wasmJs.StatusCode);
+        string wasmJsContent = await wasmJs.Content.ReadAsStringAsync();
+        Assert.Contains("SymbolonOfflineValidator", wasmJsContent, StringComparison.Ordinal);
+        Assert.Contains("generateBrowserFingerprint", wasmJsContent, StringComparison.Ordinal);
     }
 
     [Fact]

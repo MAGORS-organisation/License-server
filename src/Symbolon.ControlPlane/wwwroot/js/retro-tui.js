@@ -29,6 +29,7 @@
         { id: 'mesh', label: 'Relay Mesh & Klastre', hotkey: 'M', view: 'view-mesh', hasSub: false },
         { id: 'audit', label: 'Auditný denník', hotkey: 'A', view: 'view-audit', hasSub: false },
         { id: 'airgap', label: 'Air-Gap portál', hotkey: 'G', view: 'view-airgap', hasSub: false },
+        { id: 'wasm', label: 'Wasm Validátor', hotkey: 'D', view: 'view-wasm', hasSub: false },
         { id: 'webhooky', label: 'Webhooky', hotkey: 'W', view: 'view-webhooks', hasSub: false },
         { isSeparator: true },
         { id: 'sulad', label: 'Súlad & CRA / SBOM', hotkey: 'S', view: 'view-system', hasSub: false },
@@ -71,6 +72,7 @@
                 <li class="retro-menu-item" onclick="switchRetroView('view-mesh')" tabindex="0"><span class="hotkey">M</span>esh</li>
                 <li class="retro-menu-item" onclick="switchRetroView('view-audit')" tabindex="0"><span class="hotkey">A</span>udit</li>
                 <li class="retro-menu-item" onclick="switchRetroView('view-airgap')" tabindex="0">Air-<span class="hotkey">G</span>ap</li>
+                <li class="retro-menu-item" onclick="switchRetroView('view-wasm')" tabindex="0"><span class="hotkey">W</span>asm</li>
                 <li class="retro-menu-item" onclick="switchRetroView('view-system')" tabindex="0"><span class="hotkey">S</span>úlad CRA</li>
                 <li class="retro-menu-item" onclick="openModal('modal-auth-config')" tabindex="0">K<span class="hotkey">o</span>nfigurácia</li>
             </ul>
@@ -569,6 +571,7 @@
             'view-relays': 'ON-PREMISE RELAY UZLY S DELEGOVANOU KAPACITOU',
             'view-audit': 'KRYPTOGRAFICKY REŤAZENÝ AUDITNÝ DENNÍK (LEDGER)',
             'view-airgap': 'AIR-GAP & OFFLINE LICENČNÝ PORTÁL',
+            'view-wasm': 'WEBASSEMBLY & WEBCRYPTO OFFLINE VALIDÁTOR (100% AIR-GAP)',
             'view-webhooks': 'WEBHOOK NOTIFIKÁCIE & HISTÓRIA DORUČENIA',
             'view-mesh': 'RELAY MESH KLASTRE, DISKÉTNY KONSENZUS & HARDWARE ATTESTATION (PHASE 3.0)',
             'view-system': 'CYBER RESILIENCE ACT (CRA) & CYCLONEDX SBOM',

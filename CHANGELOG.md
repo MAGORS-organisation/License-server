@@ -10,6 +10,22 @@ a projekt striktne dodržiava [Sémantické Verziovanie (Semantic Versioning 2.0
 ## [Unreleased]
 
 ### Pridané (Added)
+- **WebAssembly & In-Browser Offline License Validator SDK (`@symbolon/validator`)**:
+  - **W3C WebCrypto API Kryptografické Overovanie (NIST P-256 / ES256)**:
+    - Zero-dependency klientsky validátor bežiaci 100% v prehliadači, Node.js a hybridných prostrediach (Electron, Tauri, React, Vue, Angular).
+    - Kryptografická verifikácia digitálnych podpisov ECDSA SHA-256 pomocou `crypto.subtle.verify` priamo z JWKS verejných kľúčov bez volania servera.
+    - Okamžitá detekcia a odmietnutie manipulácie s počtom sedadiel (tampered payload), poškodených bajtov podpisu, nesprávneho kľúča alebo expirovanej platnosti.
+  - **Hardvérový Odtlačok Prehliadača pre Web Node-Locking (`generateBrowserFingerprint`)**:
+    - Deterministický výpočet stabilného SHA-256 hashu (`fp_web_...`) z 2D Canvas renderingu, WebGL rendereru, rozlíšenia obrazovky, časového pásma, jazyka a hardvérovej súbežnosti.
+  - **Viacformátová Podpora a Balíčkovanie**:
+    - Podpora `.symlic` / `.symkey` PEM obálok, JWS Compact Serialization, JWS JSON General Serialization a `LIC-34` formátu produktových kľúčov (Crockford Base32).
+    - Balíčky: UMD `symbolon-validator.js`, ES Module `symbolon-validator.mjs`, TypeScript definície `symbolon-validator.d.ts` a NPM `package.json`.
+  - **Interaktívny Validátor v Retro FoxPro Web TUI a Standalone HTML Portál**:
+    - Nová sekcia `view-wasm` (**🛡️ Wasm Validátor**) v administračnom rozhraní s okamžitým drag-and-drop overovaním a detekciou odtlačku.
+    - Samostatný jedno-súborový offline portál `sdk/wasm/index.html` spustiteľný priamo z lokálneho disku (`file://`) bez webového servera.
+  - **Testovacia Sada Node.js a .NET**:
+    - 11 nových automatizovaných testov v `sdk/wasm/tests/validator.test.js` spúšťaných cez `node --test` (100% pass rate).
+    - Aktualizovaná sada `WebUiTests` v `Symbolon.ControlPlane.Tests` overujúca servovanie statických validačných skriptov.
 - **Cloud-Native Kubernetes Operator & Enterprise Helm Chart (`Symbolon.Operator`)**:
   - **Custom Resource Definitions (CRD v1)**:
     - `SymbolonCluster` (`licensing.symbolon.io/v1alpha1`): Deklaratívna definícia topológie klastra, počtu replík, hybridného PQC režimu, PostgreSQL úložiska (embedded/external), Ingressu s cert-managerom, PodDisruptionBudget a ServiceMonitoringu.

@@ -1744,6 +1744,100 @@ async function reactivateScimUser(id, userName) {
     }
 }
 
+// --- Wasm / In-Browser Offline License Validator Logic ---
+async function detectWasmBrowserFingerprint() {
+    try {
+        if (typeof generateBrowserFingerprint === 'function') {
+            const fp = await generateBrowserFingerprint();
+            const fpInput = document.getElementById('wasm-fp-input');
+            const disp = document.getElementById('wasm-detected-fp-display');
+            if (fpInput) fpInput.value = fp;
+            if (disp) disp.textContent = fp;
+            showToast('Odtlačok prehliadača úspešne vygenerovaný: ' + fp, 'success');
+        } else {
+            showToast('Funkcia generateBrowserFingerprint nie je načítaná.', 'error');
+        }
+    } catch (err) {
+        showToast('Chyba pri detekcii odtlačku: ' + err.message, 'error');
+    }
+}
 
+async function loadServerJwksForWasm() {
+    try {
+        const res = await fetch('/v1/jwks');
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const jwks = await res.json();
+        const jwksArea = document.getElementById('wasm-jwks-input');
+        if (jwksArea) {
+            jwksArea.value = JSON.stringify(jwks, null, 2);
+            showToast('Dôveryhodný JWKS úspešne stiahnutý zo servera.', 'success');
+        }
+    } catch (err) {
+        showToast('Nepodarilo sa načítať JWKS zo servera: ' + err.message, 'error');
+    }
+}
 
+async function runWasmValidation() {
+    const licArea = document.getElementById('wasm-license-input');
+    const jwksArea = document.getElementById('wasm-jwks-input');
+    const fpInput = document.getElementById('wasm-fp-input');
+    const resultBox = document.getElementById('wasm-validation-results');
 
+    if (!licArea || !licArea.value.trim()) {
+        showToast('Vložte licenčný súbor alebo reťazec.', 'warning');
+        return;
+    }
+
+    let jwks = null;
+    if (jwksArea && jwksArea.value.trim()) {
+        try {
+            jwks = JSON.parse(jwksArea.value.trim());
+        } catch (e) {
+            showToast('Neplatný formát JSON v poli JWKS: ' + e.message, 'error');
+            return;
+        }
+    }
+
+    try {
+        if (typeof SymbolonOfflineValidator !== 'function') {
+            showToast('SymbolonOfflineValidator knižnica nie je načítaná.', 'error');
+            return;
+        }
+
+        const validator = new SymbolonOfflineValidator({ jwks });
+        const res = await validator.validate(licArea.value.trim(), fpInput?.value.trim() || null);
+
+        let badgeClass = res.isValid ? 'badge-active' : (res.isExpired ? 'badge-expired' : 'badge-revoked');
+        let statusText = res.isValid ? '✓ PLATNÁ LICENCIA (KRYPTOGRAFICKY OVERENÁ)' : (res.isExpired ? '⏳ LICENCIA EXPIROVALA' : '✗ NEPLATNÁ / MANIPULOVANÁ');
+
+        let featuresHtml = (res.features && res.features.length > 0)
+            ? res.features.map(f => `<span class="badge" style="background:var(--accent-primary); color:#fff; margin-right:4px;">${f}</span>`).join('')
+            : '<span style="color:var(--text-muted)">Základný balík (core)</span>';
+
+        resultBox.style.display = 'block';
+        resultBox.innerHTML = `
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; border-bottom:1px solid var(--border-color); padding-bottom:10px;">
+                <span class="badge ${badgeClass}" style="font-size:14px; padding:6px 12px;">${statusText}</span>
+                <span style="font-size:12px; color:var(--text-muted); font-family:monospace;">${res.verifiedAlgs.length > 0 ? 'Algoritmus: ' + res.verifiedAlgs.join(', ') : 'Bez overenia kľúča (len dekódované)'}</span>
+            </div>
+            ${res.failureReason ? `<div style="background:rgba(244,63,94,0.15); border:1px solid rgba(244,63,94,0.3); color:var(--accent-rose); padding:10px; border-radius:6px; margin-bottom:12px; font-size:13px;"><strong>Chyba:</strong> ${res.failureReason}</div>` : ''}
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; font-size:13px; color:var(--text-secondary);">
+                <div><strong>Zákazník:</strong> <span style="color:var(--text-primary);">${res.customer || '—'}</span></div>
+                <div><strong>Produkt (Audience):</strong> <span style="color:var(--text-primary);">${res.product || '—'}</span></div>
+                <div><strong>Typ licencie:</strong> <span style="color:var(--text-primary);">${res.licenseType || 'floating'}</span></div>
+                <div><strong>Kapacita sedadiel:</strong> <span style="color:var(--text-primary);">${res.maxSeats !== null ? res.maxSeats : 'Neobmedzená'}</span></div>
+                <div><strong>Platnosť do:</strong> <span style="color:var(--text-primary);">${res.expiresAtFormatted}</span></div>
+                <div><strong>Zostáva:</strong> <span style="color:var(--text-primary);">${res.daysRemaining !== null ? res.daysRemaining + ' dní' : 'Neobmedzene'}</span></div>
+                <div><strong>Hardware viazanie:</strong> <span style="color:var(--text-primary);">${res.isNodeLocked ? (res.machineMatch ? '✓ Odtlačok súhlasí' : '✗ Nesúlad odtlačku!') : 'Voľná (Floating)'}</span></div>
+                <div><strong>Vystaviteľ (Issuer):</strong> <span style="color:var(--text-primary);">${res.issuer || '—'}</span></div>
+            </div>
+            <div style="margin-top:12px; padding-top:10px; border-top:1px solid var(--border-color);">
+                <div style="font-size:12px; font-weight:600; color:var(--text-muted); margin-bottom:6px;">POVOLENÉ MODULY (ENTITLEMENTS):</div>
+                <div>${featuresHtml}</div>
+            </div>
+        `;
+        showToast(res.isValid ? 'Licencia je platná!' : 'Licencia zlyhala pri overení.', res.isValid ? 'success' : 'error');
+    } catch (err) {
+        showToast('Chyba validátora: ' + err.message, 'error');
+    }
+}

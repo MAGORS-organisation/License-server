@@ -2,7 +2,7 @@
 
 [![Platform](https://img.shields.io/badge/.NET-10.0%20LTS-512BD4?logo=dotnet)](https://dotnet.microsoft.com/)
 [![Language](https://img.shields.io/badge/C%23-14.0-239120?logo=csharp)](https://learn.microsoft.com/dotnet/csharp/)
-[![Tests](https://img.shields.io/badge/tests-216%20passed%20(+13%20Python)-brightgreen)](#výsledky-testovania)
+[![Tests](https://img.shields.io/badge/tests-216%20passed%20(+13%20Python%2C%20+11%20Wasm)-brightgreen)](#výsledky-testovania)
 [![License: AGPL-3.0](https://img.shields.io/badge/license-AGPL--3.0-blue.svg)](LICENSE)
 [![License: Apache-2.0](https://img.shields.io/badge/client%20SDK-Apache--2.0-blue.svg)](LICENSES/Apache-2.0.txt)
 [![CRA Compliant](https://img.shields.io/badge/CRA%20Compliance-EU%202024%2F2847-success)](SECURITY.md)
@@ -103,6 +103,11 @@ Rieši to, čo dnešné cloud-first platformy ponúkajú iba ako obmedzený dopl
     - Automatizované reconcilery (`ClusterReconciler`, `LicenseReconciler`) pre generovanie a synchronizáciu Deploymentov, PodDisruptionBudget (PDB), NetworkPolicy, ServiceMonitor pre Prometheus Operator a Kubernetes Secrets.
     - Podpora produkčného Helm Chartu s `pdb.yaml`, `networkpolicy.yaml` a `servicemonitor.yaml`.
     - Integrované CLI príkazy `symbolon k8s crd`, `symbolon k8s export-license` a `symbolon k8s generate-cluster` pre GitOps a CI/CD pipelines.
+25. **WebAssembly & In-Browser Offline License Validator SDK (`@symbolon/validator`)**
+    - Zero-dependency klientsky validátor bežiaci 100% offline vo webových prehliadačoch, Node.js, Electron, Tauri, React, Vue a Angular aplikáciách.
+    - Kryptografické overovanie digitálnych podpisov **NIST P-256 (ES256)** cez štandardné rozhranie **W3C WebCrypto API** (`crypto.subtle.verify`) bez nutnosti kontaktu s licenčným serverom.
+    - **Web Node-Locking**: Generovanie stabilného hardvérového odtlačku prehliadača (`generateBrowserFingerprint`) kombinujúceho 2D Canvas rendering, WebGL informácie, parametre displeja a systémové prostredie.
+    - Interaktívny in-browser validačný portál integrovaný priamo v Retro FoxPro Web TUI (`view-wasm`) aj samostatný jedno-súborový offline portál (`sdk/wasm/index.html`).
 
 ---
 
@@ -132,6 +137,7 @@ Symbolon.slnx
 │   ├── helm/symbolon/                        - Kubernetes Helm Chart (Deployment, Service, Ingress, PDB, NetworkPolicy, ServiceMonitor)
 │   └── systemd/                              - Tvrdený Linux systemd unit pre on-premise Relay
 ├── sdk/
+│   ├── wasm/                                 - WebAssembly & WebCrypto JS/TS SDK (@symbolon/validator, 100% offline)
 │   ├── python/symbolon/                      - Python SDK (pip installable, context manager, daemon heartbeat)
 │   ├── rust/symbolon/                        - Rust crate (Tokio async, RAII Drop pattern)
 │   └── c_cpp/                                - C99 / C++17 single-header knižnica (ScopedLease RAII)
@@ -162,9 +168,10 @@ cd License-server
 # Zostavenie celého solution
 dotnet build Symbolon.slnx
 
-# Spustenie všetkých 216 testov v .NET (+ 13 unit testov v Pythone)
+# Spustenie všetkých 216 testov v .NET (+ 13 v Pythone, + 11 v Node.js/Wasm)
 dotnet test Symbolon.slnx
 python -m unittest discover sdk/python/symbolon/tests
+node --test sdk/wasm/tests/validator.test.js
 ```
 
 ### 2. Spustenie celého prostredia cez Docker Compose
@@ -340,7 +347,11 @@ Passed!  - Failed: 0, Passed:  7, Skipped: 0, Total:  7 - Symbolon.Data.Tests.dl
 Passed!  - Failed: 0, Passed:  8, Skipped: 0, Total:  8 - Symbolon.Operator.Tests.dll
 Passed!  - Failed: 0, Passed: 64, Skipped: 0, Total: 64 - Symbolon.ControlPlane.Tests.dll
 
-Celkovo: 216 úspešných testov v .NET (+ 13 unit testov v Pythone), 0 zlyhaní, 0 chýb. Trvanie: ~9 sekúnd.
+Viacjazyčné SDK & WebAssembly testovacie sady:
+Passed!  - Failed: 0, Passed: 13, Skipped: 0, Total: 13 - Python SDK (unittest)
+Passed!  - Failed: 0, Passed: 11, Skipped: 0, Total: 11 - WebAssembly / WebCrypto SDK (node:test)
+
+Celkovo: 240 úspešných automatizovaných testov (216 .NET + 13 Python + 11 Node/Wasm), 0 zlyhaní, 0 chýb.
 ```
 
 ---

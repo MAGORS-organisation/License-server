@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html lang="sk">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Symbolon — WebAssembly & WebCrypto Offline License Validator</title>
+  <style>
+    :root {
+      --bg: #0f172a;
+      --card-bg: #1e293b;
+      --card-border: #334155;
+      --text: #f8fafc;
+      --text-muted: #94a3b8;
+      --accent: #38bdf8;
+      --accent-hover: #0284c7;
+      --success-bg: #064e3b;
+      --success-text: #34d399;
+      --danger-bg: #7f1d1d;
+      --danger-text: #f87171;
+      --warning-bg: #78350f;
+      --warning-text: #fbbf24;
+      --code-bg: #090d16;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+      padding: 2rem 1rem;
+    }
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+    }
+    header {
+      margin-bottom: 2rem;
+      border-bottom: 1px solid var(--card-border);
+      padding-bottom: 1.5rem;
+    }
+    .badge {
+      display: inline-block;
+      padding: 0.25rem 0.5rem;
+      border-radius: 4px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    .badge-pqc { background: #581c87; color: #d8b4fe; }
+    .badge-wasm { background: #1e3a8a; color: #93c5fd; }
+    .badge-offline { background: #065f46; color: #a7f3d0; }
+    h1 { font-size: 1.8rem; margin: 0.5rem 0; display: flex; align-items: center; gap: 0.75rem; }
+    p.subtitle { color: var(--text-muted); font-size: 0.95rem; }
+    
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1.5rem;
+    }
+    @media (max-width: 768px) {
+      .grid { grid-template-columns: 1fr; }
+    }
+    
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 8px;
+      padding: 1.25rem;
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
+    }
+    .card h2 {
+      font-size: 1.15rem;
+      margin-bottom: 1rem;
+      color: var(--accent);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    
+    label {
+      display: block;
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      margin-bottom: 0.35rem;
+    }
+    textarea, input[type="text"] {
+      width: 100%;
+      background: var(--code-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 6px;
+      color: #38bdf8;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      font-size: 0.82rem;
+      padding: 0.75rem;
+      margin-bottom: 1rem;
+      resize: vertical;
+    }
+    textarea:focus, input[type="text"]:focus {
+      outline: none;
+      border-color: var(--accent);
+    }
+    
+    .dropzone {
+      border: 2px dashed var(--card-border);
+      border-radius: 6px;
+      padding: 1.5rem;
+      text-align: center;
+      background: rgba(15, 23, 42, 0.5);
+      cursor: pointer;
+      margin-bottom: 1rem;
+      transition: border-color 0.2s;
+    }
+    .dropzone:hover, .dropzone.dragover {
+      border-color: var(--accent);
+    }
+    .dropzone p { color: var(--text-muted); font-size: 0.85rem; }
+    
+    .btn {
+      display: inline-block;
+      width: 100%;
+      background: var(--accent);
+      color: #0f172a;
+      font-weight: 700;
+      padding: 0.75rem 1rem;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 0.95rem;
+      transition: background 0.2s;
+    }
+    .btn:hover { background: var(--accent-hover); }
+    .btn-secondary {
+      background: #334155;
+      color: var(--text);
+      font-size: 0.8rem;
+      padding: 0.4rem 0.75rem;
+      width: auto;
+    }
+    .btn-secondary:hover { background: #475569; }
+    
+    /* Result Box */
+    .result-banner {
+      padding: 1rem;
+      border-radius: 6px;
+      font-weight: 700;
+      font-size: 1.1rem;
+      margin-bottom: 1rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .result-valid { background: var(--success-bg); color: var(--success-text); border: 1px solid #059669; }
+    .result-invalid { background: var(--danger-bg); color: var(--danger-text); border: 1px solid #dc2626; }
+    .result-expired { background: var(--warning-bg); color: var(--warning-text); border: 1px solid #d97706; }
+    
+    .meta-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.85rem;
+      margin-bottom: 1rem;
+    }
+    .meta-table td {
+      padding: 0.5rem 0.25rem;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    }
+    .meta-table td:first-child {
+      color: var(--text-muted);
+      width: 40%;
+      font-weight: 500;
+    }
+    .meta-table td:last-child {
+      font-weight: 600;
+      color: var(--text);
+    }
+    
+    .pills {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.4rem;
+      margin-top: 0.5rem;
+    }
+    .pill {
+      background: #334155;
+      padding: 0.2rem 0.5rem;
+      border-radius: 4px;
+      font-size: 0.75rem;
+      color: #e2e8f0;
+    }
+    .pill-active { background: #0369a1; color: #bae6fd; }
+
+    .fp-box {
+      margin-top: 1.5rem;
+      padding-top: 1rem;
+      border-top: 1px solid var(--card-border);
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <div style="display: flex; gap: 0.5rem; margin-bottom: 0.5rem;">
+        <span class="badge badge-wasm">WebAssembly & WebCrypto</span>
+        <span class="badge badge-offline">100% Offline (No Server Contact)</span>
+        <span class="badge badge-pqc">FIPS 204 PQC Ready</span>
+      </div>
+      <h1>🛡️ Symbolon In-Browser License Validator</h1>
+      <p class="subtitle">Zero-dependency klientsky validátor pre overovanie .symlic súborov pomocou natívneho W3C WebCrypto API (NIST P-256 ECDSA). Všetky kryptografické výpočty prebiehajú výhradne v pamäti vášho prehliadača.</p>
+    </header>
+
+    <div class="grid">
+      <!-- Input Panel -->
+      <div class="card">
+        <h2>1. Vstupné Licenčné Dáta</h2>
+
+        <div class="dropzone" id="dropzone" onclick="document.getElementById('fileInput').click()">
+          <p>📄 Kliknite pre výber alebo pretiahnite súbor <strong>.symlic</strong> / <strong>.symkey</strong> sem</p>
+          <input type="file" id="fileInput" style="display: none" accept=".symlic,.symkey,.txt,.pem,.json">
+        </div>
+
+        <label for="licenseInput">Alebo vložte text licencie (PEM / JWS / LIC-34):</label>
+        <textarea id="licenseInput" rows="7" placeholder="-----BEGIN SYMBOLON LICENSE-----&#10;eyJhbGciOiJFUzI1NiIs...&#10;-----END SYMBOLON LICENSE-----"></textarea>
+
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.35rem;">
+          <label for="jwksInput" style="margin: 0;">Dôveryhodný JWKS (Verejné Kľúče):</label>
+          <button class="btn btn-secondary" onclick="loadServerJwks()">Načítať zo servera (/v1/jwks)</button>
+        </div>
+        <textarea id="jwksInput" rows="5" placeholder='{"keys":[{"kty":"EC","crv":"P-256","x":"...","y":"...","kid":"..."}]}'></textarea>
+
+        <label for="fpInput">Lokálny Fingerprint Stanice (voliteľné pre node-lock):</label>
+        <input type="text" id="fpInput" placeholder="Napr. fp_web_88f921ab04e28c11927361283921045a">
+
+        <button class="btn" onclick="runValidation()">🛡️ Overiť Licenciu V Prehliadači</button>
+      </div>
+
+      <!-- Result Panel -->
+      <div class="card">
+        <h2>2. Výsledok Overenia</h2>
+
+        <div id="resultContainer">
+          <div style="text-align: center; color: var(--text-muted); padding: 3rem 1rem;">
+            <p>Vložte licenčný kľúč alebo súbor vľavo a kliknite na tlačidlo pre okamžité kryptografické overenie.</p>
+          </div>
+        </div>
+
+        <div class="fp-box">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+            <label style="margin: 0;">Hardvérový Odtlačok Tohto Prehliadača:</label>
+            <button class="btn btn-secondary" onclick="detectBrowserFingerprint()">Detegovať Odtlačok</button>
+          </div>
+          <input type="text" id="detectedFp" readonly placeholder="Kliknite na tlačidlo pre výpočet odtlačku...">
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="./symbolon-validator.js"></script>
+  <script>
+    // Drag & Drop handling
+    const dropzone = document.getElementById('dropzone');
+    const fileInput = document.getElementById('fileInput');
+    const licenseInput = document.getElementById('licenseInput');
+
+    ['dragenter', 'dragover'].forEach(name => {
+      dropzone.addEventListener(name, (e) => { e.preventDefault(); dropzone.classList.add('dragover'); });
+    });
+    ['dragleave', 'drop'].forEach(name => {
+      dropzone.addEventListener(name, (e) => { e.preventDefault(); dropzone.classList.remove('dragover'); });
+    });
+    dropzone.addEventListener('drop', (e) => {
+      const files = e.dataTransfer.files;
+      if (files.length > 0) loadFile(files[0]);
+    });
+    fileInput.addEventListener('change', (e) => {
+      if (e.target.files.length > 0) loadFile(e.target.files[0]);
+    });
+
+    function loadFile(file) {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        licenseInput.value = e.target.result;
+        runValidation();
+      };
+      reader.readAsText(file);
+    }
+
+    async function loadServerJwks() {
+      try {
+        const res = await fetch('/v1/jwks');
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        document.getElementById('jwksInput').value = JSON.stringify(data, null, 2);
+        alert('JWKS úspešne načítaný zo servera!');
+      } catch (err) {
+        alert('Nepodarilo sa načítať JWKS z lokálneho servera: ' + err.message + '\nZadajte JWKS manuálne pre offline overenie.');
+      }
+    }
+
+    async function detectBrowserFingerprint() {
+      try {
+        const fp = await generateBrowserFingerprint();
+        document.getElementById('detectedFp').value = fp;
+        document.getElementById('fpInput').value = fp;
+      } catch (err) {
+        alert('Chyba pri generovaní odtlačku: ' + err.message);
+      }
+    }
+
+    async function runValidation() {
+      const rawLicense = licenseInput.value.trim();
+      const rawJwks = document.getElementById('jwksInput').value.trim();
+      const fp = document.getElementById('fpInput').value.trim() || null;
+      const resContainer = document.getElementById('resultContainer');
+
+      if (!rawLicense) {
+        resContainer.innerHTML = '<div class="result-banner result-invalid"><span>✗ CHÝBA LICENCIA</span></div><p style="color:var(--text-muted)">Zadajte licenčný kľúč alebo vložte .symlic súbor.</p>';
+        return;
+      }
+
+      let jwksObj = null;
+      if (rawJwks) {
+        try {
+          jwksObj = JSON.parse(rawJwks);
+        } catch (e) {
+          resContainer.innerHTML = `<div class="result-banner result-invalid"><span>✗ NEPLATNÝ JWKS FORMÁT</span></div><p style="color:var(--text-muted)">JSON parser zlyhal: ${e.message}</p>`;
+          return;
+        }
+      }
+
+      const validator = new SymbolonOfflineValidator({ jwks: jwksObj });
+      const res = await validator.validate(rawLicense, fp);
+
+      let bannerClass = 'result-valid';
+      let bannerText = '✓ PLATNÁ LICENCIA (KRYPTOGRAFICKY OVERENÁ)';
+
+      if (!res.isValid) {
+        if (res.isExpired) {
+          bannerClass = 'result-expired';
+          bannerText = '⏳ LICENCIA EXPIROVALA';
+        } else {
+          bannerClass = 'result-invalid';
+          bannerText = '✗ NEPLATNÁ / MANIPULOVANÁ LICENCIA';
+        }
+      }
+
+      let featuresHtml = '';
+      if (res.features && res.features.length > 0) {
+        featuresHtml = res.features.map(f => `<span class="pill pill-active">${f}</span>`).join(' ');
+      } else {
+        featuresHtml = '<span style="color:var(--text-muted)">Základné (Core)</span>';
+      }
+
+      resContainer.innerHTML = `
+        <div class="result-banner ${bannerClass}">
+          <span>${bannerText}</span>
+          ${res.verifiedAlgs.length > 0 ? `<span class="badge badge-wasm">${res.verifiedAlgs.join(', ')}</span>` : ''}
+        </div>
+
+        ${res.failureReason ? `<div style="background:#450a0a; color:#fca5a5; padding:0.75rem; border-radius:6px; margin-bottom:1rem; font-size:0.85rem;"><strong>Dôvod zlyhania:</strong> ${res.failureReason}</div>` : ''}
+
+        <table class="meta-table">
+          <tr><td>Zákazník:</td><td>${res.customer || '—'} ${res.customerRef ? `(${res.customerRef})` : ''}</td></tr>
+          <tr><td>Produkt (Audience):</td><td>${res.product || '—'}</td></tr>
+          <tr><td>Typ / Model:</td><td>${res.licenseType || 'floating'}</td></tr>
+          <tr><td>Licenčný Kľúč:</td><td><code>${res.licenseKey || '—'}</code></td></tr>
+          <tr><td>Počet Sedadiel:</td><td>${res.maxSeats !== null ? res.maxSeats : 'Neobmedzene'}</td></tr>
+          <tr><td>Expirácia:</td><td>${res.expiresAtFormatted}</td></tr>
+          <tr><td>Zostávajúce dni:</td><td>${res.daysRemaining !== null ? `${res.daysRemaining} dní` : 'Neobmedzene'}</td></tr>
+          <tr><td>Viazanie na HW:</td><td>${res.isNodeLocked ? (res.machineMatch ? '✓ Odtlačok súhlasí' : '✗ Odtlačok nesúhlasí!') : 'Voľná (Floating)'}</td></tr>
+          <tr><td>Vystaviteľ (Issuer):</td><td>${res.issuer || '—'}</td></tr>
+        </table>
+
+        <label>Oprávnené Moduly (Entitlements):</label>
+        <div class="pills">${featuresHtml}</div>
+      `;
+    }
+
+    // Auto-detect browser fingerprint on load
+    detectBrowserFingerprint();
+  </script>
+</body>
+</html>

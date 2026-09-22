@@ -1,0 +1,29 @@
+{
+  "name": "@symbolon/validator",
+  "version": "1.0.0",
+  "description": "Symbolon WebAssembly & In-Browser Offline License Validator SDK with WebCrypto cryptographic verification and hardware fingerprinting.",
+  "main": "symbolon-validator.js",
+  "module": "symbolon-validator.mjs",
+  "types": "symbolon-validator.d.ts",
+  "scripts": {
+    "test": "node --test tests/validator.test.js"
+  },
+  "keywords": [
+    "symbolon",
+    "license",
+    "validator",
+    "offline",
+    "wasm",
+    "webcrypto",
+    "p256",
+    "es256",
+    "licensing",
+    "floating-licenses"
+  ],
+  "author": "Symbolon License Server Team",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/MAGORS-organisation/License-server.git"
+  }
+}

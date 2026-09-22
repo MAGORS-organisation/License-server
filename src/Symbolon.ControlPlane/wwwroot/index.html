@@ -81,6 +81,12 @@
                 </a>
             </li>
             <li class="nav-item">
+                <a class="nav-link" data-view="view-wasm">
+                    <span class="nav-icon">🛡️</span>
+                    <span>Wasm Validátor</span>
+                </a>
+            </li>
+            <li class="nav-item">
                 <a class="nav-link" data-view="view-system">
                     <span class="nav-icon">⚡</span>
                     <span>API &amp; Diagnostika</span>
@@ -840,6 +846,104 @@
                 </div>
             </section>
 
+            <!-- VIEW WASM: WebAssembly & WebCrypto Offline License Validator -->
+            <section id="view-wasm" class="view-section">
+                <div class="kpi-grid">
+                    <div class="kpi-card">
+                        <div class="kpi-label">
+                            <span>Kryptografické Jadro</span>
+                            <span>🔐</span>
+                        </div>
+                        <div class="kpi-value" style="font-size: 18px; color: var(--accent-cyan);">W3C WebCrypto</div>
+                        <div class="kpi-subtext">ECDSA P-256 (NIST FIPS 186-5)</div>
+                    </div>
+                    <div class="kpi-card">
+                        <div class="kpi-label">
+                            <span>Režim Vykonávania</span>
+                            <span>⚡</span>
+                        </div>
+                        <div class="kpi-value" style="font-size: 18px; color: var(--accent-emerald);">100% Offline</div>
+                        <div class="kpi-subtext">Zero-trust, bez volania servera</div>
+                    </div>
+                    <div class="kpi-card">
+                        <div class="kpi-label">
+                            <span>Hardvérový Odtlačok</span>
+                            <span>💻</span>
+                        </div>
+                        <div class="kpi-value" style="font-size: 18px; color: var(--accent-indigo);">Canvas / WebGL</div>
+                        <div class="kpi-subtext">Deterministický SHA-256 hash</div>
+                    </div>
+                    <div class="kpi-card">
+                        <div class="kpi-label">
+                            <span>Podporované Formáty</span>
+                            <span>📜</span>
+                        </div>
+                        <div class="kpi-value" style="font-size: 18px; color: var(--accent-amber);">.symlic / JWS</div>
+                        <div class="kpi-subtext">PEM Armor &amp; LIC-34 Crockford</div>
+                    </div>
+                </div>
+
+                <div class="charts-grid" style="grid-template-columns: 1fr 1fr; gap: 20px;">
+                    <!-- Left: Input form -->
+                    <div class="chart-card">
+                        <div class="chart-header">
+                            <div class="chart-title">1. Vstupné Licenčné Dáta</div>
+                        </div>
+
+                        <div class="form-group">
+                            <label class="form-label" for="wasm-license-input">Vložte obsah licencie (.symlic PEM, JWS alebo LIC-34 kľúč):</label>
+                            <textarea class="form-control" id="wasm-license-input" rows="7" style="font-family: monospace; font-size: 12px;" placeholder="-----BEGIN SYMBOLON LICENSE-----&#10;eyJhbGciOiJFUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6...&#10;-----END SYMBOLON LICENSE-----"></textarea>
+                        </div>
+
+                        <div class="form-group">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                                <label class="form-label" for="wasm-jwks-input" style="margin: 0;">Dôveryhodné Verejné Kľúče (JWKS):</label>
+                                <button type="button" class="btn btn-secondary btn-sm" onclick="loadServerJwksForWasm()" style="font-size: 11px; padding: 2px 8px;">Načítať zo servera</button>
+                            </div>
+                            <textarea class="form-control" id="wasm-jwks-input" rows="4" style="font-family: monospace; font-size: 11px;" placeholder='{"keys":[{"kty":"EC","crv":"P-256","x":"...","y":"...","kid":"..."}]}'></textarea>
+                            <div style="font-size: 11px; color: var(--text-muted); margin-top: 4px;">Ak pole ponecháte prázdne, vykoná sa len dekódovanie claims bez overenia digitálneho podpisu.</div>
+                        </div>
+
+                        <div class="form-group">
+                            <label class="form-label" for="wasm-fp-input">Lokálny Odtlačok Stanice (voliteľné pre node-locked licencie):</label>
+                            <input type="text" class="form-control" id="wasm-fp-input" placeholder="Napr. fp_web_88f921ab04e28c11927361283921045a">
+                        </div>
+
+                        <div style="margin-top: 16px;">
+                            <button type="button" class="btn btn-primary" onclick="runWasmValidation()" style="width: 100%; font-size: 14px; padding: 10px;">🛡️ Overiť Licenciu V Prehliadači (WebCrypto)</button>
+                        </div>
+                    </div>
+
+                    <!-- Right: Results & Browser Fingerprint -->
+                    <div class="chart-card">
+                        <div class="chart-header">
+                            <div class="chart-title">2. Výsledok Kryptografického Overenia</div>
+                        </div>
+
+                        <div id="wasm-validation-results" style="background: rgba(0,0,0,0.25); border: 1px solid var(--border-color); border-radius: 6px; padding: 16px; min-height: 240px;">
+                            <div style="text-align: center; color: var(--text-muted); padding: 40px 10px;">
+                                <div style="font-size: 32px; margin-bottom: 12px;">🛡️</div>
+                                <div>Vložte licenčný kľúč vľavo a stlačte <strong>Overiť Licenciu</strong>.</div>
+                                <div style="font-size: 12px; margin-top: 8px;">Verifikácia prebehne okamžite v pamäti prehliadača cez W3C SubtleCrypto bez sieťového prenosu.</div>
+                            </div>
+                        </div>
+
+                        <div class="table-card" style="margin-top: 20px; border: 1px solid var(--border-color);">
+                            <div class="table-header">
+                                <div class="table-title">💻 Detekcia Odtlačku Prehliadača (Web Node-Lock)</div>
+                                <button type="button" class="btn btn-secondary btn-sm" onclick="detectWasmBrowserFingerprint()">Zistiť Odtlačok</button>
+                            </div>
+                            <div style="padding: 12px; font-size: 12px; color: var(--text-secondary);">
+                                <div>Odtlačok vypočítaný z parametrov displeja, Canvasu a WebGL:</div>
+                                <div id="wasm-detected-fp-display" style="font-family: monospace; font-size: 13px; color: var(--accent-cyan); background: rgba(0,0,0,0.3); padding: 8px; border-radius: 4px; margin-top: 6px; word-break: break-all;">
+                                    Kliknite na "Zistiť Odtlačok" pre výpočet...
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
             <!-- VIEW 6: API & Diagnostika -->
             <section id="view-system" class="view-section">
                 <div class="kpi-grid">
@@ -1264,6 +1368,7 @@
     <!-- Toast Notifications Container -->
     <div class="toast-container" id="toast-container"></div>
 
+    <script src="/js/symbolon-validator.js"></script>
     <script src="/js/dashboard.js"></script>
     <script src="/js/retro-tui.js"></script>
 </body>
