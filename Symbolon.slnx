@@ -8,6 +8,7 @@
     <Project Path="src/Symbolon.Domain/Symbolon.Domain.csproj" />
     <Project Path="src/Symbolon.Format/Symbolon.Format.csproj" />
     <Project Path="src/Symbolon.Protocol/Symbolon.Protocol.csproj" />
+    <Project Path="src/Symbolon.Operator/Symbolon.Operator.csproj" />
     <Project Path="src/Symbolon.Relay/Symbolon.Relay.csproj" />
   </Folder>
   <Folder Name="/tests/">
@@ -18,6 +19,7 @@
     <Project Path="tests/Symbolon.Data.Tests/Symbolon.Data.Tests.csproj" />
     <Project Path="tests/Symbolon.Domain.Tests/Symbolon.Domain.Tests.csproj" />
     <Project Path="tests/Symbolon.Format.Tests/Symbolon.Format.Tests.csproj" />
+    <Project Path="tests/Symbolon.Operator.Tests/Symbolon.Operator.Tests.csproj" />
     <Project Path="tests/Symbolon.Protocol.Tests/Symbolon.Protocol.Tests.csproj" />
     <Project Path="tests/Symbolon.Relay.Tests/Symbolon.Relay.Tests.csproj" />
   </Folder>

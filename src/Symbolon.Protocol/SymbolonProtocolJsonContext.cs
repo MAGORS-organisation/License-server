@@ -43,6 +43,15 @@ namespace Symbolon.Protocol;
 [JsonSerializable(typeof(Symbolon.Protocol.Sso.SsoUserProfileDto))]
 [JsonSerializable(typeof(Symbolon.Protocol.Sso.SsoLoginInitiateResponseDto))]
 [JsonSerializable(typeof(Symbolon.Protocol.Sso.SsoSessionClaims))]
+[JsonSerializable(typeof(Symbolon.Protocol.K8s.SymbolonClusterCustomResource))]
+[JsonSerializable(typeof(List<Symbolon.Protocol.K8s.SymbolonClusterCustomResource>))]
+[JsonSerializable(typeof(Symbolon.Protocol.K8s.SymbolonLicenseCustomResource))]
+[JsonSerializable(typeof(List<Symbolon.Protocol.K8s.SymbolonLicenseCustomResource>))]
+[JsonSerializable(typeof(Symbolon.Protocol.K8s.K8sObjectMeta))]
+[JsonSerializable(typeof(Symbolon.Protocol.K8s.SymbolonClusterSpec))]
+[JsonSerializable(typeof(Symbolon.Protocol.K8s.SymbolonClusterStatus))]
+[JsonSerializable(typeof(Symbolon.Protocol.K8s.SymbolonLicenseSpec))]
+[JsonSerializable(typeof(Symbolon.Protocol.K8s.SymbolonLicenseStatus))]
 public sealed partial class SymbolonProtocolJsonContext : JsonSerializerContext
 {
 }

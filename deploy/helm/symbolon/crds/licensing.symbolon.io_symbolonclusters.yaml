@@ -1,0 +1,213 @@
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: symbolonclusters.licensing.symbolon.io
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.16.0
+spec:
+  group: licensing.symbolon.io
+  names:
+    kind: SymbolonCluster
+    listKind: SymbolonClusterList
+    plural: symbolonclusters
+    singular: symboloncluster
+    shortNames:
+      - sc
+      - symc
+  scope: Namespaced
+  versions:
+    - name: v1alpha1
+      served: true
+      storage: true
+      subresources:
+        status: {}
+      additionalPrinterColumns:
+        - name: Phase
+          type: string
+          jsonPath: .status.phase
+        - name: Ready
+          type: integer
+          jsonPath: .status.readyReplicas
+        - name: Replicas
+          type: integer
+          jsonPath: .spec.replicas
+        - name: PQC
+          type: boolean
+          jsonPath: .spec.pqcEnabled
+        - name: Active-KID
+          type: string
+          jsonPath: .status.activeKid
+        - name: Age
+          type: date
+          jsonPath: .metadata.creationTimestamp
+      schema:
+        openAPIV3Schema:
+          type: object
+          description: SymbolonCluster is the Schema for the Symbolon Enterprise Licensing Server clusters.
+          properties:
+            apiVersion:
+              type: string
+            kind:
+              type: string
+            metadata:
+              type: object
+            spec:
+              type: object
+              description: Specification of the desired state of SymbolonCluster.
+              required:
+                - replicas
+              properties:
+                replicas:
+                  type: integer
+                  minimum: 1
+                  maximum: 32
+                  default: 2
+                  description: Number of desired ControlPlane replicas for high-availability.
+                image:
+                  type: object
+                  properties:
+                    repository:
+                      type: string
+                      default: ghcr.io/magors-organisation/symbolon-controlplane
+                    tag:
+                      type: string
+                      default: latest
+                    pullPolicy:
+                      type: string
+                      enum: [Always, IfNotPresent, Never]
+                      default: IfNotPresent
+                pqcEnabled:
+                  type: boolean
+                  default: true
+                  description: Enable Post-Quantum Cryptography hybrid signing (ML-DSA-65 / FIPS 204).
+                database:
+                  type: object
+                  description: PostgreSQL database backend configuration.
+                  properties:
+                    host:
+                      type: string
+                      default: postgres-service
+                    port:
+                      type: integer
+                      default: 5432
+                    name:
+                      type: string
+                      default: symbolon
+                    username:
+                      type: string
+                      default: symbolon
+                    existingSecret:
+                      type: string
+                      description: Secret name containing the database password.
+                    password:
+                      type: string
+                      description: Plaintext password (if existingSecret not used).
+                crypto:
+                  type: object
+                  description: Signing key ring settings.
+                  properties:
+                    keyAlg:
+                      type: string
+                      enum: [ES256, ML-DSA-65, Hybrid]
+                      default: Hybrid
+                    existingSecret:
+                      type: string
+                      description: Secret name containing pre-existing master signing keys.
+                    autoGenerate:
+                      type: boolean
+                      default: true
+                geoReplication:
+                  type: object
+                  description: Multi-region active-active replication settings.
+                  properties:
+                    enabled:
+                      type: boolean
+                      default: false
+                    clusterId:
+                      type: string
+                      default: eu-central-1
+                    seatRangeStart:
+                      type: integer
+                      default: 1
+                    seatRangeEnd:
+                      type: integer
+                      default: 100
+                    peers:
+                      type: array
+                      items:
+                        type: object
+                        required: [region, endpoint]
+                        properties:
+                          region:
+                            type: string
+                          endpoint:
+                            type: string
+                ingress:
+                  type: object
+                  description: External access configuration.
+                  properties:
+                    enabled:
+                      type: boolean
+                      default: false
+                    className:
+                      type: string
+                      default: nginx
+                    host:
+                      type: string
+                    tls:
+                      type: boolean
+                      default: true
+                    certManagerIssuer:
+                      type: string
+                      default: letsencrypt-prod
+                    annotations:
+                      type: object
+                      additionalProperties:
+                        type: string
+                monitoring:
+                  type: object
+                  description: Observability and Prometheus exporter integration.
+                  properties:
+                    serviceMonitor:
+                      type: boolean
+                      default: true
+                    prometheusScrape:
+                      type: boolean
+                      default: true
+                    metricsPort:
+                      type: integer
+                      default: 8080
+            status:
+              type: object
+              description: Current observed status of the SymbolonCluster.
+              properties:
+                phase:
+                  type: string
+                  enum: [Pending, Initializing, Ready, Degraded, Failed]
+                readyReplicas:
+                  type: integer
+                activeKid:
+                  type: string
+                observedGeneration:
+                  type: integer
+                lastReconciledAt:
+                  type: string
+                  format: date-time
+                conditions:
+                  type: array
+                  items:
+                    type: object
+                    required: [type, status]
+                    properties:
+                      type:
+                        type: string
+                      status:
+                        type: string
+                        enum: ["True", "False", "Unknown"]
+                      reason:
+                        type: string
+                      message:
+                        type: string
+                      lastTransitionTime:
+                        type: string
+                        format: date-time

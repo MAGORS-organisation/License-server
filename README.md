@@ -2,7 +2,7 @@
 
 [![Platform](https://img.shields.io/badge/.NET-10.0%20LTS-512BD4?logo=dotnet)](https://dotnet.microsoft.com/)
 [![Language](https://img.shields.io/badge/C%23-14.0-239120?logo=csharp)](https://learn.microsoft.com/dotnet/csharp/)
-[![Tests](https://img.shields.io/badge/tests-208%20passed%20(+13%20Python)-brightgreen)](#výsledky-testovania)
+[![Tests](https://img.shields.io/badge/tests-216%20passed%20(+13%20Python)-brightgreen)](#výsledky-testovania)
 [![License: AGPL-3.0](https://img.shields.io/badge/license-AGPL--3.0-blue.svg)](LICENSE)
 [![License: Apache-2.0](https://img.shields.io/badge/client%20SDK-Apache--2.0-blue.svg)](LICENSES/Apache-2.0.txt)
 [![CRA Compliant](https://img.shields.io/badge/CRA%20Compliance-EU%202024%2F2847-success)](SECURITY.md)
@@ -98,6 +98,11 @@ Rieši to, čo dnešné cloud-first platformy ponúkajú iba ako obmedzený dopl
     - SAML 2.0 Web Browser SSO profil (SP-initiated aj IdP-initiated) s XXE-safe XML validáciou (`DtdProcessing.Prohibit`) a automatickým exportom SP metadát (`/auth/sso/saml/metadata`).
     - Automatický RBAC claim mapper transformujúci externé IdP skupiny a roly na interné úrovne oprávnení (`admin:super`, `admin:tenant`, `auditor`).
     - Duálny režim autentifikácie v `ApiKeyAuthenticationHandler`: paralelné spracovanie strojových kľúčov (`X-Api-Key` / `Bearer sym_adm_...`) a zabezpečených HTTP-Only SSO cookie relácií (`symbolon_session` / `sym_sso_...`) pre Web TUI.
+24. **Cloud-Native Kubernetes Operator & Enterprise Helm Chart (`Symbolon.Operator`)**
+    - Custom Resource Definitions (CRDs): `SymbolonCluster` (správa klastra, replík, PQC režimu, PostgreSQL storage, Ingress a ServiceMonitor) a `SymbolonLicense` (deklaratívne nasadzovanie a sledovanie stavu licencií priamo cez `kubectl`).
+    - Automatizované reconcilery (`ClusterReconciler`, `LicenseReconciler`) pre generovanie a synchronizáciu Deploymentov, PodDisruptionBudget (PDB), NetworkPolicy, ServiceMonitor pre Prometheus Operator a Kubernetes Secrets.
+    - Podpora produkčného Helm Chartu s `pdb.yaml`, `networkpolicy.yaml` a `servicemonitor.yaml`.
+    - Integrované CLI príkazy `symbolon k8s crd`, `symbolon k8s export-license` a `symbolon k8s generate-cluster` pre GitOps a CI/CD pipelines.
 
 ---
 
@@ -116,6 +121,7 @@ Symbolon.slnx
 │   ├── Symbolon.Client         (Apache-2.0)  - Klientske ISV SDK, IAsyncDisposable SeatLease, automatický heartbeat
 │   ├── Symbolon.Cli            (AGPL-3.0)    - CLI nástroj pre správu kľúčov, vydávanie licencií, SBOM a diagnostiku
 │   ├── Symbolon.Data           (AGPL-3.0)    - EF Core 10, Npgsql 10, multi-tenancy, materializované sedadlá, ledger
+│   ├── Symbolon.Operator       (AGPL-3.0)    - Kubernetes Operator, CRDs, reconcilery, manifest generátory
 │   └── Symbolon.ControlPlane   (AGPL-3.0)    - Centrálny server (Public, Admin, Relay, Compliance, /metrics, Retro TUI)
 ├── deploy/
 │   ├── config/                               - Vzorové konfiguračné súbory a mapovania z FlexNetu (.opt -> policy.json)
@@ -123,7 +129,7 @@ Symbolon.slnx
 │   ├── docker-compose.yml                    - Kompletný stack: Postgres 17, ControlPlane, Relay, Prometheus, Grafana
 │   ├── prometheus/                           - Prometheus konfigurácia zberu metrík
 │   ├── grafana/                              - Provisioning a predkonfigurovaný dashboard
-│   ├── helm/symbolon/                        - Kubernetes Helm Chart (Deployment, Service, Ingress, HPA, Secret)
+│   ├── helm/symbolon/                        - Kubernetes Helm Chart (Deployment, Service, Ingress, PDB, NetworkPolicy, ServiceMonitor)
 │   └── systemd/                              - Tvrdený Linux systemd unit pre on-premise Relay
 ├── sdk/
 │   ├── python/symbolon/                      - Python SDK (pip installable, context manager, daemon heartbeat)
@@ -138,6 +144,7 @@ Symbolon.slnx
     ├── Symbolon.Client.Tests                 - Testy ISV SDK, automatického obnovovania a jitteru
     ├── Symbolon.Cli.Tests                    - Testy príkazového riadka
     ├── Symbolon.Data.Tests                   - Testy PostgreSQL / SQLite úložiska sedadiel a auditného reťazca
+    ├── Symbolon.Operator.Tests               - Testy Kubernetes Operatora, reconcilerov a manifestov
     └── Symbolon.ControlPlane.Tests           - Komplexné testy API, metrík, CRA reportov a CycloneDX SBOM
 ```
 
@@ -155,7 +162,7 @@ cd License-server
 # Zostavenie celého solution
 dotnet build Symbolon.slnx
 
-# Spustenie všetkých 98 testov v .NET (+ 2 unit testy v Pythone)
+# Spustenie všetkých 216 testov v .NET (+ 13 unit testov v Pythone)
 dotnet test Symbolon.slnx
 python -m unittest discover sdk/python/symbolon/tests
 ```
@@ -319,7 +326,7 @@ dotnet run --project src/Symbolon.Cli -- doctor --file license.symlic --key ./my
 
 ## Výsledky Testovania
 
-Všetkých 9 projektov má 100% úspešnosť testov bez zlyhania:
+Všetkých 10 testovacích projektov má 100% úspešnosť testov bez zlyhania:
 
 ```text
 Passed!  - Failed: 0, Passed: 19, Skipped: 0, Total: 19 - Symbolon.Crypto.Tests.dll
@@ -330,9 +337,10 @@ Passed!  - Failed: 0, Passed:  9, Skipped: 0, Total:  9 - Symbolon.Relay.Tests.d
 Passed!  - Failed: 0, Passed: 11, Skipped: 0, Total: 11 - Symbolon.Client.Tests.dll
 Passed!  - Failed: 0, Passed: 21, Skipped: 0, Total: 21 - Symbolon.Cli.Tests.dll
 Passed!  - Failed: 0, Passed:  7, Skipped: 0, Total:  7 - Symbolon.Data.Tests.dll
-Passed!  - Failed: 0, Passed: 57, Skipped: 0, Total: 57 - Symbolon.ControlPlane.Tests.dll
+Passed!  - Failed: 0, Passed:  8, Skipped: 0, Total:  8 - Symbolon.Operator.Tests.dll
+Passed!  - Failed: 0, Passed: 64, Skipped: 0, Total: 64 - Symbolon.ControlPlane.Tests.dll
 
-Celkovo: 201 úspešných testov v .NET (+ 13 unit testov v Pythone), 0 zlyhaní, 0 chýb. Trvanie: ~8 sekúnd.
+Celkovo: 216 úspešných testov v .NET (+ 13 unit testov v Pythone), 0 zlyhaní, 0 chýb. Trvanie: ~9 sekúnd.
 ```
 
 ---

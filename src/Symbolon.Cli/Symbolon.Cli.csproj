@@ -21,6 +21,7 @@
     <ProjectReference Include="..\Symbolon.Protocol\Symbolon.Protocol.csproj" />
     <ProjectReference Include="..\Symbolon.Client\Symbolon.Client.csproj" />
     <ProjectReference Include="..\Symbolon.Domain\Symbolon.Domain.csproj" />
+    <ProjectReference Include="..\Symbolon.Operator\Symbolon.Operator.csproj" />
   </ItemGroup>
 
 </Project>

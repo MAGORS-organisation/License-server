@@ -1,0 +1,32 @@
+{{- if .Values.networkPolicy.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "symbolon.fullname" . }}-netpol
+  labels:
+    {{- include "symbolon.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "symbolon.selectorLabels" . | nindent 6 }}
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - from:
+        - namespaceSelector: {}
+      ports:
+        - protocol: TCP
+          port: {{ .Values.service.targetPort }}
+  egress:
+    # Allow DNS
+    - ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+    # Allow Database Connection
+    - ports:
+        - protocol: TCP
+          port: {{ .Values.database.port | default 5432 }}
+{{- end }}

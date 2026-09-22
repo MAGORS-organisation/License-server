@@ -50,6 +50,7 @@ internal static class Program
                 "CLUSTER" => await Commands.ClusterCommands.HandleClusterAsync(args[1..]).ConfigureAwait(false),
                 "EBPF" => await Commands.EbpfCommands.HandleEbpfAsync(args[1..]).ConfigureAwait(false),
                 "ATTESTATION" => await Commands.AttestationCommands.HandleAttestationAsync(args[1..]).ConfigureAwait(false),
+                "K8S" or "OPERATOR" => await Commands.K8sCommands.HandleK8sAsync(args[1..]).ConfigureAwait(false),
                 _ => UnknownCommand(args[0])
             };
         }
@@ -674,6 +675,7 @@ internal static class Program
               cluster status|sync [options]             Multi-regiónová geo-replikácia, vektorové hodiny a CRDT status
               ebpf status|attach|violations [options]   eBPF kernel socket enforcement a BPF map monitoring
               attestation verify [options]              Verifikácia hardvérovej TPM 2.0 / Enclave citácie
+              k8s crd|export-license|generate-cluster   Kubernetes Operator CRD a GitOps licenčné manifesty
             """);
     }
 }

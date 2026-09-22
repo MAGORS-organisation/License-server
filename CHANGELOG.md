@@ -10,6 +10,26 @@ a projekt striktne dodržiava [Sémantické Verziovanie (Semantic Versioning 2.0
 ## [Unreleased]
 
 ### Pridané (Added)
+- **Cloud-Native Kubernetes Operator & Enterprise Helm Chart (`Symbolon.Operator`)**:
+  - **Custom Resource Definitions (CRD v1)**:
+    - `SymbolonCluster` (`licensing.symbolon.io/v1alpha1`): Deklaratívna definícia topológie klastra, počtu replík, hybridného PQC režimu, PostgreSQL úložiska (embedded/external), Ingressu s cert-managerom, PodDisruptionBudget a ServiceMonitoringu.
+    - `SymbolonLicense` (`licensing.symbolon.io/v1alpha1`): Deklaratívny manažment licencií a ich injekcia do Kubernetes tajomstiev (Secrets) s automatickým sledovaním stavu (Active/Expired/Suspended), zostávajúcich dní a alokovaných sedadiel priamo cez `kubectl get symbolonlicenses`.
+  - **Reconcilers (`ClusterReconciler`, `LicenseReconciler`) & Generator (`K8sManifestGenerator`)**:
+    - Automatizované generovanie a ladenie Kubernetes Deploymentov s bezpečnostným kontextom (NonRoot UID 10001, ReadOnlyRootFilesystem, drop ALL capabilities).
+    - Automatické generovanie ClusterIP / LoadBalancer Service, Ingress s TLS certifikátmi a cert-manager anotáciami.
+    - Generovanie `PodDisruptionBudget` (PDB) s `minAvailable: 1` garantujúce nulový výpadok pri rolling updates klastra.
+    - Generovanie `ServiceMonitor` pre Prometheus Operator (`release: prometheus`) s metrickým endpointom `/metrics`.
+    - Generovanie Kubernetes Secretov obsahujúcich surové PEM dáta a certifikáty pre klientske pody.
+  - **Enterprise Helm Chart Rozšírenia (`deploy/helm/symbolon`)**:
+    - Pridané šablóny `pdb.yaml`, `networkpolicy.yaml` (Zero-Trust izolácia portov 8080/8443) a `servicemonitor.yaml`.
+    - Aktualizovaný `values.yaml` s prepínačmi pre PDB, NetworkPolicy a Prometheus Operator ServiceMonitor.
+    - Zahrnuté CRD definície v `deploy/helm/symbolon/crds/`.
+  - **CLI Rozšírenia pre Kubernetes & GitOps (`symbolon k8s`)**:
+    - `symbolon k8s crd`: Export CRD manifestov pre `SymbolonCluster` a `SymbolonLicense` do stdout alebo YAML súborov.
+    - `symbolon k8s export-license`: Export existujúceho `.symlic` súboru do formátu CRD `SymbolonLicense`.
+    - `symbolon k8s generate-cluster`: Vygenerovanie hotového klientskeho manifestu klastra so zadaným počtom replík a PQC nastavením.
+  - **Testovacie Pokrytie**:
+    - 8 nových integračných a unit testov v `Symbolon.Operator.Tests` pokrývajúcich generovanie manifestov, PDB, Ingress, Secret a reconcilery (216 .NET testov a 13 Python testov prechádza so 100% úspešnosťou a 0 varovaniami).
 - **SAML 2.0 / OIDC Single Sign-On (SSO) pre Web TUI Administráciu s Enterprise RBAC Mapovaním Rolí**:
   - **OIDC Core 1.0 Authorization Code Flow s PKCE (RFC 7636)**:
     - Bezstavový generátor kryptografického PKCE verifikátora a challenge SHA-256 (`S256`).
