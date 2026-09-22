@@ -1,32 +1,30 @@
 using System.Collections.Concurrent;
-using System.Text.Json;
 using System.Text.Json.Serialization;
 
 namespace Symbolon.Relay.Mesh;
 
-#pragma warning disable CA1515 // Types in Relay app exported for mesh coordination
 public sealed record MeshPeer(
-    string NodeId,
-    string Endpoint,
-    int AllocatedSeats,
-    int FreeSeats,
-    DateTimeOffset LastSeen,
-    bool IsHealthy);
+    [property: JsonPropertyName("nodeId")] string NodeId,
+    [property: JsonPropertyName("endpoint")] string Endpoint,
+    [property: JsonPropertyName("allocatedSeats")] int AllocatedSeats,
+    [property: JsonPropertyName("freeSeats")] int FreeSeats,
+    [property: JsonPropertyName("lastSeen")] DateTimeOffset LastSeen,
+    [property: JsonPropertyName("isHealthy")] bool IsHealthy);
 
 public sealed record MeshTransferProposal(
-    string TransactionId,
-    string SourceNodeId,
-    string TargetNodeId,
-    int RequestedQuantity,
-    long LamportClock,
-    DateTimeOffset Timestamp);
+    [property: JsonPropertyName("transactionId")] string TransactionId,
+    [property: JsonPropertyName("sourceNodeId")] string SourceNodeId,
+    [property: JsonPropertyName("targetNodeId")] string TargetNodeId,
+    [property: JsonPropertyName("requestedQuantity")] int RequestedQuantity,
+    [property: JsonPropertyName("lamportClock")] long LamportClock,
+    [property: JsonPropertyName("timestamp")] DateTimeOffset Timestamp);
 
 public sealed record MeshTransferResult(
-    bool Success,
-    string TransactionId,
-    IReadOnlyList<int> TransferredSeatNumbers,
-    long LamportClock,
-    string? ErrorMessage);
+    [property: JsonPropertyName("success")] bool Success,
+    [property: JsonPropertyName("transactionId")] string TransactionId,
+    [property: JsonPropertyName("transferredSeatNumbers")] IReadOnlyList<int> TransferredSeatNumbers,
+    [property: JsonPropertyName("lamportClock")] long LamportClock,
+    [property: JsonPropertyName("errorMessage")] string? ErrorMessage);
 
 public interface IRelayMeshCoordinator
 {
@@ -158,7 +156,7 @@ public sealed class RelayMeshCoordinator : IRelayMeshCoordinator
         ArgumentException.ThrowIfNullOrWhiteSpace(targetPeerId);
         ct.ThrowIfCancellationRequested();
 
-        if (!_peers.TryGetValue(targetPeerId, out var targetPeer))
+        if (!_peers.TryGetValue(targetPeerId, out _))
         {
             return Task.FromResult(new MeshTransferResult(
                 false,
@@ -171,16 +169,8 @@ public sealed class RelayMeshCoordinator : IRelayMeshCoordinator
         long clock = Interlocked.Increment(ref _lamportClock);
         string txId = $"tx_mesh_{Guid.NewGuid():N}";
 
-        var proposal = new MeshTransferProposal(
-            txId,
-            _localNodeId,
-            targetPeerId,
-            quantity,
-            clock,
-            DateTimeOffset.UtcNow);
-
         // In a live deployment, this would perform a secure mutual-TLS HTTP/2 POST to targetPeer.Endpoint
-        // When running in-process or unit test environment, we simulate successful local reconciliation.
+        // In local or testing environments, this simulates local reconciliation.
         return Task.FromResult(new MeshTransferResult(
             true,
             txId,

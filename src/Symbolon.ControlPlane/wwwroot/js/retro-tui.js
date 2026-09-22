@@ -26,12 +26,13 @@
         { id: 'ciselniky', label: 'Číselníky', hotkey: 'Č', view: null, hasSub: true },
         { isSeparator: true },
         { id: 'relaye', label: 'Relay uzly', hotkey: 'R', view: 'view-relays', hasSub: false },
+        { id: 'mesh', label: 'Relay Mesh & Klastre', hotkey: 'M', view: 'view-mesh', hasSub: false },
         { id: 'audit', label: 'Auditný denník', hotkey: 'A', view: 'view-audit', hasSub: false },
         { id: 'airgap', label: 'Air-Gap portál', hotkey: 'G', view: 'view-airgap', hasSub: false },
         { id: 'webhooky', label: 'Webhooky', hotkey: 'W', view: 'view-webhooks', hasSub: false },
         { isSeparator: true },
         { id: 'sulad', label: 'Súlad & CRA / SBOM', hotkey: 'S', view: 'view-system', hasSub: false },
-        { id: 'apikeys', label: 'API Kľúče & Merkle', hotkey: 'M', view: 'view-apikeys', hasSub: false },
+        { id: 'apikeys', label: 'API Kľúče & Merkle', hotkey: 'T', view: 'view-apikeys', hasSub: false },
         { id: 'konfiguracia', label: 'Konfigurácia', hotkey: 'O', action: 'open-config', hasSub: false },
         { id: 'pomoc', label: 'Pomoc (F1)', hotkey: 'P', action: 'open-help', hasSub: false }
     ];
@@ -67,6 +68,7 @@
                 <li class="retro-menu-item" onclick="switchRetroView('view-licenses')" tabindex="0"><span class="hotkey">L</span>icencie</li>
                 <li class="retro-menu-item" onclick="switchRetroView('view-keys')" tabindex="0"><span class="hotkey">K</span>ľúče</li>
                 <li class="retro-menu-item" onclick="switchRetroView('view-relays')" tabindex="0"><span class="hotkey">R</span>elaye</li>
+                <li class="retro-menu-item" onclick="switchRetroView('view-mesh')" tabindex="0"><span class="hotkey">M</span>esh</li>
                 <li class="retro-menu-item" onclick="switchRetroView('view-audit')" tabindex="0"><span class="hotkey">A</span>udit</li>
                 <li class="retro-menu-item" onclick="switchRetroView('view-airgap')" tabindex="0">Air-<span class="hotkey">G</span>ap</li>
                 <li class="retro-menu-item" onclick="switchRetroView('view-system')" tabindex="0"><span class="hotkey">S</span>úlad CRA</li>
@@ -399,6 +401,14 @@
                 e.preventDefault();
                 switchRetroView('view-webhooks');
                 return;
+            } else if (keyUpper === 'M') {
+                e.preventDefault();
+                switchRetroView('view-mesh');
+                return;
+            } else if (keyUpper === 'T') {
+                e.preventDefault();
+                switchRetroView('view-apikeys');
+                return;
             } else if (keyUpper === 'S') {
                 e.preventDefault();
                 switchRetroView('view-system');
@@ -560,6 +570,7 @@
             'view-audit': 'KRYPTOGRAFICKY REŤAZENÝ AUDITNÝ DENNÍK (LEDGER)',
             'view-airgap': 'AIR-GAP & OFFLINE LICENČNÝ PORTÁL',
             'view-webhooks': 'WEBHOOK NOTIFIKÁCIE & HISTÓRIA DORUČENIA',
+            'view-mesh': 'RELAY MESH KLASTRE, DISKÉTNY KONSENZUS & HARDWARE ATTESTATION (PHASE 3.0)',
             'view-system': 'CYBER RESILIENCE ACT (CRA) & CYCLONEDX SBOM',
             'view-apikeys': 'SPRÁVA API KĽÚČOV & MERKLE STROM INTEGRITA'
         };

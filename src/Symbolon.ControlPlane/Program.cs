@@ -52,6 +52,8 @@ builder.Services.AddHttpClient();
 builder.Services.AddSingleton<Symbolon.ControlPlane.Webhooks.IWebhookDispatcher, Symbolon.ControlPlane.Webhooks.WebhookDispatcher>();
 builder.Services.AddSingleton<Symbolon.ControlPlane.Queuing.IQueueManager, Symbolon.ControlPlane.Queuing.QueueManager>();
 builder.Services.AddScoped<Symbolon.ControlPlane.Alerting.IAlertService, Symbolon.ControlPlane.Alerting.AlertService>();
+builder.Services.AddSingleton<Symbolon.Relay.Mesh.IRelayMeshCoordinator>(_ =>
+    new Symbolon.Relay.Mesh.RelayMeshCoordinator("cp_primary_cluster", Enumerable.Range(1, 100)));
 builder.Services.AddScoped<LeaseEngine>();
 
 // Rate Limiting (STRIDE T11, T12, SEC-05: Partitioned by Client IP / Admin Key)
@@ -151,6 +153,14 @@ app.MapGet("/health/ready", async (SymbolonDbContext db, CancellationToken ct) =
         ? Results.Ok(new { status = "ready", database = "connected", timestamp = DateTimeOffset.UtcNow })
         : Results.StatusCode(StatusCodes.Status503ServiceUnavailable);
 }).WithTags("Health");
+
+app.MapGet("/v1/system/mesh", (Symbolon.Relay.Mesh.IRelayMeshCoordinator mesh) =>
+    Results.Ok(new
+    {
+        localNodeId = mesh.LocalNodeId,
+        lamportClock = mesh.CurrentClock,
+        peers = mesh.GetPeers()
+    })).WithTags("Mesh");
 
 // Security Headers Middleware (SEC-06)
 app.Use(async (context, next) =>

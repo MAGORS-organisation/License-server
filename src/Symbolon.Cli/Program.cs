@@ -42,6 +42,9 @@ internal static class Program
                 "EXPORT" => await Commands.MigrationCommands.HandleExportAsync(args[1..]).ConfigureAwait(false),
                 "SBOM" => await Commands.ComplianceCommands.HandleSbomAsync(args[1..]).ConfigureAwait(false),
                 "VERIFY-ARTIFACT" or "VERIFY" => await Commands.ComplianceCommands.HandleVerifyArtifactAsync(args[1..]).ConfigureAwait(false),
+                "OCI" => await Commands.OciCommands.HandleOciAsync(args[1..]).ConfigureAwait(false),
+                "MESH" => await Commands.MeshCommands.HandleMeshAsync(args[1..]).ConfigureAwait(false),
+                "ATTESTATION" => await Commands.AttestationCommands.HandleAttestationAsync(args[1..]).ConfigureAwait(false),
                 _ => UnknownCommand(args[0])
             };
         }
@@ -204,6 +207,7 @@ internal static class Program
         string? customer = GetArg(args, "--customer") ?? "CUST-0001";
         string? product = GetArg(args, "--product") ?? "acme-app";
         string? outPath = GetArg(args, "--out");
+        string? jwksOut = GetArg(args, "--jwks-out");
         int seats = int.TryParse(GetArg(args, "--seats"), CultureInfo.InvariantCulture, out int s) ? s : 10;
 
         LicenseKey key = string.IsNullOrWhiteSpace(keyStr)
@@ -249,6 +253,15 @@ internal static class Program
 
         var signer = new LicenseDocumentSigner([ecKey, pqKey]);
         string pem = signer.Sign(claims);
+
+        if (jwksOut is not null)
+        {
+            var jwks = new JsonWebKeySetDto
+            {
+                Keys = [ecKey.ExportPublicJwk(), pqKey.ExportPublicJwk()]
+            };
+            File.WriteAllText(jwksOut, JsonSerializer.Serialize(jwks, SymbolonJsonContext.Default.JsonWebKeySetDto));
+        }
 
         if (outPath is not null)
         {
@@ -414,6 +427,9 @@ internal static class Program
               export --out <cesta> [--format <json|csv>]
               sbom [--out <cesta>]                      Vygeneruje CycloneDX v1.6 SBOM v JSON formáte
               verify-artifact <cesta> [--checksum <sha256>]  Vypočíta a overí integritu súboru (SHA-256/512)
+              oci pack|verify [options]                 Vytvorenie a verifikácia OCI Cryptographic License Bundles
+              mesh status [--node <id>]                 Zobrazenie konsenzu a topológie Relay Mesh klastra
+              attestation verify [options]              Verifikácia hardvérovej TPM 2.0 / Enclave citácie
             """);
     }
 }

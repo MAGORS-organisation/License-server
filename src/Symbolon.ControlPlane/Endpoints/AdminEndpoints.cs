@@ -35,8 +35,9 @@ public static class AdminEndpoints
         group.MapGet("/licenses/{id}", GetLicenseByIdAsync).WithName("GetLicenseById");
         group.MapPost("/licenses/{id}/revoke", RevokeLicenseAsync).WithName("RevokeLicense");
 
-        // Audit & Reports
+        // Audit, Reports & Alerts
         group.MapGet("/audit", GetAuditEventsAsync).WithName("GetAuditEvents");
+        group.MapGet("/alerts", GetAlertsAsync).WithName("GetAlerts");
         group.MapGet("/reports/concurrency", GetConcurrencyReportAsync).WithName("GetConcurrencyReport");
 
         // Key Management & Rotation
@@ -488,6 +489,41 @@ public static class AdminEndpoints
             .ConfigureAwait(false);
 
         return TypedResults.Ok(events);
+    }
+
+    private static async Task<IResult> GetAlertsAsync(
+        HttpContext context,
+        SymbolonDbContext db,
+        CancellationToken ct)
+    {
+        var query = db.AuditEvents.Where(a => a.Type.StartsWith("alert."));
+
+        if (!IsSuperAdmin(context))
+        {
+            string? callerTenant = GetCallerTenantId(context);
+            if (!string.IsNullOrWhiteSpace(callerTenant))
+            {
+                query = query.Where(a => a.TenantId == callerTenant);
+            }
+        }
+
+        var alerts = await query
+            .OrderByDescending(a => a.TsServer)
+            .Take(50)
+            .Select(a => new
+            {
+                id = a.Id,
+                type = a.Type,
+                licenseId = a.LicenseId,
+                tenantId = a.TenantId,
+                subject = a.Subject,
+                payload = a.PayloadJson,
+                timestamp = a.TsServer
+            })
+            .ToListAsync(ct)
+            .ConfigureAwait(false);
+
+        return TypedResults.Ok(alerts);
     }
 
     private static async Task<IResult> GetConcurrencyReportAsync(

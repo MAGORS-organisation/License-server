@@ -61,6 +61,7 @@ public static class WasmLicenseValidator
 
         // 1. Build KeyRing from JWKS
         using var keyRing = new SymbolonKeyRing();
+        var loadedAlgs = new HashSet<string>(StringComparer.Ordinal);
         if (!string.IsNullOrWhiteSpace(jwksJson))
         {
             try
@@ -76,6 +77,9 @@ public static class WasmLicenseValidator
                         string? x = keyElem.TryGetProperty("x", out var xElem) ? xElem.GetString() : null;
                         string? y = keyElem.TryGetProperty("y", out var yElem) ? yElem.GetString() : null;
 
+                        string? alg = keyElem.TryGetProperty("alg", out var algElem) ? algElem.GetString() : null;
+                        string? pub = keyElem.TryGetProperty("pub", out var pubElem) ? pubElem.GetString() : null;
+
                         if (string.Equals(kty, "EC", StringComparison.OrdinalIgnoreCase) &&
                             string.Equals(crv, "P-256", StringComparison.OrdinalIgnoreCase) &&
                             x is not null && y is not null)
@@ -85,6 +89,22 @@ public static class WasmLicenseValidator
 
                             var prov = Es256SignatureProvider.ImportPublic(xBytes, yBytes, kid);
                             keyRing.Add(prov);
+                            loadedAlgs.Add(prov.Alg);
+                        }
+                        else if ((string.Equals(kty, "AKP", StringComparison.OrdinalIgnoreCase) ||
+                                  string.Equals(alg, Alg.MlDsa65, StringComparison.OrdinalIgnoreCase)) &&
+                                 pub is not null && MlDsaSignatureProvider.IsSupported)
+                        {
+                            var jwkDto = new JsonWebKeyDto
+                            {
+                                Kty = kty ?? "AKP",
+                                Alg = alg ?? Alg.MlDsa65,
+                                Kid = kid,
+                                Pub = pub
+                            };
+                            var prov = MlDsaSignatureProvider.ImportJwk(jwkDto);
+                            keyRing.Add(prov);
+                            loadedAlgs.Add(prov.Alg);
                         }
                     }
                 }
@@ -117,7 +137,9 @@ public static class WasmLicenseValidator
         var options = new SymbolonVerifierOptions
         {
             ExpectedAudience = expectedAudience,
-            ClockSkewTolerance = TimeSpan.FromMinutes(5)
+            ClockSkewTolerance = TimeSpan.FromMinutes(5),
+            SupportedAlgs = loadedAlgs.Count > 0 ? loadedAlgs : new HashSet<string>(StringComparer.Ordinal) { Alg.Es256 },
+            Strictness = Strictness.Lenient
         };
 
         var verifier = new LicenseDocumentVerifier(keyRing, TimeProvider.System, options);

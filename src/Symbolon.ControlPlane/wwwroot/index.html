@@ -69,9 +69,15 @@
                 </a>
             </li>
             <li class="nav-item">
+                <a class="nav-link" data-view="view-mesh">
+                    <span class="nav-icon">🌐</span>
+                    <span>Relay Mesh &amp; Alerty</span>
+                </a>
+            </li>
+            <li class="nav-item">
                 <a class="nav-link" data-view="view-system">
                     <span class="nav-icon">⚡</span>
-                    <span>API & Diagnostika</span>
+                    <span>API &amp; Diagnostika</span>
                 </a>
             </li>
         </ul>
@@ -438,6 +444,143 @@
                             <button class="btn btn-primary" onclick="verifyAuditInclusion()">Overiť Inklúziu</button>
                         </div>
                         <div id="verify-result" style="display: none; padding: 16px; border-radius: 6px; font-family: monospace; font-size: 13px;"></div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- VIEW: Relay Mesh & Anomaly Alerting (Phase 3.0) -->
+            <section id="view-mesh" class="view-section">
+                <div class="kpi-grid">
+                    <div class="kpi-card">
+                        <div class="kpi-label">
+                            <span>Aktívne Bezpečnostné Alerty</span>
+                            <span>🚨</span>
+                        </div>
+                        <div class="kpi-value" id="kpi-mesh-alerts" style="color: var(--accent-rose);">0</div>
+                        <div class="kpi-subtext">kapacitné stropy a anomálie</div>
+                    </div>
+                    <div class="kpi-card">
+                        <div class="kpi-label">
+                            <span>Mesh Relay Uzly</span>
+                            <span>🌐</span>
+                        </div>
+                        <div class="kpi-value" id="kpi-mesh-nodes">1</div>
+                        <div class="kpi-subtext">distribuovaný konsenzus</div>
+                    </div>
+                    <div class="kpi-card">
+                        <div class="kpi-label">
+                            <span>Lamportove Logické Hodiny</span>
+                            <span>⏱️</span>
+                        </div>
+                        <div class="kpi-value" id="kpi-mesh-clock" style="color: var(--accent-amber);">0</div>
+                        <div class="kpi-subtext">monotónny kauzálny čas</div>
+                    </div>
+                    <div class="kpi-card">
+                        <div class="kpi-label">
+                            <span>Hardvérové Attestation (R6)</span>
+                            <span>🛡️</span>
+                        </div>
+                        <div class="kpi-value" style="color: var(--accent-emerald);">TPM 2.0</div>
+                        <div class="kpi-subtext">PCR quote &amp; Enclave binding</div>
+                    </div>
+                </div>
+
+                <!-- Alert Log Card -->
+                <div class="table-card" style="margin-top: 20px;">
+                    <div class="table-header">
+                        <div>
+                            <div class="table-title">🚨 Aktívne Udalosti a Anomálie (IAlertService)</div>
+                            <div class="table-subtitle">Detekcia vyčerpania kapacity (≥ 90%), denial spikes a bezpečnostných anomálií</div>
+                        </div>
+                        <div class="table-actions">
+                            <button class="btn btn-secondary btn-sm" onclick="loadMeshAndAlerts()">Obnoviť</button>
+                        </div>
+                    </div>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Časová Pečiatka</th>
+                                <th>Typ Alertu</th>
+                                <th>Licencia / Tenant</th>
+                                <th>Popis / Dôvod</th>
+                                <th>Závažnosť</th>
+                            </tr>
+                        </thead>
+                        <tbody id="mesh-alerts-table-body">
+                            <tr>
+                                <td colspan="5" style="text-align: center; color: var(--text-muted); padding: 24px;">Žiadne aktívne výstrahy. Systém funguje v normále.</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Mesh Topology Card -->
+                <div class="table-card" style="margin-top: 20px;">
+                    <div class="table-header">
+                        <div>
+                            <div class="table-title">🌐 Decentralizovaná Relay Mesh Topológia (Lamport Consensus)</div>
+                            <div class="table-subtitle">Disjoint seat leasing zabraňujúci split-brain overage pri výpadku spojenia</div>
+                        </div>
+                    </div>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Node ID</th>
+                                <th>Endpoint</th>
+                                <th>Pridelené Sedadlá</th>
+                                <th>Voľné Sedadlá</th>
+                                <th>Posledný Heartbeat</th>
+                                <th>Stav</th>
+                            </tr>
+                        </thead>
+                        <tbody id="mesh-nodes-table-body">
+                            <tr>
+                                <td><code>cp_primary_cluster</code> (Lokálny)</td>
+                                <td>https://127.0.0.1:8080</td>
+                                <td>100</td>
+                                <td>100</td>
+                                <td>Práve teraz</td>
+                                <td><span class="badge badge-active">Líder klastra</span></td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Hardware Enclave & OCI Bundle Verifier Tool -->
+                <div class="charts-grid" style="margin-top: 20px;">
+                    <div class="chart-card">
+                        <div class="chart-header">
+                            <div class="chart-title">🛡️ Overenie TPM 2.0 PCR Hardware Quote</div>
+                        </div>
+                        <p style="color: var(--text-secondary); font-size: 13px; margin-bottom: 12px;">
+                            Overenie kryptografickej citácie Enclave / TPM 2.0 proti anti-replay nonce a PCR digestu.
+                        </p>
+                        <div class="form-group">
+                            <label class="form-label" for="tpm-quote-input">Hardware Attestation Quote (JSON)</label>
+                            <textarea class="form-control" id="tpm-quote-input" rows="4" style="font-family: monospace; font-size: 12px;" placeholder='{"enclaveType": 1, "aikId": "aik-01", "nonce": "...", "pcrIndices": [0,1,7], ...}'></textarea>
+                        </div>
+                        <div style="display: flex; gap: 8px;">
+                            <button class="btn btn-primary btn-sm" onclick="verifyTpmQuoteInBrowser()">Overiť Citáciu</button>
+                            <button class="btn btn-secondary btn-sm" onclick="fillSampleTpmQuote()">Vložiť Ukážkovú Citáciu</button>
+                        </div>
+                        <div id="tpm-quote-result" style="display: none; margin-top: 12px; padding: 12px; border-radius: 6px; font-family: monospace; font-size: 12px;"></div>
+                    </div>
+
+                    <div class="chart-card">
+                        <div class="chart-header">
+                            <div class="chart-title">📦 OCI Cryptographic Bundle Inšpektor</div>
+                        </div>
+                        <p style="color: var(--text-secondary); font-size: 13px; margin-bottom: 12px;">
+                            Architektúra balíčkovania pre Kubernetes a air-gapped repozitáre kontajnerov.
+                        </p>
+                        <div style="background: rgba(0,0,0,0.2); border: 1px solid var(--border-color); border-radius: 6px; padding: 14px; font-size: 13px; color: var(--text-secondary); line-height: 1.6;">
+                            <div><strong>Formát balíčka:</strong> <code>application/vnd.oci.image.manifest.v1+json</code></div>
+                            <div style="margin-top: 4px;"><strong>Podporované vrstvy:</strong> <code>symbolon.license.v1+jwt</code>, <code>symbolon.jwks.v1+json</code></div>
+                            <div style="margin-top: 4px;"><strong>CLI Príkazy:</strong> <code>symbolon oci pack</code> / <code>symbolon oci verify</code></div>
+                            <div style="margin-top: 10px;">
+                                <a href="/openapi/v1.json" class="btn btn-secondary btn-sm">Stiahnuť Špecifikáciu</a>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </section>
