@@ -18,6 +18,14 @@ a projekt striktne dodržiava [Sémantické Verziovanie (Semantic Versioning 2.0
   - **HTTP Replikácia API (`ReplicationEndpoints`)**: Endpointy `POST /v1/replication/sync`, `GET /v1/replication/status` a `POST /v1/replication/peers` pre výmenu deliet.
   - **CLI Príkaz `symbolon cluster`**: `symbolon cluster status` pre zobrazenie topológie, vektorových hodín a CRDT kapacít; `symbolon cluster sync` pre manuálny on-demand delta sync.
   - **Retro Web TUI Integrácia**: Nová vizualizačná karta Active-Active Geo-Replikácie v zobrazení `view-mesh` zobrazujúca vektorový čas a stav jednotlivých regiónov v reálnom čase.
+- **eBPF Kernel Socket Enforcement (Linux)**:
+  - **Linux BPF Program (`ebpf/symbolon_sock_filter.bpf.c`)**: Nízkoúrovňový BPF CO-RE C program pripájaný k `cgroup/connect4` a `cgroup/connect6` pre striktnú kontrolu socketových spojení priamo na úrovni Linux jadra.
+  - **BPF Mapy & Ring Buffer Udalostí (`license_map`, `events_ringbuf`)**: Kernel hash mapa pre overovanie aktívnych leasingov a ring buffer pre asynchrónny zber bezpečnostných incidentov.
+  - **Okamžité Blokovanie Neoprávnených Spojení (`-EPERM`)**: Deterministické zablokovanie sieťovej prevádzky aplikácií a procesov bez platnej licencie alebo po okamžitej revokácii.
+  - **Jadrový Engine a Emulátor (`EbpfEnforcementEngine`)**: Správa životného cyklu cgroups, portových filtrov a deterministická simulácia pre cross-platform testovanie (Linux, Windows, macOS).
+  - **HTTP Endpoints (`EbpfEndpoints`)**: Endpointy `GET /v1/system/ebpf/status`, `GET /v1/system/ebpf/violations`, `POST /v1/system/ebpf/attach` a `detach`.
+  - **CLI Nástroje `symbolon ebpf`**: Príkazy `symbolon ebpf status`, `symbolon ebpf attach` a `symbolon ebpf violations`.
+  - **Retro TUI Web Dashboard**: Nová monitorovacia karta v `view-mesh` zobrazujúca režim ovládača, chránené cgroups, aktívne BPF položky a zablokované spojenia v reálnom čase.
 
 ## [1.0.0] - 2026-09-22
 

@@ -61,6 +61,7 @@ builder.Services.AddSingleton<Symbolon.Domain.Replication.IGeoReplicationEngine>
     engine.RegisterPeer("ap-southeast-1", "https://ap.symbolon.internal/v1/replication", 201, 300);
     return engine;
 });
+builder.Services.AddSingleton<Symbolon.Domain.Enforcement.IEbpfEnforcementEngine, Symbolon.Domain.Enforcement.EbpfEnforcementEngine>();
 builder.Services.AddScoped<LeaseEngine>();
 
 // Rate Limiting (STRIDE T11, T12, SEC-05: Partitioned by Client IP / Admin Key)
@@ -203,6 +204,7 @@ app.MapWebhookEndpoints().RequireAuthorization().RequireRateLimiting("admin");
 app.MapRelaySyncEndpoints().RequireRateLimiting("relay");
 app.MapOfflineEndpoints();
 app.MapReplicationEndpoints();
+app.MapEbpfEndpoints();
 
 // SPA Fallback
 app.MapFallbackToFile("index.html");

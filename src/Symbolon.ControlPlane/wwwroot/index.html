@@ -627,6 +627,57 @@
                         </div>
                     </div>
                 </div>
+
+                <!-- eBPF Kernel Socket Enforcement (Linux) -->
+                <div class="table-card" style="margin-top: 20px;">
+                    <div class="table-header">
+                        <div>
+                            <div class="table-title">⚡ eBPF Kernel Socket Enforcement (Linux Boundary)</div>
+                            <div class="table-subtitle">Nízkoúrovňová ochrana jadra: cgroup socket filtre, BPF hash mapy a automatické zablokovanie neoprávnených spojení (-EPERM)</div>
+                        </div>
+                        <div class="table-actions">
+                            <button class="btn btn-secondary btn-sm" onclick="loadEbpfStatusAndViolations()">Obnoviť eBPF</button>
+                        </div>
+                    </div>
+                    <div class="kpi-grid" style="grid-template-columns: repeat(4, 1fr); margin-bottom: 16px;">
+                        <div class="kpi-card">
+                            <div class="kpi-label">Režim Ovládača</div>
+                            <div class="kpi-value" id="ebpf-driver-mode" style="font-size: 16px; color: var(--accent-cyan); font-family: monospace;">Linux-eBPF-CORE</div>
+                            <div class="kpi-subtext">cgroup/connect4 hook</div>
+                        </div>
+                        <div class="kpi-card">
+                            <div class="kpi-label">Pripojené Cgroups</div>
+                            <div class="kpi-value" id="ebpf-attached-cgroups">0</div>
+                            <div class="kpi-subtext">chránené kontajnery</div>
+                        </div>
+                        <div class="kpi-card">
+                            <div class="kpi-label">Aktívne BPF Leasingy</div>
+                            <div class="kpi-value" id="ebpf-active-leases" style="color: var(--accent-emerald);">0</div>
+                            <div class="kpi-subtext">v jadrovej mape</div>
+                        </div>
+                        <div class="kpi-card">
+                            <div class="kpi-label">Zablokované Spojenia</div>
+                            <div class="kpi-value" id="ebpf-blocked-count" style="color: var(--accent-rose);">0</div>
+                            <div class="kpi-subtext">kernel DROP (-EPERM)</div>
+                        </div>
+                    </div>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Čas Udalosti</th>
+                                <th>Cgroup ID</th>
+                                <th>PID Procesu</th>
+                                <th>Cieľová Adresa</th>
+                                <th>Dôvod Blokovania Jadrom</th>
+                                <th>Akcia Jadra</th>
+                            </tr>
+                        </thead>
+                        <tbody id="ebpf-violations-table-body">
+                            <tr>
+                                <td colspan="6" style="text-align: center; color: var(--text-muted); padding: 18px;">Žiadne bezpečnostné incidenty v eBPF ring buffere.</td>
+                            </tr>
+                        </tbody>
+                    </table>
                 </div>
             </section>
 

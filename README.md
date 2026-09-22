@@ -2,7 +2,7 @@
 
 [![Platform](https://img.shields.io/badge/.NET-10.0%20LTS-512BD4?logo=dotnet)](https://dotnet.microsoft.com/)
 [![Language](https://img.shields.io/badge/C%23-14.0-239120?logo=csharp)](https://learn.microsoft.com/dotnet/csharp/)
-[![Tests](https://img.shields.io/badge/tests-142%20passed%20(+3%20Python)-brightgreen)](#výsledky-testovania)
+[![Tests](https://img.shields.io/badge/tests-155%20passed%20(+3%20Python)-brightgreen)](#výsledky-testovania)
 [![License: AGPL-3.0](https://img.shields.io/badge/license-AGPL--3.0-blue.svg)](LICENSE)
 [![License: Apache-2.0](https://img.shields.io/badge/client%20SDK-Apache--2.0-blue.svg)](LICENSES/Apache-2.0.txt)
 [![CRA Compliant](https://img.shields.io/badge/CRA%20Compliance-EU%202024%2F2847-success)](SECURITY.md)
@@ -64,6 +64,10 @@ Rieši to, čo dnešné cloud-first platformy ponúkajú iba ako obmedzený dopl
     - Kauzálne vektorové hodiny (Vector Clocks), stavový PN-Counter CRDT a autonómne disjoint prideľovanie sedadiel bez centrálneho distribuovaného zámku.
     - Okamžité bezkolízne lokálne checkouts v EU, US aj AP regiónoch s automatickým zliatím po obnovení spojenia (partition healing) a HMAC-SHA256 autentifikáciou.
     - Kompletná CLI správa (`symbolon cluster status/sync`) a živá vizualizácia v Retro TUI dashboarde.
+16. **eBPF Kernel Socket Enforcement (Linux Boundary)**
+    - Nízkoúrovňová ochrana na úrovni jadra Linuxu pomocou BPF CO-RE programov pripájaných na cgroup socket hooks (`cgroup/connect4`, `cgroup/connect6`).
+    - Jadrová kontrola BPF máp (`license_map`) a okamžité zablokovanie sieťových spojení (`-EPERM` / `BPF_DROP`) procesov bez platného licenčného leasingu s ring-buffer auditom.
+    - Diagnostické CLI príkazy (`symbolon ebpf status/attach/violations`) a živý monitoring v Retro TUI dashboarde.
 
 ---
 

@@ -1225,6 +1225,9 @@ async function loadMeshAndAlerts() {
 
     // 3. Geo-Replication Status (Active-Active CRDT)
     await loadGeoReplicationStatus();
+
+    // 4. eBPF Kernel Enforcement (Linux)
+    await loadEbpfStatusAndViolations();
 }
 
 function fillSampleTpmQuote() {
@@ -1344,6 +1347,54 @@ async function loadGeoReplicationStatus() {
                 });
             }
             tbody.innerHTML = html;
+        }
+    } catch {
+        // Silent failover
+    }
+}
+
+async function loadEbpfStatusAndViolations() {
+    try {
+        const [statusRes, violationsRes] = await Promise.all([
+            fetch("/v1/system/ebpf/status"),
+            fetch("/v1/system/ebpf/violations?limit=20")
+        ]);
+
+        if (statusRes.ok) {
+            const status = await statusRes.json();
+            const driverEl = document.getElementById("ebpf-driver-mode");
+            const cgroupsEl = document.getElementById("ebpf-attached-cgroups");
+            const leasesEl = document.getElementById("ebpf-active-leases");
+            const blockedEl = document.getElementById("ebpf-blocked-count");
+
+            if (driverEl) driverEl.textContent = status.driverMode || "Linux-eBPF-CORE";
+            if (cgroupsEl) cgroupsEl.textContent = status.attachedCgroups ? status.attachedCgroups.length : 0;
+            if (leasesEl) leasesEl.textContent = status.activeLeaseCount || 0;
+            if (blockedEl) blockedEl.textContent = status.blockedAttemptsCount || 0;
+        }
+
+        if (violationsRes.ok) {
+            const violations = await violationsRes.json();
+            const tbody = document.getElementById("ebpf-violations-table-body");
+            if (tbody) {
+                if (violations.length === 0) {
+                    tbody.innerHTML = `<tr><td colspan="6" style="text-align: center; color: var(--text-muted); padding: 18px;">Žiadne bezpečnostné incidenty v eBPF ring buffere.</td></tr>`;
+                } else {
+                    tbody.innerHTML = violations.map(v => {
+                        const time = new Date(v.timestamp).toLocaleTimeString();
+                        return `
+                            <tr>
+                                <td style="font-size: 12px; color: var(--text-secondary);">${escapeHtml(time)}</td>
+                                <td><code>${escapeHtml(v.cgroupId)}</code></td>
+                                <td><code>PID ${escapeHtml(v.pid)}</code></td>
+                                <td><code>${escapeHtml(v.destinationIp)}:${escapeHtml(v.destinationPort)}</code></td>
+                                <td><span class="badge badge-revoked">${escapeHtml(v.reason)}</span></td>
+                                <td><strong style="color: var(--accent-rose);">DROP (-EPERM)</strong></td>
+                            </tr>
+                        `;
+                    }).join("");
+                }
+            }
         }
     } catch {
         // Silent failover
