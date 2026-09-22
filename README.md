@@ -2,7 +2,7 @@
 
 [![Platform](https://img.shields.io/badge/.NET-10.0%20LTS-512BD4?logo=dotnet)](https://dotnet.microsoft.com/)
 [![Language](https://img.shields.io/badge/C%23-14.0-239120?logo=csharp)](https://learn.microsoft.com/dotnet/csharp/)
-[![Tests](https://img.shields.io/badge/tests-155%20passed%20(+3%20Python)-brightgreen)](#výsledky-testovania)
+[![Tests](https://img.shields.io/badge/tests-155%20passed%20(+8%20Python)-brightgreen)](#výsledky-testovania)
 [![License: AGPL-3.0](https://img.shields.io/badge/license-AGPL--3.0-blue.svg)](LICENSE)
 [![License: Apache-2.0](https://img.shields.io/badge/client%20SDK-Apache--2.0-blue.svg)](LICENSES/Apache-2.0.txt)
 [![CRA Compliant](https://img.shields.io/badge/CRA%20Compliance-EU%202024%2F2847-success)](SECURITY.md)
@@ -53,6 +53,7 @@ Rieši to, čo dnešné cloud-first platformy ponúkajú iba ako obmedzený dopl
     - Offline node-lock aktivácie viazané na hardvérový fingerprint stanice.
 11. **Viacjazyčné Klientske SDK (C#, Python, Rust, C/C++)**
     - Oficiálne klientske knižnice pod licenciou **Apache-2.0** v priečinku `sdk/` s automatickým vláknom pre heartbeat, adaptívnym jitterom ±10% a RAII / kontextovým manažérom.
+    - **Hardware Enclave Attestation**: TPM 2.0 PCR quote generovanie a kryptografická verifikácia v C#, Pythone aj Ruste pre bezpečné air-gapped klientske prostredia.
 12. **Hardware Enclave Attestation (R6)**
     - Podpora overovania kryptografických citácií TPM 2.0 PCR a Confidential Computing Enclaves (Intel SGX, AMD SEV-SNP) chránená challenge-response mechanizmom proti replay útokom.
 13. **Cloud-Native Zero-Trust Mesh & OCI Bundles**

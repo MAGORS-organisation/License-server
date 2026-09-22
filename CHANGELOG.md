@@ -31,6 +31,10 @@ a projekt striktne dodržiava [Sémantické Verziovanie (Semantic Versioning 2.0
   - **Automatizované GitHub Actions Release Workflow (`release.yml`)**: Publikácia archívov (`.tar.gz` a `.zip`), agregácia kryptografických kontrolných súčtov `SHA256SUMS.txt`, CycloneDX v1.6 SBOM a automatické vytvorenie GitHub Release pri vytvorení tagu `v*.*.*`.
   - **Rozšírenie Testovacej Matice (`ci.yml`)**: Doplnenie `macos-latest` do CI behu pre garantovanie multi-platformovej stability na Linuxe, Windows a macOS.
   - **Lokálny Zostavovací Skript (`scripts/package-release.ps1`)**: Nástroj na lokálne balenie a overovanie kontrolných súčtov bez nutnosti spúšťať vzdialený pipeline.
+- **Multi-Language SDK Attestation Extensions**:
+  - **Python SDK (`sdk/python/symbolon/attestation.py`)**: Modul pre hardvérové Enclave / TPM 2.0 PCR citácie (`HardwareAttestationQuote`, `TpmQuoteGenerator`, `TpmQuoteVerifier`), anti-replay nonce verifikáciu a validáciu integrity Secure Boot registrov (PCR 0, 1, 7).
+  - **Rust SDK (`sdk/rust/symbolon/src/attestation.rs`)**: Pamäťovo bezpečný modul pre generovanie a konštantno-časovú verifikáciu TPM 2.0 citácií (`HardwareAttestationQuote`, `TpmQuoteGenerator`, `TpmQuoteVerifier`, `EnclaveType`).
+  - **Klientske Testy**: 8 automatizovaných unit testov v Python SDK s 100% úspešnosťou.
 
 ## [1.0.0] - 2026-09-22
 
