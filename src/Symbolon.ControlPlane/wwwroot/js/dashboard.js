@@ -29,6 +29,8 @@ document.addEventListener("DOMContentLoaded", () => {
     initNavigation();
     initModals();
     updateApiKeyButtonState();
+    checkSsoUserStatus();
+    loadSsoProviders();
     refreshAllData();
 
     // Auto refresh every 15 seconds
@@ -997,6 +999,71 @@ function copyGeneratedApiKey() {
     if (text) {
         navigator.clipboard.writeText(text);
         showToast("API kľúč skopírovaný do schránky!", "success");
+    }
+}
+
+// Enterprise SSO Functions
+async function checkSsoUserStatus() {
+    const badge = document.getElementById("sso-user-badge");
+    const nameEl = document.getElementById("sso-user-name");
+    const roleEl = document.getElementById("sso-user-role");
+    if (!badge || !nameEl || !roleEl) return;
+
+    try {
+        const res = await fetch("/auth/sso/me");
+        if (res.ok) {
+            const data = await res.json();
+            if (data.isAuthenticated) {
+                badge.style.display = "inline-flex";
+                nameEl.textContent = "👤 " + (data.userName || data.email || data.userId);
+                roleEl.textContent = data.role || "user";
+                if (data.role === "admin:super") {
+                    roleEl.style.backgroundColor = "var(--accent-rose)";
+                } else if (data.role === "admin:tenant") {
+                    roleEl.style.backgroundColor = "var(--accent-primary)";
+                } else {
+                    roleEl.style.backgroundColor = "var(--text-muted)";
+                }
+            } else {
+                badge.style.display = "none";
+            }
+        } else {
+            badge.style.display = "none";
+        }
+    } catch {
+        badge.style.display = "none";
+    }
+}
+
+async function loadSsoProviders() {
+    const list = document.getElementById("sso-providers-list");
+    if (!list) return;
+
+    try {
+        const res = await fetch("/auth/sso/providers");
+        if (res.ok) {
+            const providers = await res.json();
+            if (Array.isArray(providers) && providers.length > 0) {
+                list.innerHTML = providers.map(p => `
+                    <a href="${escapeHtml(p.loginEndpoint)}" class="btn btn-secondary btn-sm" style="width: 100%; text-align: center; display: flex; align-items: center; justify-content: center; gap: 8px;">
+                        <span>🔑</span>
+                        <span>Prihlásiť sa cez ${escapeHtml(p.displayName)} (${p.providerType.toUpperCase()})</span>
+                    </a>
+                `).join("");
+            }
+        }
+    } catch {
+        // Fallback to static link
+    }
+}
+
+async function logoutSso() {
+    try {
+        await fetch("/auth/sso/logout", { method: "POST" });
+        showToast("Boli ste odhlásený zo SSO relácie.", "info");
+        setTimeout(() => location.reload(), 500);
+    } catch (err) {
+        showToast("Chyba pri odhlásení: " + err.message, "error");
     }
 }
 

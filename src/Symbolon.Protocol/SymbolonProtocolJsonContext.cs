@@ -36,6 +36,13 @@ namespace Symbolon.Protocol;
 [JsonSerializable(typeof(Symbolon.Protocol.Scim.ScimEmailDto))]
 [JsonSerializable(typeof(Symbolon.Protocol.Scim.ScimMemberDto))]
 [JsonSerializable(typeof(Symbolon.Protocol.Scim.ScimMetaDto))]
+[JsonSerializable(typeof(Symbolon.Protocol.Sso.SsoProviderSummaryDto))]
+[JsonSerializable(typeof(List<Symbolon.Protocol.Sso.SsoProviderSummaryDto>))]
+[JsonSerializable(typeof(Symbolon.Protocol.Sso.SsoProviderConfigDto))]
+[JsonSerializable(typeof(List<Symbolon.Protocol.Sso.SsoProviderConfigDto>))]
+[JsonSerializable(typeof(Symbolon.Protocol.Sso.SsoUserProfileDto))]
+[JsonSerializable(typeof(Symbolon.Protocol.Sso.SsoLoginInitiateResponseDto))]
+[JsonSerializable(typeof(Symbolon.Protocol.Sso.SsoSessionClaims))]
 public sealed partial class SymbolonProtocolJsonContext : JsonSerializerContext
 {
 }

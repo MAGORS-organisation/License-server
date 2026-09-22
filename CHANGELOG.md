@@ -10,6 +10,31 @@ a projekt striktne dodržiava [Sémantické Verziovanie (Semantic Versioning 2.0
 ## [Unreleased]
 
 ### Pridané (Added)
+- **SAML 2.0 / OIDC Single Sign-On (SSO) pre Web TUI Administráciu s Enterprise RBAC Mapovaním Rolí**:
+  - **OIDC Core 1.0 Authorization Code Flow s PKCE (RFC 7636)**:
+    - Bezstavový generátor kryptografického PKCE verifikátora a challenge SHA-256 (`S256`).
+    - Bezstavová ochrana stavu relácie cez kryptograficky podpísaný HMAC-SHA256 token (`ProtectState` / `UnprotectState`) s 15-minútovou platnosťou chrániacou pred CSRF útokmi bez potreby stavových tabuliek v pamäti.
+    - OIDC Endpointy: `GET /auth/sso/oidc/login` (iniciácia a presmerovanie na IdP) a `GET /auth/sso/oidc/callback` (výmena autorizačného kódu za tokeny, extrakcia identitných claims a vydanie relácie).
+  - **SAML 2.0 Web Browser SSO Profile (SP-Initiated aj IdP-Initiated)**:
+    - Generovanie SP metadát XML (`GET /auth/sso/saml/metadata`) s deskriptorom `SPSSODescriptor` a väzbou `HTTP-POST`.
+    - Generovanie požiadaviek `AuthnRequest` s Deflate + Base64 kompresiou (`HTTP-Redirect` binding) cez `GET /auth/sso/saml/login`.
+    - Assertion Consumer Service (`POST /auth/sso/saml/acs`) s ochranou proti XXE injekciám (`DtdProcessing.Prohibit`, `XmlResolver = null`), overením stavu `Success`, audience a extrakciou atribútov (NameID, displayName, email, role, groups).
+  - **Enterprise RBAC Claim & Skupinový Mapper**:
+    - Automatické dynamické mapovanie skupín a rolí z IdP (Okta, Microsoft Entra ID, Keycloak, PingFederate) na interné Symbolon role:
+      - `admin:super` (plný prístup ku všetkým entitám a rotácii master podpisových kľúčov)
+      - `admin:tenant` (správa licencií, produktov a politík v rámci tenanta)
+      - `auditor` (len čítanie logov a prehľadov, blokované modifikačné metódy)
+    - Prioritná hierarchia riešenia rolí (`admin:super` > `admin:tenant` > `auditor` > `DefaultRole`).
+  - **Duálny Režim Autentifikácie v `ApiKeyAuthenticationHandler`**:
+    - Bezproblémové súbežné fungovanie strojových API kľúčov (`X-Api-Key` / `Bearer sym_adm_...`) a podpisovaných SSO relácií (`sym_sso_...` token / zabezpečený HTTP-Only `symbolon_session` cookie).
+    - Endpointy pre profil a odhlásenie: `GET /auth/sso/me` a `POST /auth/sso/logout`.
+  - **Administrácia Konfigurácií SSO**:
+    - REST CRUD endpointy `GET /admin/v1/sso/configs`, `POST /admin/v1/sso/configs`, `DELETE /admin/v1/sso/configs/{id}` s multi-tenantnou izoláciou.
+  - **Retro FoxPro Web TUI Rozšírenie**:
+    - Topbar odznak prihláseného SSO administrátora `[👤 Meno (Rola)]` s tlačidlom pre odhlásenie `[🚪 Odhlásiť]`.
+    - Autentifikačné okno s podporou podnikového SSO a zoznamom aktívnych IdP providerov s priamym prihlásením.
+  - **Testovacie Pokrytie**:
+    - Nové integračné a unit testy v `SsoApiTests.cs` pokrývajúce OIDC PKCE flow, SAML XML parsovanie a metadáta, RBAC mapovanie a autorizáciu cez cookie reláciu (208 .NET testov a 13 Python testov prechádza so 100% úspešnosťou a 0 varovaniami).
 - **Enterprise SCIM 2.0 Identity & Group Synchronization Bridge (`RFC 7643`, `RFC 7644`)**:
   - **Štandardné SCIM 2.0 Endpointy (`/scim/v2`)**:
     - `GET /scim/v2/ServiceProviderConfig`: RFC 7644 §4 schopnosti poskytovateľa služieb (podpora PATCH, filter do 1000 výsledkov, HTTP Bearer autentifikácia).

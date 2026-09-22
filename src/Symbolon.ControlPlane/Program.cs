@@ -64,6 +64,8 @@ builder.Services.AddSingleton<Symbolon.Domain.Replication.IGeoReplicationEngine>
 });
 builder.Services.AddSingleton<Symbolon.Domain.Enforcement.IEbpfEnforcementEngine, Symbolon.Domain.Enforcement.EbpfEnforcementEngine>();
 builder.Services.AddSingleton<Symbolon.Domain.Security.IFraudDetectionService, Symbolon.Domain.Security.FraudDetectionService>();
+builder.Services.AddSingleton<Symbolon.ControlPlane.Security.Sso.SsoSessionManager>();
+builder.Services.AddSingleton<Symbolon.ControlPlane.Security.Sso.SsoEngine>();
 builder.Services.AddScoped<LeaseEngine>();
 
 // Rate Limiting (STRIDE T11, T12, SEC-05: Partitioned by Client IP / Admin Key)
@@ -211,6 +213,7 @@ app.MapOfflineEndpoints();
 app.MapReplicationEndpoints();
 app.MapEbpfEndpoints();
 app.MapScimEndpoints();
+app.MapSsoEndpoints();
 
 // SPA Fallback
 app.MapFallbackToFile("index.html");

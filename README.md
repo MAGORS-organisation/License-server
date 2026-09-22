@@ -2,7 +2,7 @@
 
 [![Platform](https://img.shields.io/badge/.NET-10.0%20LTS-512BD4?logo=dotnet)](https://dotnet.microsoft.com/)
 [![Language](https://img.shields.io/badge/C%23-14.0-239120?logo=csharp)](https://learn.microsoft.com/dotnet/csharp/)
-[![Tests](https://img.shields.io/badge/tests-201%20passed%20(+13%20Python)-brightgreen)](#výsledky-testovania)
+[![Tests](https://img.shields.io/badge/tests-208%20passed%20(+13%20Python)-brightgreen)](#výsledky-testovania)
 [![License: AGPL-3.0](https://img.shields.io/badge/license-AGPL--3.0-blue.svg)](LICENSE)
 [![License: Apache-2.0](https://img.shields.io/badge/client%20SDK-Apache--2.0-blue.svg)](LICENSES/Apache-2.0.txt)
 [![CRA Compliant](https://img.shields.io/badge/CRA%20Compliance-EU%202024%2F2847-success)](SECURITY.md)
@@ -92,6 +92,12 @@ Rieši to, čo dnešné cloud-first platformy ponúkajú iba ako obmedzený dopl
     - Automatická obojsmerná synchronizácia identít a skupín s podnikovými IdP (Microsoft Entra ID / Azure AD, Okta, PingFederate, Google Workspace) cez štandardné rozhranie `/scim/v2`.
     - **Zero-Trust Automatické Deprovisioning & Okamžitá Revokácia Sedadiel**: Okamžité uvoľnenie všetkých plávajúcich licencií (`LeaseEngine.ReleaseAsync`), zrušenie čakajúcich frontových lístkov a odobratie menných alokácií pri deaktivácii používateľa v IdP.
     - Retro FoxPro Web TUI integrácia s monitorovaním synchronizovaných používateľov a manuálnym núdzovým riadením.
+23. **SAML 2.0 & OIDC Single Sign-On (SSO) s Enterprise RBAC Mapovaním Rolí**
+    - Natívna integrácia s podnikovými Identity Provider-mi (Okta, Microsoft Entra ID, Keycloak, PingFederate).
+    - OIDC Core 1.0 Authorization Code Flow s PKCE (RFC 7636) a bezstavovou HMAC-SHA256 ochranou relácie chrániacou pred CSRF útokmi.
+    - SAML 2.0 Web Browser SSO profil (SP-initiated aj IdP-initiated) s XXE-safe XML validáciou (`DtdProcessing.Prohibit`) a automatickým exportom SP metadát (`/auth/sso/saml/metadata`).
+    - Automatický RBAC claim mapper transformujúci externé IdP skupiny a roly na interné úrovne oprávnení (`admin:super`, `admin:tenant`, `auditor`).
+    - Duálny režim autentifikácie v `ApiKeyAuthenticationHandler`: paralelné spracovanie strojových kľúčov (`X-Api-Key` / `Bearer sym_adm_...`) a zabezpečených HTTP-Only SSO cookie relácií (`symbolon_session` / `sym_sso_...`) pre Web TUI.
 
 ---
 

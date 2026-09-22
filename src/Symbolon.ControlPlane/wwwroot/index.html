@@ -99,6 +99,11 @@
         <header class="topbar">
             <h1 class="page-title" id="page-title">Prehľad</h1>
             <div class="topbar-actions">
+                <div id="sso-user-badge" style="display: none; align-items: center; gap: 8px; font-size: 13px; background: rgba(59, 130, 246, 0.15); border: 1px solid rgba(59, 130, 246, 0.3); border-radius: 6px; padding: 4px 10px; color: var(--text-primary);">
+                    <span id="sso-user-name">👤 Používateľ</span>
+                    <span id="sso-user-role" class="badge" style="font-size: 11px; background: var(--accent-primary); color: #fff;">admin</span>
+                    <button class="btn btn-secondary btn-sm" onclick="logoutSso()" style="padding: 2px 8px; font-size: 11px;" title="Odhlásiť SSO reláciu">🚪 Odhlásiť</button>
+                </div>
                 <button class="btn btn-secondary btn-sm" id="btn-api-key-config" onclick="openModal('modal-auth-config')" title="Nastaviť prístupový API kľúč pre Dashboard">🔑 API Kľúč</button>
                 <div class="health-badge">
                     <div class="pulse-dot"></div>
@@ -1160,20 +1165,41 @@
         </div>
     </div>
 
-    <!-- Modal: Auth Config (API Key) -->
+    <!-- Modal: Auth Config (API Key & Enterprise SSO) -->
     <div class="modal-overlay" id="modal-auth-config">
-        <div class="modal-box" style="max-width: 500px;">
+        <div class="modal-box" style="max-width: 520px;">
             <div class="modal-header">
-                <div class="modal-title">Konfigurácia Prístupového API Kľúča</div>
+                <div class="modal-title">Autentifikácia &amp; Prístup do Správy</div>
                 <button class="modal-close" onclick="closeModal('modal-auth-config')">&times;</button>
             </div>
             <div style="padding: 10px 0;">
-                <p style="color: var(--text-secondary); font-size: 13px; line-height: 1.5; margin-bottom: 12px;">
-                    Zadajte API kľúč, ktorý bude odosielaný v hlavičke <code>X-Api-Key</code> pri požiadavkách do Admin API. Kľúč je bezpečne uložený vo vašom prehliadači (localStorage).
-                </p>
-                <div class="form-group">
-                    <label class="form-label" for="cfg-api-key">API Kľúč (sym_adm_...)</label>
-                    <input type="password" class="form-control" id="cfg-api-key" placeholder="sym_adm_xxxxxxxx_xxxxxxxxxxxxxxxx">
+                <!-- SSO Section -->
+                <div style="margin-bottom: 20px; padding-bottom: 16px; border-bottom: 1px solid var(--border-color);">
+                    <div style="font-weight: 600; font-size: 14px; margin-bottom: 6px; color: var(--text-primary); display: flex; align-items: center; gap: 6px;">
+                        <span>🏢 Podnikové SSO (OIDC / SAML 2.0)</span>
+                    </div>
+                    <p style="color: var(--text-secondary); font-size: 12px; margin-bottom: 12px;">
+                        Prihláste sa pomocou centrálneho podnikového IdP (Okta, Microsoft Entra ID, Keycloak). Vaša rola bude automaticky namapovaná.
+                    </p>
+                    <div id="sso-providers-list" style="display: flex; flex-direction: column; gap: 8px;">
+                        <button type="button" class="btn btn-secondary btn-sm" style="width: 100%; text-align: center;" onclick="location.href='/auth/sso/oidc/login?providerId=default'">
+                            🔑 Prihlásiť sa cez Podnikové SSO (OIDC)
+                        </button>
+                    </div>
+                </div>
+
+                <!-- API Key Section -->
+                <div>
+                    <div style="font-weight: 600; font-size: 14px; margin-bottom: 6px; color: var(--text-primary);">
+                        🔑 Servisný / Manuálny API Kľúč
+                    </div>
+                    <p style="color: var(--text-secondary); font-size: 12px; line-height: 1.5; margin-bottom: 12px;">
+                        Pre automatizáciu a strojový prístup. Zadajte API kľúč odosielaný v hlavičke <code>X-Api-Key</code>:
+                    </p>
+                    <div class="form-group">
+                        <label class="form-label" for="cfg-api-key">API Kľúč (sym_adm_...)</label>
+                        <input type="password" class="form-control" id="cfg-api-key" placeholder="sym_adm_xxxxxxxx_xxxxxxxxxxxxxxxx">
+                    </div>
                 </div>
             </div>
             <div class="modal-footer">

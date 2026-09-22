@@ -31,6 +31,7 @@ public class SymbolonDbContext : DbContext
     public DbSet<ScimUserEntity> ScimUsers => Set<ScimUserEntity>();
     public DbSet<ScimGroupEntity> ScimGroups => Set<ScimGroupEntity>();
     public DbSet<ScimGroupMemberEntity> ScimGroupMembers => Set<ScimGroupMemberEntity>();
+    public DbSet<SsoProviderEntity> SsoProviders => Set<SsoProviderEntity>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -342,6 +343,22 @@ public class SymbolonDbContext : DbContext
             b.HasOne(m => m.User)
              .WithMany(u => u.GroupMemberships)
              .HasForeignKey(m => m.UserId)
+             .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // SSO Provider
+        modelBuilder.Entity<SsoProviderEntity>(b =>
+        {
+            b.ToTable("sso_providers");
+            b.HasKey(p => p.Id);
+            b.Property(p => p.DisplayName).HasMaxLength(256).IsRequired();
+            b.Property(p => p.Issuer).HasMaxLength(512).IsRequired();
+            b.Property(p => p.ClientId).HasMaxLength(256).IsRequired();
+            b.Property(p => p.ProviderType).HasMaxLength(32).IsRequired();
+            b.HasIndex(p => new { p.TenantId, p.ProviderType });
+            b.HasOne(p => p.Tenant)
+             .WithMany()
+             .HasForeignKey(p => p.TenantId)
              .OnDelete(DeleteBehavior.Cascade);
         });
 

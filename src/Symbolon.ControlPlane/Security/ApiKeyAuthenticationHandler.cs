@@ -19,6 +19,7 @@ public sealed class ApiKeyAuthenticationHandler : AuthenticationHandler<ApiKeyAu
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly IConfiguration _configuration;
     private readonly TimeProvider _timeProvider;
+    private readonly Sso.SsoSessionManager _ssoSessionManager;
 
     public ApiKeyAuthenticationHandler(
         IOptionsMonitor<ApiKeyAuthenticationOptions> options,
@@ -26,12 +27,14 @@ public sealed class ApiKeyAuthenticationHandler : AuthenticationHandler<ApiKeyAu
         UrlEncoder encoder,
         IServiceScopeFactory scopeFactory,
         IConfiguration configuration,
-        TimeProvider timeProvider)
+        TimeProvider timeProvider,
+        Sso.SsoSessionManager ssoSessionManager)
         : base(options, logger, encoder)
     {
         _scopeFactory = scopeFactory;
         _configuration = configuration;
         _timeProvider = timeProvider;
+        _ssoSessionManager = ssoSessionManager;
     }
 
     protected override async Task<AuthenticateResult> HandleAuthenticateAsync()
@@ -49,6 +52,10 @@ public sealed class ApiKeyAuthenticationHandler : AuthenticationHandler<ApiKeyAu
             {
                 rawKey = authStr["Bearer ".Length..].Trim();
             }
+        }
+        else if (Request.Cookies.TryGetValue("symbolon_session", out var cookieVal) && !string.IsNullOrWhiteSpace(cookieVal))
+        {
+            rawKey = cookieVal.Trim();
         }
 
         bool enableDevBypass = _configuration.GetValue<bool>("Security:EnableDevSuperAdminBypass");
@@ -72,6 +79,30 @@ public sealed class ApiKeyAuthenticationHandler : AuthenticationHandler<ApiKeyAu
             }
 
             return AuthenticateResult.NoResult();
+        }
+
+        // Dual-mode authentication: Check for SSO session token
+        if (rawKey.StartsWith("sym_sso_", StringComparison.Ordinal))
+        {
+            var sessionClaims = _ssoSessionManager.ValidateSessionToken(rawKey);
+            if (sessionClaims != null)
+            {
+                var claims = new[]
+                {
+                    new Claim(ClaimTypes.NameIdentifier, sessionClaims.Sub),
+                    new Claim(ClaimTypes.Name, sessionClaims.Name),
+                    new Claim(ClaimTypes.Role, sessionClaims.Role),
+                    new Claim("tenant_id", sessionClaims.TenantId),
+                    new Claim(ClaimTypes.Email, sessionClaims.Email ?? string.Empty)
+                };
+
+                var identity = new ClaimsIdentity(claims, Scheme.Name);
+                var principal = new ClaimsPrincipal(identity);
+                var ticket = new AuthenticationTicket(principal, Scheme.Name);
+                return AuthenticateResult.Success(ticket);
+            }
+
+            return AuthenticateResult.Fail("Invalid or expired SSO session.");
         }
 
         string prefix = rawKey.Length >= 16 ? rawKey[..16] : rawKey;

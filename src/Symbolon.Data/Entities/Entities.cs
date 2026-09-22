@@ -337,3 +337,26 @@ public sealed class ScimGroupMemberEntity
     public ScimUserEntity? User { get; set; }
 }
 
+public sealed class SsoProviderEntity
+{
+    public string Id { get; set; } = string.Empty;
+    public string TenantId { get; set; } = string.Empty;
+    public string ProviderType { get; set; } = "oidc"; // "oidc" or "saml"
+    public string DisplayName { get; set; } = string.Empty;
+    public string Issuer { get; set; } = string.Empty;
+    public string ClientId { get; set; } = string.Empty;
+    public string? ClientSecret { get; set; }
+    public string? MetadataEndpoint { get; set; }
+    public string? AuthorizationEndpoint { get; set; }
+    public string? TokenEndpoint { get; set; }
+    public string? UserInfoEndpoint { get; set; }
+    public string? IdpCertificate { get; set; }
+    public string RoleMappingJson { get; set; } = "{}";
+    public string DefaultRole { get; set; } = "admin:tenant";
+    public bool IsEnabled { get; set; } = true;
+    public DateTimeOffset CreatedAt { get; set; }
+    public DateTimeOffset UpdatedAt { get; set; }
+
+    public Tenant? Tenant { get; set; }
+}
+
