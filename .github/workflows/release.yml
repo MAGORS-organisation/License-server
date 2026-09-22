@@ -1,0 +1,161 @@
+name: Symbolon Cross-Platform Release Pipeline
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Verzia tagu (napr. v1.1.0)'
+        required: true
+        default: 'v1.1.0'
+
+permissions:
+  contents: write
+  packages: write
+
+jobs:
+  build-packages:
+    name: Build ${{ matrix.target.rid }} (${{ matrix.target.os }})
+    runs-on: ${{ matrix.target.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        target:
+          - os: ubuntu-latest
+            rid: linux-x64
+            archive_ext: tar.gz
+            is_windows: false
+          - os: ubuntu-latest
+            rid: linux-arm64
+            archive_ext: tar.gz
+            is_windows: false
+          - os: windows-latest
+            rid: win-x64
+            archive_ext: zip
+            is_windows: true
+          - os: windows-latest
+            rid: win-arm64
+            archive_ext: zip
+            is_windows: true
+          - os: macos-latest
+            rid: osx-x64
+            archive_ext: tar.gz
+            is_windows: false
+          - os: macos-latest
+            rid: osx-arm64
+            archive_ext: tar.gz
+            is_windows: false
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 10 SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Extract Release Tag
+        shell: bash
+        run: |
+          TAG="${{ github.event.inputs.tag || github.ref_name }}"
+          echo "RELEASE_VERSION=${TAG#v}" >> $GITHUB_ENV
+          echo "Building Symbolon version: ${TAG#v}"
+
+      - name: Publish Symbolon.Cli
+        run: >
+          dotnet publish src/Symbolon.Cli/Symbolon.Cli.csproj
+          -c Release
+          -r ${{ matrix.target.rid }}
+          --self-contained true
+          -p:PublishSingleFile=true
+          -p:EnableCompressionInSingleFile=true
+          -p:IncludeNativeLibrariesForSelfExtract=true
+          -o dist/${{ matrix.target.rid }}
+
+      - name: Publish Symbolon.ControlPlane
+        run: >
+          dotnet publish src/Symbolon.ControlPlane/Symbolon.ControlPlane.csproj
+          -c Release
+          -r ${{ matrix.target.rid }}
+          --self-contained true
+          -p:PublishSingleFile=true
+          -p:EnableCompressionInSingleFile=true
+          -p:IncludeNativeLibrariesForSelfExtract=true
+          -o dist/${{ matrix.target.rid }}
+
+      - name: Publish Symbolon.Relay
+        run: >
+          dotnet publish src/Symbolon.Relay/Symbolon.Relay.csproj
+          -c Release
+          -r ${{ matrix.target.rid }}
+          --self-contained true
+          -p:PublishSingleFile=true
+          -p:EnableCompressionInSingleFile=true
+          -p:IncludeNativeLibrariesForSelfExtract=true
+          -o dist/${{ matrix.target.rid }}
+
+      - name: Package Archive (Windows Zip)
+        if: ${{ matrix.target.is_windows }}
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path output
+          Compress-Archive -Path dist/${{ matrix.target.rid }}/* -DestinationPath output/symbolon-${{ env.RELEASE_VERSION }}-${{ matrix.target.rid }}.zip
+
+      - name: Package Archive (Unix Tar.gz)
+        if: ${{ !matrix.target.is_windows }}
+        shell: bash
+        run: |
+          mkdir -p output
+          tar -czvf output/symbolon-${{ env.RELEASE_VERSION }}-${{ matrix.target.rid }}.tar.gz -C dist/${{ matrix.target.rid }} .
+
+      - name: Upload Build Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: package-${{ matrix.target.rid }}
+          path: output/*
+          retention-days: 2
+
+  create-release:
+    name: Aggregate & Publish GitHub Release
+    needs: build-packages
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 10 SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Download Build Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: release-assets
+          pattern: package-*
+          merge-multiple: true
+
+      - name: Generate CycloneDX SBOM
+        run: |
+          dotnet run --project src/Symbolon.Cli/Symbolon.Cli.csproj -- sbom --out release-assets/cyclonedx-sbom.json
+
+      - name: Compute Cryptographic SHA-256 Checksums
+        working-directory: release-assets
+        run: |
+          sha256sum * > SHA256SUMS.txt
+          cat SHA256SUMS.txt
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event.inputs.tag || github.ref_name }}
+          name: Symbolon Enterprise ${{ github.event.inputs.tag || github.ref_name }}
+          generate_release_notes: true
+          files: |
+            release-assets/*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -68,6 +68,9 @@ Rieši to, čo dnešné cloud-first platformy ponúkajú iba ako obmedzený dopl
     - Nízkoúrovňová ochrana na úrovni jadra Linuxu pomocou BPF CO-RE programov pripájaných na cgroup socket hooks (`cgroup/connect4`, `cgroup/connect6`).
     - Jadrová kontrola BPF máp (`license_map`) a okamžité zablokovanie sieťových spojení (`-EPERM` / `BPF_DROP`) procesov bez platného licenčného leasingu s ring-buffer auditom.
     - Diagnostické CLI príkazy (`symbolon ebpf status/attach/violations`) a živý monitoring v Retro TUI dashboarde.
+17. **Cross-Platform Release Matrix & Multi-Arch Distribúcia**
+    - Plnohodnotná podpora a samostatné single-file balíčky pre 6 cieľových platforiem: `linux-x64`, `linux-arm64`, `win-x64`, `win-arm64`, `osx-x64`, `osx-arm64`.
+    - Plne automatizovaný GitHub Actions release pipeline (`.github/workflows/release.yml`) s generovaním `SHA256SUMS.txt`, CycloneDX v1.6 SBOM a GitHub Releases.
 
 ---
 

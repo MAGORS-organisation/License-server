@@ -26,6 +26,11 @@ a projekt striktne dodržiava [Sémantické Verziovanie (Semantic Versioning 2.0
   - **HTTP Endpoints (`EbpfEndpoints`)**: Endpointy `GET /v1/system/ebpf/status`, `GET /v1/system/ebpf/violations`, `POST /v1/system/ebpf/attach` a `detach`.
   - **CLI Nástroje `symbolon ebpf`**: Príkazy `symbolon ebpf status`, `symbolon ebpf attach` a `symbolon ebpf violations`.
   - **Retro TUI Web Dashboard**: Nová monitorovacia karta v `view-mesh` zobrazujúca režim ovládača, chránené cgroups, aktívne BPF položky a zablokované spojenia v reálnom čase.
+- **Cross-Platform Release Matrix & GitHub Actions CI/CD**:
+  - **Multi-Arch Single-File Binárky**: Zostavovanie samostatných balíčkov pre 6 cieľových platforiem: `linux-x64`, `linux-arm64`, `win-x64`, `win-arm64`, `osx-x64`, `osx-arm64` (ControlPlane, Relay, CLI).
+  - **Automatizované GitHub Actions Release Workflow (`release.yml`)**: Publikácia archívov (`.tar.gz` a `.zip`), agregácia kryptografických kontrolných súčtov `SHA256SUMS.txt`, CycloneDX v1.6 SBOM a automatické vytvorenie GitHub Release pri vytvorení tagu `v*.*.*`.
+  - **Rozšírenie Testovacej Matice (`ci.yml`)**: Doplnenie `macos-latest` do CI behu pre garantovanie multi-platformovej stability na Linuxe, Windows a macOS.
+  - **Lokálny Zostavovací Skript (`scripts/package-release.ps1`)**: Nástroj na lokálne balenie a overovanie kontrolných súčtov bez nutnosti spúšťať vzdialený pipeline.
 
 ## [1.0.0] - 2026-09-22
 
