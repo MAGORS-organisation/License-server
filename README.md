@@ -2,7 +2,7 @@
 
 [![Platform](https://img.shields.io/badge/.NET-10.0%20LTS-512BD4?logo=dotnet)](https://dotnet.microsoft.com/)
 [![Language](https://img.shields.io/badge/C%23-14.0-239120?logo=csharp)](https://learn.microsoft.com/dotnet/csharp/)
-[![Tests](https://img.shields.io/badge/tests-102%20passed%20(+3%20Python)-brightgreen)](#výsledky-testovania)
+[![Tests](https://img.shields.io/badge/tests-127%20passed%20(+3%20Python)-brightgreen)](#výsledky-testovania)
 [![License: AGPL-3.0](https://img.shields.io/badge/license-AGPL--3.0-blue.svg)](LICENSE)
 [![License: Apache-2.0](https://img.shields.io/badge/client%20SDK-Apache--2.0-blue.svg)](LICENSES/Apache-2.0.txt)
 [![CRA Compliant](https://img.shields.io/badge/CRA%20Compliance-EU%202024%2F2847-success)](SECURITY.md)
@@ -13,6 +13,7 @@
 
 Rieši to, čo dnešné cloud-first platformy ponúkajú iba ako obmedzený doplnok: **vysokovýkonné plávajúce (concurrent / floating) licencie**, deterministické účtovanie sedadiel bez distribuovaných zámkov, lokálne on-premise relay uzly s delegovanou kapacitou, offline validáciu a **post-kvantovú kryptografiu** (FIPS 204).
 
+👉 **[Zoznam Zmien (CHANGELOG.md)](CHANGELOG.md)**  
 👉 **[Ucelený Integration Quickstart Guide (C#, Python, Rust, C/C++)](docs/quickstart-guide.md)**  
 👉 **[Návod na Migráciu z FlexNet Publisher (FLEXlm)](docs/migracia-z-flexnetu.md)**  
 
@@ -52,6 +53,13 @@ Rieši to, čo dnešné cloud-first platformy ponúkajú iba ako obmedzený dopl
     - Offline node-lock aktivácie viazané na hardvérový fingerprint stanice.
 11. **Viacjazyčné Klientske SDK (C#, Python, Rust, C/C++)**
     - Oficiálne klientske knižnice pod licenciou **Apache-2.0** v priečinku `sdk/` s automatickým vláknom pre heartbeat, adaptívnym jitterom ±10% a RAII / kontextovým manažérom.
+12. **Hardware Enclave Attestation (R6)**
+    - Podpora overovania kryptografických citácií TPM 2.0 PCR a Confidential Computing Enclaves (Intel SGX, AMD SEV-SNP) chránená challenge-response mechanizmom proti replay útokom.
+13. **Cloud-Native Zero-Trust Mesh & OCI Bundles**
+    - P2P Relay Mesh koordinátor s **Lamportovými logickými hodinami** a disjunktnými partíciami sedadiel zabraňujúci split-brain overage.
+    - Štandardizované balíčky OCI Image Manifest v1 pre air-gapped Kubernetes repozitáre (`symbolon oci pack/verify`).
+14. **Jednookenné Desktop Prostredie & Živá Telemetria**
+    - Kompletná správa servera v jedinom okne s priebežným monitoringom systémových zdrojov (CPU, RAM, DISK, NET, IP, Používateľ) v reálnom čase.
 
 ---
 
@@ -277,16 +285,16 @@ Všetkých 9 projektov má 100% úspešnosť testov bez zlyhania:
 
 ```text
 Passed!  - Failed: 0, Passed:  9, Skipped: 0, Total:  9 - Symbolon.Crypto.Tests.dll
-Passed!  - Failed: 0, Passed: 26, Skipped: 0, Total: 26 - Symbolon.Format.Tests.dll
-Passed!  - Failed: 0, Passed:  6, Skipped: 0, Total:  6 - Symbolon.Protocol.Tests.dll
+Passed!  - Failed: 0, Passed: 37, Skipped: 0, Total: 37 - Symbolon.Format.Tests.dll
+Passed!  - Failed: 0, Passed:  8, Skipped: 0, Total:  8 - Symbolon.Protocol.Tests.dll
 Passed!  - Failed: 0, Passed:  6, Skipped: 0, Total:  6 - Symbolon.Domain.Tests.dll
-Passed!  - Failed: 0, Passed:  7, Skipped: 0, Total:  7 - Symbolon.Relay.Tests.dll
+Passed!  - Failed: 0, Passed:  9, Skipped: 0, Total:  9 - Symbolon.Relay.Tests.dll
 Passed!  - Failed: 0, Passed:  5, Skipped: 0, Total:  5 - Symbolon.Client.Tests.dll
-Passed!  - Failed: 0, Passed:  7, Skipped: 0, Total:  7 - Symbolon.Cli.Tests.dll
+Passed!  - Failed: 0, Passed: 10, Skipped: 0, Total: 10 - Symbolon.Cli.Tests.dll
 Passed!  - Failed: 0, Passed:  7, Skipped: 0, Total:  7 - Symbolon.Data.Tests.dll
-Passed!  - Failed: 0, Passed: 29, Skipped: 0, Total: 29 - Symbolon.ControlPlane.Tests.dll
+Passed!  - Failed: 0, Passed: 36, Skipped: 0, Total: 36 - Symbolon.ControlPlane.Tests.dll
 
-Celkovo: 102 úspešných testov v .NET (+ 3 unit testy v Pythone), 0 zlyhaní, 0 chýb. Trvanie: ~6 sekúnd.
+Celkovo: 127 úspešných testov v .NET (+ 3 unit testy v Pythone), 0 zlyhaní, 0 chýb. Trvanie: ~6 sekúnd.
 ```
 
 ---
