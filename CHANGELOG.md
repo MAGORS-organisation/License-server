@@ -10,6 +10,27 @@ a projekt striktne dodržiava [Sémantické Verziovanie (Semantic Versioning 2.0
 ## [Unreleased]
 
 ### Pridané (Added)
+- **Zero-Config Server Discovery, Resilient Multi-Server Failover Pool & Enterprise Environment Variable Resolution (UDP Multicast / Broadcast, SYMBOLON_LICENSE_SERVER, SDK Auto-Discovery & CLI)**:
+  - **Protokolová vrstva (`Symbolon.Protocol`)**:
+    - Štandardný UDP discovery port `7584` (`0x1D90`) podľa špecifikácie.
+    - DTO kontrakty `DiscoveryProbePacket`, `DiscoveryAnnouncementPacket` a `DiscoveredServerInfo` zaregistrované v AOT JSON source generátore `SymbolonProtocolJsonContext`.
+  - **Client & Failover Pool (`Symbolon.Client`)**:
+    - `SymbolonServerResolver`: Enterprise parsovač reťazcov serverov podporujúci FlexNet `port@host` a `@host`, štandardné `http`/`https` URI, zoznamy oddelené bodkočiarkami a čiarkami, a automatický fallback na premenné `SYMBOLON_LICENSE_SERVER` a `SYMBOLON_SERVERS`.
+    - `ServerFailoverPool`: Robustný pool serverov s priebežným vyhodnocovaním zdravia uzlov, evidenciou zlyhaní, cooldown lehotami a transparentným prepnutím (failover) pri sieťových chybách a HTTP 502/503/504 stavoch.
+    - `SymbolonDiscoveryClient`: Odosielanie UDP broadcast/multicast sond a meranie RTT sieťovej latencie aktívnych serverov.
+    - Integrácia failover poolu priamo do `SymbolonClient.AcquireSeatAsync`, `BorrowSeatAsync` a `ReturnBorrowedSeatAsync`.
+  - **Serverové Responders (`Symbolon.ControlPlane` & `Symbolon.Relay`)**:
+    - `DiscoveryResponderService` pre `ControlPlane` odpovedajúci na prichádzajúce UDP sondy identitou klastra a URL servera.
+    - `RelayDiscoveryResponderService` pre `Relay` oznamujúci dostupnosť lokálneho edge relay uzla.
+  - **Viacjazyčné SDK (Multi-Language Parity)**:
+    - **Python SDK**: Funkcie `resolve_license_servers()`, `discover_servers()` a automatické rozlíšenie servera pri inicializácii `SymbolonClient(product_code=...)`.
+    - **Rust SDK**: Funkcia `resolve_license_servers()` a konštruktor `SymbolonClient::from_env(product_code)`.
+    - **C / C++ SDK**: Funkcia `symbolon_resolve_server()` pre rozlíšenie FlexNet a URL reťazcov z premenných prostredia.
+  - **CLI Nástroje (`Symbolon.Cli`)**:
+    - Nové príkazy `symbolon discover` (live UDP broadcast sonda do lokálnej siete so Spectre.Console tabuľkou a RTT latenciou) a `symbolon servers resolve` pre interaktívne testovanie enterprise syntaxe.
+  - **Testovacie Pokrytie**:
+    - 305 .NET unit/integration testov naprieč všetkými 10 projektmi (100% pass rate, 0 varovaní, 0 chýb s `TreatWarningsAsErrors=true`), 15 Python SDK testov, 12 Wasm validator testov (celkovo 332 automatizovaných testov).
+
 - **Dynamic Entitlements & Granular Feature Flagging Engine (Tiered Modules, Package Suites, Per-Feature Concurrency Limits, SDK RAII Context Managers, Web UI, CLI & Multi-Language SDK Integration)**:
   - **Dátová a doménová vrstva (`FeatureDefinitionEntity`, `PackageSuiteEntity`, `LicenseEntitlementEntity`, `ActiveFeatureLeaseEntity`)**:
     - Nezávislé kvóty sedadiel pre jednotlivé funkčné moduly a add-ony oddelené od kapacity hlavnej licencie podľa vzoru FlexNet/RLM/Sentinel RMS.

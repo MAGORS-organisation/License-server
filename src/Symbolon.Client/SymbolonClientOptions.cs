@@ -1,3 +1,4 @@
+using Symbolon.Client.Discovery;
 using Symbolon.Crypto;
 using Symbolon.Format;
 
@@ -5,7 +6,27 @@ namespace Symbolon.Client;
 
 public sealed class SymbolonClientOptions
 {
-    public required Uri ServerUri { get; init; }
+    /// <summary>
+    /// Primary server endpoint URI.
+    /// Optional if <see cref="ServerUris"/>, <see cref="FailoverPool"/>, or <see cref="AutoDiscover"/> is specified.
+    /// </summary>
+    public Uri? ServerUri { get; init; }
+
+    /// <summary>
+    /// Ordered list of candidate server URIs for high-availability failover.
+    /// </summary>
+    public IReadOnlyList<Uri>? ServerUris { get; init; }
+
+    /// <summary>
+    /// Custom failover pool instance.
+    /// </summary>
+    public ServerFailoverPool? FailoverPool { get; init; }
+
+    /// <summary>
+    /// If true, performs local network discovery via UDP probe or environment variable resolution.
+    /// </summary>
+    public bool AutoDiscover { get; init; }
+
     public required string LicenseKey { get; init; }
     public required string ProductCode { get; init; }
     public IKeyRing? TrustedKeys { get; init; }

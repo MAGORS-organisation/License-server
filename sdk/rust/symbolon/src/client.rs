@@ -177,6 +177,14 @@ impl SymbolonClient {
         }
     }
 
+    /// Initializes a SymbolonClient by automatically resolving servers from
+    /// SYMBOLON_LICENSE_SERVER or SYMBOLON_SERVERS environment variables.
+    pub fn from_env(product_code: impl Into<String>) -> Self {
+        let servers = resolve_license_servers(None);
+        let server_url = servers.into_iter().next().unwrap_or_else(|| "http://localhost:5000".to_string());
+        Self::new(server_url, product_code)
+    }
+
     pub fn acquire_seat(&self, license_key: &str) -> Result<SeatLease, SymbolonError> {
         let dummy_token = LeaseToken {
             lease_id: format!("les_{:x}", rand_u64()),
@@ -208,3 +216,54 @@ pub fn generate_w3c_traceparent() -> String {
         .unwrap_or(42);
     format!("00-{:032x}-{:016x}-01", now, (now >> 64) as u64)
 }
+
+/// Resolves license server endpoints from an explicit string or environment variables
+/// (SYMBOLON_LICENSE_SERVER, SYMBOLON_SERVERS).
+/// Supports FlexNet syntax (e.g. 27000@lic1.corp.local) and semicolon/comma separated lists.
+pub fn resolve_license_servers(input: Option<&str>) -> Vec<String> {
+    let candidate = match input {
+        Some(s) if !s.trim().is_empty() => s.to_string(),
+        _ => std::env::var("SYMBOLON_LICENSE_SERVER")
+            .or_else(|_| std::env::var("SYMBOLON_SERVERS"))
+            .unwrap_or_default(),
+    };
+
+    if candidate.trim().is_empty() {
+        return Vec::new();
+    }
+
+    let mut results = Vec::new();
+    for token in candidate.split([';', ',']) {
+        let token = token.trim();
+        if token.is_empty() {
+            continue;
+        }
+
+        // Check FlexNet notation: [port]@host[:port]
+        let parsed = if let Some(at_idx) = token.find('@') {
+            let port_part = token[..at_idx].trim();
+            let host_part = token[at_idx + 1..].trim();
+            let (host, port) = if let Some(colon_idx) = host_part.find(':') {
+                (&host_part[..colon_idx], &host_part[colon_idx + 1..])
+            } else if !port_part.is_empty() {
+                (host_part, port_part)
+            } else {
+                (host_part, "8080")
+            };
+            format!("http://{}:{}", host, port)
+        } else if token.starts_with("http://") || token.starts_with("https://") {
+            token.trim_end_matches('/').to_string()
+        } else if token.contains(':') {
+            format!("http://{}", token.trim_end_matches('/'))
+        } else {
+            format!("http://{}:8080", token)
+        };
+
+        if !results.contains(&parsed) {
+            results.push(parsed);
+        }
+    }
+
+    results
+}
+

@@ -60,6 +60,7 @@ builder.Services.AddScoped<Symbolon.Domain.Webhooks.IWebhookStore, Symbolon.Data
 builder.Services.AddSingleton<Symbolon.Domain.Lifecycle.LicenseLifecycleEngine>();
 builder.Services.AddSingleton<Symbolon.ControlPlane.Webhooks.IWebhookDispatcher, Symbolon.ControlPlane.Webhooks.WebhookDispatcher>();
 builder.Services.AddHostedService<Symbolon.ControlPlane.Services.WebhookBackgroundService>();
+builder.Services.AddHostedService<Symbolon.ControlPlane.Services.DiscoveryResponderService>();
 builder.Services.AddSingleton<Symbolon.ControlPlane.Queuing.IQueueManager, Symbolon.ControlPlane.Queuing.QueueManager>();
 builder.Services.AddScoped<Symbolon.ControlPlane.Alerting.IAlertService, Symbolon.ControlPlane.Alerting.AlertService>();
 builder.Services.AddSingleton<Symbolon.Relay.Mesh.IRelayMeshCoordinator>(_ =>

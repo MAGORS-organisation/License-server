@@ -2,7 +2,7 @@
 
 [![Platform](https://img.shields.io/badge/.NET-10.0%20LTS-512BD4?logo=dotnet)](https://dotnet.microsoft.com/)
 [![Language](https://img.shields.io/badge/C%23-14.0-239120?logo=csharp)](https://learn.microsoft.com/dotnet/csharp/)
-[![Tests](https://img.shields.io/badge/tests-298%20passed%20(+14%20Python%2C%20+12%20Wasm)-brightgreen)](#výsledky-testovania)
+[![Tests](https://img.shields.io/badge/tests-305%20passed%20(+15%20Python%2C%20+12%20Wasm)-brightgreen)](#výsledky-testovania)
 [![License: AGPL-3.0](https://img.shields.io/badge/license-AGPL--3.0-blue.svg)](LICENSE)
 [![License: Apache-2.0](https://img.shields.io/badge/client%20SDK-Apache--2.0-blue.svg)](LICENSES/Apache-2.0.txt)
 [![CRA Compliant](https://img.shields.io/badge/CRA%20Compliance-EU%202024%2F2847-success)](SECURITY.md)
@@ -144,6 +144,12 @@ Rieši to, čo dnešné cloud-first platformy ponúkajú iba ako obmedzený dopl
     - **Dynamická alokácia za behu**: Získavanie a uvoľňovanie funkcií za behu bez nutnosti re-checkoutu hlavného sedadla aplikácie (`POST /v1/leases/{id}/features/acquire`, `POST /v1/leases/{id}/features/release`, `GET /v1/leases/{id}/features`).
     - **RAII Správa vo Viacjazyčných SDK**: Plná integrácia do C# (`await using var feat = await lease.UseFeatureAsync("FEA_SOLVER")`), Pythonu (`with lease.use_feature("FEA_SOLVER"):`), Rustu (`let _feat = lease.acquire_feature("FEA_SOLVER", ...)` s `Drop`) a C/C++ (`ScopedFeatureLease`) s deterministickým uvoľnením zdrojov.
     - **Live Concurrency Teplomery & FoxPro TUI**: Grafické gauge merače vyťaženia modulov, katalóg balíkov a suít vo webovom paneli aj v retro FoxPro TUI (klávesová skratka `U`).
+31. **Zero-Config Server Discovery, Resilient Multi-Server Failover Pool & Enterprise Environment Variable Resolution**
+    - **Zero-Config UDP Broadcast / Multicast Discovery (Port 7584 / `0x1D90`)**: Automatické vyhľadávanie aktívnych uzlov ControlPlane a Relay na lokálnej podsieti bez nutnosti akejkoľvek manuálnej konfigurácie adries serverov.
+    - **Odolný `ServerFailoverPool`**: Priebežné sledovanie zdravia serverov s automatickým prepnutím na záložné inštancie pri výpadkoch siete, 502/503/504 stavoch a exponenciálnym cooldownom.
+    - **Enterprise Premenné Prostredia (`SYMBOLON_LICENSE_SERVER`, `SYMBOLON_SERVERS`)**: Podpora FlexNet notácie `port@host`, `@host`, štandardných URL adries a zoznamov oddelených čiarkami či bodkočiarkami.
+    - **Parita vo Viacjazyčných SDK**: Automatická detekcia a konfigurácia v C#, Python, Rust a C/C++ SDK.
+    - **CLI Nástroje**: Príkazy `symbolon discover` a `symbolon servers resolve` pre vizualizáciu nájdených uzlov a diagnostiku parsovania.
 
 ---
 

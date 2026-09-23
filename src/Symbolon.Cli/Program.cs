@@ -56,6 +56,7 @@ internal static class Program
                 "FEATURES" or "ENTITLEMENTS" => await Commands.FeatureCommands.HandleFeaturesAsync(args[1..]).ConfigureAwait(false),
                 "MIGRATE" => await Commands.MigrateCommands.HandleMigrateAsync(args[1..]).ConfigureAwait(false),
                 "WEBHOOKS" or "WEBHOOK" => await Commands.WebhookCommands.HandleWebhooksAsync(args[1..]).ConfigureAwait(false),
+                "DISCOVER" or "SERVERS" => await Commands.DiscoverCommands.HandleDiscoverAsync(args[1..]).ConfigureAwait(false),
                 _ => UnknownCommand(args[0])
             };
         }
@@ -696,6 +697,7 @@ internal static class Program
               features list|create|suites|grant|usage   Granulárne moduly, balíčky a živé merače konkurencie
               migrate flexnet|options|log|keygen        Migračný nástroj a transpiler z FlexNet a Keygen.sh
               webhooks list|create|delete|test|deliveries Outbound webhooky, Slack/Teams alerty a DLQ replay
+              discover | servers [resolve]              Zero-Config detekcia serverov cez UDP broadcast a riešenie SYMBOLON_LICENSE_SERVER
             """);
     }
 }

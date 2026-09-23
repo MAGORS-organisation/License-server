@@ -141,15 +141,27 @@ class SymbolonClient:
 
     def __init__(
         self,
-        server_url: str,
-        product_code: str,
+        server_url: Optional[str] = None,
+        product_code: str = "",
         relay_url: Optional[str] = None,
         heartbeat_interval: float = 30.0,
         jitter_factor: float = 0.10,
         timeout: float = 10.0,
+        server_urls: Optional[List[str]] = None,
     ):
-        self.server_url = server_url.rstrip("/")
-        self.relay_url = relay_url.rstrip("/") if relay_url else None
+        servers = list(server_urls) if server_urls else []
+        if server_url:
+            resolved = resolve_license_servers(server_url, fallback_to_env=False)
+            servers.extend(resolved if resolved else [server_url.rstrip("/")])
+        elif not servers:
+            servers = resolve_license_servers(fallback_to_env=True)
+
+        if not servers:
+            servers = ["http://localhost:5000"]
+
+        self.server_url = servers[0].rstrip("/")
+        self.server_urls = [s.rstrip("/") for s in servers]
+        self.relay_url = relay_url.rstrip("/") if relay_url else (self.server_urls[1] if len(self.server_urls) > 1 else None)
         self.product_code = product_code
         self.heartbeat_interval = heartbeat_interval
         self.jitter_factor = jitter_factor
@@ -373,4 +385,86 @@ class SymbolonClient:
                 return json.loads(res.read().decode("utf-8"))
         except Exception:
             return []
+
+
+def resolve_license_servers(input_str: Optional[str] = None, fallback_to_env: bool = True) -> List[str]:
+    """
+    Parses and resolves Symbolon license server URLs from a string or enterprise environment variables.
+    Supports FlexNet port@host format (e.g., 27000@lic1.corp.com), comma/semicolon separated lists,
+    and fallback to SYMBOLON_LICENSE_SERVER or SYMBOLON_SERVERS.
+    """
+    import os
+    import re
+    candidate = input_str
+    if not candidate and fallback_to_env:
+        candidate = os.environ.get("SYMBOLON_LICENSE_SERVER") or os.environ.get("SYMBOLON_SERVERS")
+    if not candidate:
+        return []
+
+    tokens = [t.strip() for t in re.split(r"[;,]", candidate) if t.strip()]
+    results = []
+    flexnet_pattern = re.compile(r"^(?:(\d+))?@([^:]+)(?::(\d+))?$")
+
+    for token in tokens:
+        match = flexnet_pattern.match(token)
+        if match:
+            port = match.group(1) or match.group(3) or "8080"
+            host = match.group(2)
+            url = f"http://{host}:{port}"
+            if url not in results:
+                results.append(url)
+            continue
+
+        if token.startswith("http://") or token.startswith("https://"):
+            url = token.rstrip("/")
+            if url not in results:
+                results.append(url)
+        else:
+            if ":" in token:
+                url = f"http://{token}".rstrip("/")
+            else:
+                url = f"http://{token}:8080"
+            if url not in results:
+                results.append(url)
+
+    return results
+
+
+def discover_servers(timeout: float = 1.0, port: int = 7584, product_code: Optional[str] = None) -> List[dict]:
+    """Discovers active Symbolon servers on the local subnet via UDP broadcast."""
+    import socket
+    discovered = []
+    seen_urls = set()
+    probe = {
+        "magic": "symbolon:discover",
+        "clientVersion": "1.0.0",
+        "productCode": product_code,
+        "clientId": socket.gethostname(),
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+    }
+    payload = json.dumps(probe).encode("utf-8")
+    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
+    sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
+    sock.settimeout(timeout)
+    try:
+        sock.sendto(payload, ("<broadcast>", port))
+        start_time = time.time()
+        while True:
+            try:
+                data, addr = sock.recvfrom(4096)
+                rtt = (time.time() - start_time) * 1000.0
+                packet = json.loads(data.decode("utf-8"))
+                if packet.get("magic") == "symbolon:server":
+                    url = packet.get("serverUrl")
+                    if url and url not in seen_urls:
+                        seen_urls.add(url)
+                        packet["roundTripMs"] = round(rtt, 2)
+                        packet["remoteAddress"] = addr[0]
+                        discovered.append(packet)
+            except socket.timeout:
+                break
+    finally:
+        sock.close()
+    return discovered
+
 

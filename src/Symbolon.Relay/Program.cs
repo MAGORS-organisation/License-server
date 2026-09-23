@@ -39,6 +39,8 @@ builder.Services.AddSingleton(TimeProvider.System);
 // Domain Engine
 builder.Services.AddSingleton<LeaseEngine>();
 
+builder.Services.AddHostedService<RelayDiscoveryResponderService>();
+
 var app = builder.Build();
 
 // Endpoints

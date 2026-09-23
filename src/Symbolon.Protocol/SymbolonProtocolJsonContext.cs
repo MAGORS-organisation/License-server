@@ -58,6 +58,8 @@ namespace Symbolon.Protocol;
 [JsonSerializable(typeof(Symbolon.Protocol.K8s.SymbolonClusterStatus))]
 [JsonSerializable(typeof(Symbolon.Protocol.K8s.SymbolonLicenseSpec))]
 [JsonSerializable(typeof(Symbolon.Protocol.K8s.SymbolonLicenseStatus))]
+[JsonSerializable(typeof(DiscoveryProbePacket))]
+[JsonSerializable(typeof(DiscoveryAnnouncementPacket))]
 public sealed partial class SymbolonProtocolJsonContext : JsonSerializerContext
 {
 }

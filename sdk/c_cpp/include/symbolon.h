@@ -60,6 +60,21 @@ SYMBOLON_API symbolon_status_t symbolon_client_create(
     symbolon_client_t** out_client);
 
 /**
+ * Resolves license server URL from input string or enterprise environment variables
+ * (SYMBOLON_LICENSE_SERVER, SYMBOLON_SERVERS).
+ * Supports FlexNet "port@host" format and URLs.
+ *
+ * @param input_or_null Input string to parse, or NULL to read from environment.
+ * @param out_buffer Buffer to store the primary resolved server URL (e.g. "http://host:port").
+ * @param buffer_size Size of out_buffer in bytes.
+ * @return SYMBOLON_OK on success, SYMBOLON_ERR_LICENSE_NOT_FOUND if no server is configured.
+ */
+SYMBOLON_API symbolon_status_t symbolon_resolve_server(
+    const char* input_or_null,
+    char* out_buffer,
+    size_t buffer_size);
+
+/**
  * Acquires a floating concurrent seat lease.
  *
  * @param client Valid client handle.

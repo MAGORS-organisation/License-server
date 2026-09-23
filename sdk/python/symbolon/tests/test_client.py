@@ -130,7 +130,35 @@ class TestSymbolonPythonSdk(unittest.TestCase):
             with lease.use_feature("DENIED_MOD"):
                 pass
 
+    def test_resolve_license_servers_flexnet_and_env(self):
+        from symbolon.client import resolve_license_servers, SymbolonClient
+
+        # FlexNet notation port@host
+        res1 = resolve_license_servers("27000@lic1.corp.com")
+        self.assertEqual(res1, ["http://lic1.corp.com:27000"])
+
+        # Multiple servers separated by semicolons and commas
+        res2 = resolve_license_servers("27000@lic1.corp.com;https://backup-lic:8443,@lic3")
+        self.assertEqual(res2, [
+            "http://lic1.corp.com:27000",
+            "https://backup-lic:8443",
+            "http://lic3:8080"
+        ])
+
+        # Environment variable fallback
+        os.environ["SYMBOLON_LICENSE_SERVER"] = "28000@env-lic.corp.com"
+        try:
+            res_env = resolve_license_servers()
+            self.assertEqual(res_env, ["http://env-lic.corp.com:28000"])
+
+            # Client initializes automatically from environment
+            client = SymbolonClient(product_code="cad-suite")
+            self.assertEqual(client.server_url, "http://env-lic.corp.com:28000")
+        finally:
+            del os.environ["SYMBOLON_LICENSE_SERVER"]
+
 
 if __name__ == "__main__":
     unittest.main()
+
 

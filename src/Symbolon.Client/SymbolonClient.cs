@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Net.Http.Json;
 using Microsoft.Extensions.Logging;
+using Symbolon.Client.Discovery;
 using Symbolon.Format;
 using Symbolon.Protocol;
 using Symbolon.Protocol.Tracing;
@@ -10,20 +11,22 @@ namespace Symbolon.Client;
 /// <summary>
 /// Symbolon Client SDK for ISV applications integrating on-prem floating licenses.
 /// Conforms to docs/08-referencna-implementacia.md §8.6.
+/// Features resilient high-availability multi-server failover and zero-config discovery.
 /// </summary>
 public sealed class SymbolonClient : IDisposable
 {
     private readonly SymbolonClientOptions _options;
-    private readonly HttpClient _http;
-    private readonly bool _ownsHttpClient;
+    private readonly ServerFailoverPool _failoverPool;
+    private readonly bool _ownsPool;
     private readonly LeaseTokenVerifier? _verifier;
     private readonly IReadOnlyDictionary<string, string> _fingerprint;
     private readonly ILogger? _log;
 
+    public ServerFailoverPool FailoverPool => _failoverPool;
+
     public SymbolonClient(SymbolonClientOptions options, ILogger? log = null)
     {
         ArgumentNullException.ThrowIfNull(options);
-        ArgumentNullException.ThrowIfNull(options.ServerUri);
         ArgumentException.ThrowIfNullOrWhiteSpace(options.LicenseKey);
 
         // Pre-validate license key structure and CRC-32C locally before network call (KEY-8)
@@ -35,15 +38,56 @@ public sealed class SymbolonClient : IDisposable
         _options = options;
         _log = log;
 
-        if (options.HttpClient is not null)
+        if (options.FailoverPool is not null)
         {
-            _http = options.HttpClient;
-            _ownsHttpClient = false;
+            _failoverPool = options.FailoverPool;
+            _ownsPool = false;
         }
         else
         {
-            _http = new HttpClient { BaseAddress = options.ServerUri };
-            _ownsHttpClient = true;
+            var servers = new List<Uri>();
+
+            if (options.ServerUri is not null)
+            {
+                servers.Add(options.ServerUri);
+            }
+
+            if (options.ServerUris is not null)
+            {
+                foreach (var uri in options.ServerUris)
+                {
+                    if (!servers.Contains(uri)) servers.Add(uri);
+                }
+            }
+
+            if (servers.Count == 0 && options.AutoDiscover)
+            {
+                var resolved = SymbolonServerResolver.Resolve(fallbackToEnvironment: true);
+                foreach (var uri in resolved)
+                {
+                    if (!servers.Contains(uri)) servers.Add(uri);
+                }
+            }
+
+            if (servers.Count == 0 && options.ServerUri is null)
+            {
+                var envResolved = SymbolonServerResolver.Resolve(fallbackToEnvironment: true);
+                if (envResolved.Count > 0)
+                {
+                    servers.AddRange(envResolved);
+                }
+                else
+                {
+                    servers.Add(new Uri("http://localhost:8080"));
+                }
+            }
+
+            _failoverPool = new ServerFailoverPool(
+                servers,
+                customHttpClient: options.HttpClient,
+                timeProvider: options.TimeProvider,
+                logger: log);
+            _ownsPool = true;
         }
 
         if (options.TrustedKeys is not null)
@@ -55,7 +99,7 @@ public sealed class SymbolonClient : IDisposable
     }
 
     /// <summary>
-    /// Requests a floating seat allocation from the license server.
+    /// Requests a floating seat allocation from the license server with automatic multi-server failover.
     /// </summary>
     public async Task<SeatLease> AcquireSeatAsync(
         IReadOnlyList<string>? features = null,
@@ -72,70 +116,78 @@ public sealed class SymbolonClient : IDisposable
             Features = features
         };
 
-        HttpResponseMessage response;
         try
         {
-            response = await _http.PostAsJsonAsync(
-                new Uri("v1/leases", UriKind.Relative),
-                checkoutDto,
-                SymbolonProtocolJsonContext.Default.CheckoutRequestDto,
-                ct).ConfigureAwait(false);
+            return await _failoverPool.ExecuteWithFailoverAsync(async (serverUri, http, token) =>
+            {
+                var targetUri = new Uri(serverUri, "v1/leases");
+                var response = await http.PostAsJsonAsync(
+                    targetUri,
+                    checkoutDto,
+                    SymbolonProtocolJsonContext.Default.CheckoutRequestDto,
+                    token).ConfigureAwait(false);
+
+                if ((int)response.StatusCode is 502 or 503 or 504)
+                {
+                    throw new HttpRequestException($"Server node {serverUri} returned {(int)response.StatusCode}");
+                }
+
+                if (!response.IsSuccessStatusCode)
+                {
+                    activity?.SetStatus(ActivityStatusCode.Error, $"HTTP {(int)response.StatusCode}");
+                    return SeatLease.Denied($"Denied: Server returned {(int)response.StatusCode}");
+                }
+
+                var body = await response.Content.ReadFromJsonAsync(
+                    SymbolonProtocolJsonContext.Default.CheckoutResponseDto,
+                    token).ConfigureAwait(false);
+
+                if (body is null || string.IsNullOrWhiteSpace(body.LeaseId) || string.IsNullOrWhiteSpace(body.Token))
+                {
+                    activity?.SetStatus(ActivityStatusCode.Error, "Malformed server response");
+                    return SeatLease.Denied("Malformed server response");
+                }
+
+                activity?.SetTag(SymbolonTracing.TagLeaseId, body.LeaseId);
+
+                // Verify the token if trusted keys are configured
+                if (_verifier is not null)
+                {
+                    string expectedFpHash = FingerprintHelper.ComputeHash(_fingerprint);
+                    var verifyResult = _verifier.Verify(
+                        token: body.Token,
+                        expectedFpHash: expectedFpHash,
+                        expectedLicenseId: null);
+
+                    if (!verifyResult.IsValid)
+                    {
+                        activity?.SetStatus(ActivityStatusCode.Error, "Token verification failed");
+                        return SeatLease.Denied($"Token verification failed: {verifyResult.FailureReason}");
+                    }
+                }
+
+                activity?.SetStatus(ActivityStatusCode.Ok);
+                return new SeatLease(
+                    acquired: true,
+                    reason: null,
+                    leaseId: body.LeaseId,
+                    token: body.Token,
+                    seatNo: body.Seat,
+                    expiresAt: body.ExpiresAt,
+                    entitlements: body.Entitlements,
+                    http: http,
+                    time: _options.TimeProvider,
+                    heartbeatInterval: _options.HeartbeatInterval,
+                    gracePeriod: _options.GracePeriod,
+                    fingerprint: _fingerprint,
+                    log: _log);
+            }, ct).ConfigureAwait(false);
         }
-        catch (Exception ex) when (ex is HttpRequestException or TimeoutException)
+        catch (SymbolonFailoverExhaustedException ex)
         {
             activity?.SetStatus(ActivityStatusCode.Error, ex.Message);
             return SeatLease.Denied($"Offline: {ex.Message}");
         }
-
-        if (!response.IsSuccessStatusCode)
-        {
-            activity?.SetStatus(ActivityStatusCode.Error, $"HTTP {(int)response.StatusCode}");
-            return SeatLease.Denied($"Denied: Server returned {(int)response.StatusCode}");
-        }
-
-        var body = await response.Content.ReadFromJsonAsync(
-            SymbolonProtocolJsonContext.Default.CheckoutResponseDto,
-            ct).ConfigureAwait(false);
-
-        if (body is null || string.IsNullOrWhiteSpace(body.LeaseId) || string.IsNullOrWhiteSpace(body.Token))
-        {
-            activity?.SetStatus(ActivityStatusCode.Error, "Malformed server response");
-            return SeatLease.Denied("Malformed server response");
-        }
-
-        activity?.SetTag(SymbolonTracing.TagLeaseId, body.LeaseId);
-
-        // Verify the token if trusted keys are configured
-        if (_verifier is not null)
-        {
-            string expectedFpHash = FingerprintHelper.ComputeHash(_fingerprint);
-            var verifyResult = _verifier.Verify(
-                token: body.Token,
-                expectedFpHash: expectedFpHash,
-                expectedLicenseId: null);
-
-            if (!verifyResult.IsValid)
-            {
-                activity?.SetStatus(ActivityStatusCode.Error, "Token verification failed");
-                return SeatLease.Denied($"Token verification failed: {verifyResult.FailureReason}");
-            }
-        }
-
-        activity?.SetStatus(ActivityStatusCode.Ok);
-        return new SeatLease(
-            acquired: true,
-            reason: null,
-            leaseId: body.LeaseId,
-            token: body.Token,
-            seatNo: body.Seat,
-            expiresAt: body.ExpiresAt,
-            entitlements: body.Entitlements,
-            http: _http,
-            time: _options.TimeProvider,
-            heartbeatInterval: _options.HeartbeatInterval,
-            gracePeriod: _options.GracePeriod,
-            fingerprint: _fingerprint,
-            log: _log);
     }
 
     /// <summary>
@@ -154,24 +206,42 @@ public sealed class SymbolonClient : IDisposable
         activity?.SetTag(SymbolonTracing.TagBorrowDays, days);
 
         var dto = new BorrowRequestDto(days);
-        var response = await _http.PostAsJsonAsync(
-            new Uri($"v1/leases/{leaseId}/borrow", UriKind.Relative),
-            dto,
-            SymbolonProtocolJsonContext.Default.BorrowRequestDto,
-            ct).ConfigureAwait(false);
 
-        if (!response.IsSuccessStatusCode)
+        try
         {
-            activity?.SetStatus(ActivityStatusCode.Error, $"HTTP {(int)response.StatusCode}");
+            return await _failoverPool.ExecuteWithFailoverAsync(async (serverUri, http, token) =>
+            {
+                var targetUri = new Uri(serverUri, $"v1/leases/{leaseId}/borrow");
+                var response = await http.PostAsJsonAsync(
+                    targetUri,
+                    dto,
+                    SymbolonProtocolJsonContext.Default.BorrowRequestDto,
+                    token).ConfigureAwait(false);
+
+                if ((int)response.StatusCode is 502 or 503 or 504)
+                {
+                    throw new HttpRequestException($"Server node {serverUri} returned {(int)response.StatusCode}");
+                }
+
+                if (!response.IsSuccessStatusCode)
+                {
+                    activity?.SetStatus(ActivityStatusCode.Error, $"HTTP {(int)response.StatusCode}");
+                    return null;
+                }
+
+                var result = await response.Content.ReadFromJsonAsync(
+                    SymbolonProtocolJsonContext.Default.BorrowResponseDto,
+                    token).ConfigureAwait(false);
+
+                activity?.SetStatus(ActivityStatusCode.Ok);
+                return result;
+            }, ct).ConfigureAwait(false);
+        }
+        catch (SymbolonFailoverExhaustedException ex)
+        {
+            activity?.SetStatus(ActivityStatusCode.Error, ex.Message);
             return null;
         }
-
-        var result = await response.Content.ReadFromJsonAsync(
-            SymbolonProtocolJsonContext.Default.BorrowResponseDto,
-            ct).ConfigureAwait(false);
-
-        activity?.SetStatus(ActivityStatusCode.Ok);
-        return result;
     }
 
     /// <summary>
@@ -184,27 +254,44 @@ public sealed class SymbolonClient : IDisposable
         using var activity = SymbolonTracing.ActivitySource.StartActivity(SymbolonTracing.OpReturnBorrowed);
         activity?.SetTag(SymbolonTracing.TagLeaseId, leaseId);
 
-        var response = await _http.DeleteAsync(
-            new Uri($"v1/leases/{leaseId}", UriKind.Relative),
-            ct).ConfigureAwait(false);
-
-        if (response.IsSuccessStatusCode)
+        try
         {
-            activity?.SetStatus(ActivityStatusCode.Ok);
-        }
-        else
-        {
-            activity?.SetStatus(ActivityStatusCode.Error, $"HTTP {(int)response.StatusCode}");
-        }
+            return await _failoverPool.ExecuteWithFailoverAsync(async (serverUri, http, token) =>
+            {
+                var targetUri = new Uri(serverUri, $"v1/leases/{leaseId}");
+                var response = await http.DeleteAsync(
+                    targetUri,
+                    token).ConfigureAwait(false);
 
-        return response.IsSuccessStatusCode;
+                if ((int)response.StatusCode is 502 or 503 or 504)
+                {
+                    throw new HttpRequestException($"Server node {serverUri} returned {(int)response.StatusCode}");
+                }
+
+                if (response.IsSuccessStatusCode)
+                {
+                    activity?.SetStatus(ActivityStatusCode.Ok);
+                }
+                else
+                {
+                    activity?.SetStatus(ActivityStatusCode.Error, $"HTTP {(int)response.StatusCode}");
+                }
+
+                return response.IsSuccessStatusCode;
+            }, ct).ConfigureAwait(false);
+        }
+        catch (SymbolonFailoverExhaustedException ex)
+        {
+            activity?.SetStatus(ActivityStatusCode.Error, ex.Message);
+            return false;
+        }
     }
 
     public void Dispose()
     {
-        if (_ownsHttpClient)
+        if (_ownsPool)
         {
-            _http.Dispose();
+            _failoverPool.Dispose();
         }
     }
 }

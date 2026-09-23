@@ -68,6 +68,94 @@ SYMBOLON_API symbolon_status_t symbolon_client_create(
     return SYMBOLON_OK;
 }
 
+SYMBOLON_API symbolon_status_t symbolon_resolve_server(
+    const char* input_or_null,
+    char* out_buffer,
+    size_t buffer_size)
+{
+    if (!out_buffer || buffer_size == 0) {
+        return SYMBOLON_ERR_INVALID_ARGUMENT;
+    }
+
+    const char* candidate = input_or_null;
+    char env_buf[512] = {0};
+
+    if (!candidate || candidate[0] == '\0') {
+#if defined(_WIN32)
+        DWORD len = GetEnvironmentVariableA("SYMBOLON_LICENSE_SERVER", env_buf, (DWORD)sizeof(env_buf));
+        if (len == 0) {
+            len = GetEnvironmentVariableA("SYMBOLON_SERVERS", env_buf, (DWORD)sizeof(env_buf));
+        }
+        if (len > 0 && len < sizeof(env_buf)) {
+            candidate = env_buf;
+        }
+#else
+        candidate = getenv("SYMBOLON_LICENSE_SERVER");
+        if (!candidate || candidate[0] == '\0') {
+            candidate = getenv("SYMBOLON_SERVERS");
+        }
+#endif
+    }
+
+    if (!candidate || candidate[0] == '\0') {
+        return SYMBOLON_ERR_LICENSE_NOT_FOUND;
+    }
+
+    // Isolate first entry if list is separated by ';' or ','
+    char token[256] = {0};
+    size_t i = 0;
+    while (candidate[i] != '\0' && candidate[i] != ';' && candidate[i] != ',' && i < sizeof(token) - 1) {
+        token[i] = candidate[i];
+        i++;
+    }
+    token[i] = '\0';
+
+    // Trim leading whitespace
+    char* p = token;
+    while (*p == ' ' || *p == '\t') p++;
+    if (*p == '\0') {
+        return SYMBOLON_ERR_LICENSE_NOT_FOUND;
+    }
+
+    // Trim trailing whitespace
+    char* end = p + strlen(p) - 1;
+    while (end > p && (*end == ' ' || *end == '\t')) {
+        *end = '\0';
+        end--;
+    }
+
+    // Check FlexNet notation: [port]@host[:port]
+    char* at_sign = strchr(p, '@');
+    if (at_sign) {
+        *at_sign = '\0';
+        char* port_str = p;
+        char* host_str = at_sign + 1;
+        char* colon = strchr(host_str, ':');
+        if (colon) {
+            *colon = '\0';
+            port_str = colon + 1;
+        }
+        if (port_str[0] == '\0') {
+            port_str = "8080";
+        }
+        snprintf(out_buffer, buffer_size, "http://%s:%s", host_str, port_str);
+        return SYMBOLON_OK;
+    }
+
+    if (strncmp(p, "http://", 7) == 0 || strncmp(p, "https://", 8) == 0) {
+        snprintf(out_buffer, buffer_size, "%s", p);
+        return SYMBOLON_OK;
+    }
+
+    if (strchr(p, ':')) {
+        snprintf(out_buffer, buffer_size, "http://%s", p);
+    } else {
+        snprintf(out_buffer, buffer_size, "http://%s:8080", p);
+    }
+
+    return SYMBOLON_OK;
+}
+
 SYMBOLON_API symbolon_status_t symbolon_acquire_seat(
     symbolon_client_t* client,
     const char* license_key,
