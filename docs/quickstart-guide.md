@@ -192,12 +192,30 @@ fn main() {
             println!("✓ Úspešne alokované sedadlo #{} (Lease ID: {})", 
                      lease.seat_number(), lease.lease_id());
 
+            // 4. Overenie oprávnenia pre funkčný modul (napr. FEA Solver)
+            if lease.has_feature("FEA_SOLVER") {
+                println!("Modul FEA_SOLVER je priamo obsiahnutý v licencii.");
+            }
+
+            // 5. Dynamická alokácia prídavného modulu za behu s RAII ochranou
+            {
+                match lease.acquire_feature("FEA_SOLVER", Some("2026.1")) {
+                    Ok(solver_feat) => {
+                        println!("✓ Dynamicky pridelený modul {} (v{})", solver_feat.feature_code, solver_feat.version.as_deref().unwrap_or("*"));
+                        // Simulácia výpočtu...
+                        println!("Výpočtové jadro FEA beží...");
+                        // Po opustení tohto bloku sa solver_feat automaticky uvoľní cez Drop!
+                    }
+                    Err(err) => eprintln!("Modul FEA_SOLVER nie je dostupný: {err}"),
+                }
+            }
+
             // Simulácia práce aplikácie
             println!("Aplikácia spracováva dáta...");
             thread::sleep(Duration::from_secs(3));
 
             // Keď premenná `lease` opustí scope, automaticky sa zavolá trait Drop,
-            // ktorý odošle požiadavku na okamžité uvoľnenie sedadla.
+            // ktorý odošle požiadavku na okamžité uvoľnenie hlavného sedadla.
         }
         Err(err) => {
             eprintln!("❌ Zlyhalo pridelenie sedadla: {err}");
@@ -212,7 +230,7 @@ fn main() {
 
 ## 5. Integrácia v C / C++ (C99 & C++17)
 
-Pre systémové aplikácie, herné enginy, CAD nástroje alebo embedded prostredia je určená single-header knižnica [`symbolon.h`](file:///c:/Licenčný%20server/sdk/c_cpp/include/symbolon.h).
+Pre systémové aplikácie, herné enginy, CAD nástroje alebo embedded prostredia je určená knižnica [`symbolon.h`](file:///c:/Licenčný%20server/sdk/c_cpp/include/symbolon.h).
 
 ### Príklad v ANSI C (C99)
 
@@ -240,10 +258,24 @@ int main(void)
         printf("✓ Sedadlo pridelené! Lease ID: %s, Sedadlo #%d\n",
                lease_id, symbolon_lease_get_seat_number(lease));
 
-        // 3. Manuálny heartbeat (ak sa nepoužíva vstavané vlákno)
+        // 3. Overenie a dynamická alokácia modulu (FEA Solver)
+        int has_fea = 0;
+        symbolon_lease_has_feature(lease, "FEA_SOLVER", &has_fea);
+        printf("FEA Solver pred alokáciou: %s\n", has_fea ? "AKTÍVNY" : "NEAKTÍVNY");
+
+        symbolon_feature_lease_t* feat_lease = NULL;
+        if (symbolon_acquire_feature(lease, "FEA_SOLVER", "2026.1", &feat_lease) == SYMBOLON_OK) {
+            printf("✓ Dynamicky alokovaný modul FEA_SOLVER!\n");
+            // Beží výpočtové jadro...
+            // Uvoľnenie modulu späť do fondu:
+            symbolon_release_feature(feat_lease);
+            printf("Modul FEA_SOLVER bol uvoľnený.\n");
+        }
+
+        // 4. Manuálny heartbeat (ak sa nepoužíva vstavané vlákno)
         symbolon_renew_seat(lease);
 
-        // 4. Uvoľnenie sedadla pri ukončení
+        // 5. Uvoľnenie sedadla pri ukončení
         symbolon_release_seat(lease);
         printf("Sedadlo uvoľnené späť do fondu.\n");
     } 
@@ -254,13 +286,13 @@ int main(void)
         fprintf(stderr, "Chyba komunikácie so serverom: %d\n", status);
     }
 
-    // 5. Uvoľnenie klienta
+    // 6. Uvoľnenie klienta
     symbolon_client_destroy(client);
     return 0;
 }
 ```
 
-### Príklad v C++17 (Moderné RAII cez `ScopedLease`)
+### Príklad v C++17 (Moderné RAII cez `ScopedLease` & `ScopedFeatureLease`)
 
 ```cpp
 #include <iostream>
@@ -282,10 +314,18 @@ void run_application() {
 
     // Moderný RAII wrapper: automaticky uvoľní sedadlo pri návrate z funkcie alebo pri výnimke
     symbolon::ScopedLease lease(raw_lease);
-
     std::cout << "Licencia aktívna, aplikácia beží..." << std::endl;
-    // ... výkonný kód aplikácie ...
 
+    // Dynamická alokácia modulu chránená vnútorným RAII ScopedFeatureLease
+    symbolon_feature_lease_t* raw_feat = nullptr;
+    if (symbolon_acquire_feature(lease.get(), "FEA_SOLVER", "2026.1", &raw_feat) == SYMBOLON_OK) {
+        symbolon::ScopedFeatureLease feat(raw_feat);
+        std::cout << "FEA Solver modul je aktívny v ScopedFeatureLease..." << std::endl;
+        // Po ukončení tohto vnútorného bloku deštruktor ScopedFeatureLease automaticky vráti modul!
+    }
+
+    // ... ďalší výkonný kód aplikácie ...
+    // Po opustení run_application() deštruktor ScopedLease vráti hlavné sedadlo!
     symbolon_client_destroy(raw_client);
 }
 ```

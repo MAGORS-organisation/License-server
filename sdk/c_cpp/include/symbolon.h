@@ -32,6 +32,8 @@ typedef enum {
     SYMBOLON_ERR_CAPACITY_EXHAUSTED = 3,
     SYMBOLON_ERR_LICENSE_NOT_FOUND = 4,
     SYMBOLON_ERR_EXPIRED = 5,
+    SYMBOLON_ERR_FEATURE_DENIED = 6,
+    SYMBOLON_ERR_FEATURE_CAPACITY_EXHAUSTED = 7,
     SYMBOLON_ERR_UNKNOWN = 99
 } symbolon_status_t;
 
@@ -40,6 +42,9 @@ typedef struct symbolon_client symbolon_client_t;
 
 /** Opaque seat lease handle. */
 typedef struct symbolon_lease symbolon_lease_t;
+
+/** Opaque feature lease handle. */
+typedef struct symbolon_feature_lease symbolon_feature_lease_t;
 
 /**
  * Creates and initializes a Symbolon client.
@@ -97,6 +102,55 @@ SYMBOLON_API symbolon_status_t symbolon_lease_get_id(
 SYMBOLON_API int symbolon_lease_get_seat_number(const symbolon_lease_t* lease);
 
 /**
+ * Checks if a feature code is entitled by the active seat lease or currently acquired.
+ *
+ * @param lease Active lease handle.
+ * @param feature_code Identifier of the feature (e.g. "FEA_SOLVER").
+ * @param out_has_feature Pointer to store integer result (1 = entitled/active, 0 = not entitled).
+ * @return SYMBOLON_OK on success.
+ */
+SYMBOLON_API symbolon_status_t symbolon_lease_has_feature(
+    const symbolon_lease_t* lease,
+    const char* feature_code,
+    int* out_has_feature);
+
+/**
+ * Dynamically acquires an add-on module / feature seat for an active lease.
+ *
+ * @param lease Active lease handle.
+ * @param feature_code Identifier of the feature to acquire.
+ * @param version Optional version string constraint (e.g. "2026.1" or NULL).
+ * @param out_feature_lease Pointer to store the acquired feature lease handle.
+ * @return SYMBOLON_OK on success, SYMBOLON_ERR_FEATURE_CAPACITY_EXHAUSTED if feature pool is full, SYMBOLON_ERR_FEATURE_DENIED if not permitted.
+ */
+SYMBOLON_API symbolon_status_t symbolon_acquire_feature(
+    symbolon_lease_t* lease,
+    const char* feature_code,
+    const char* version,
+    symbolon_feature_lease_t** out_feature_lease);
+
+/**
+ * Releases an acquired feature lease back to the shared pool.
+ *
+ * @param feature_lease Feature lease handle to release.
+ * @return SYMBOLON_OK on success.
+ */
+SYMBOLON_API symbolon_status_t symbolon_release_feature(symbolon_feature_lease_t* feature_lease);
+
+/**
+ * Retrieves the feature code associated with the feature lease.
+ *
+ * @param feature_lease Valid feature lease handle.
+ * @param buffer Output buffer to receive the code.
+ * @param buffer_len Size of output buffer.
+ * @return SYMBOLON_OK on success.
+ */
+SYMBOLON_API symbolon_status_t symbolon_feature_lease_get_code(
+    const symbolon_feature_lease_t* feature_lease,
+    char* buffer,
+    size_t buffer_len);
+
+/**
  * Computes canonical SHA-256 hardware fingerprint of the current machine.
  *
  * @param buffer Output buffer (min 72 bytes recommended).
@@ -115,7 +169,7 @@ SYMBOLON_API void symbolon_client_destroy(symbolon_client_t* client);
 #ifdef __cplusplus
 }
 
-// C++ RAII Wrapper
+// C++ RAII Wrappers
 namespace symbolon {
 
 class ScopedLease {
@@ -149,6 +203,39 @@ public:
 
 private:
     symbolon_lease_t* lease_;
+};
+
+class ScopedFeatureLease {
+public:
+    explicit ScopedFeatureLease(symbolon_feature_lease_t* feat = nullptr) : feat_(feat) {}
+    ~ScopedFeatureLease() {
+        if (feat_) {
+            symbolon_release_feature(feat_);
+            feat_ = nullptr;
+        }
+    }
+
+    ScopedFeatureLease(ScopedFeatureLease&& other) noexcept : feat_(other.feat_) {
+        other.feat_ = nullptr;
+    }
+
+    ScopedFeatureLease& operator=(ScopedFeatureLease&& other) noexcept {
+        if (this != &other) {
+            if (feat_) symbolon_release_feature(feat_);
+            feat_ = other.feat_;
+            other.feat_ = nullptr;
+        }
+        return *this;
+    }
+
+    ScopedFeatureLease(const ScopedFeatureLease&) = delete;
+    ScopedFeatureLease& operator=(const ScopedFeatureLease&) = delete;
+
+    symbolon_feature_lease_t* get() const { return feat_; }
+    bool is_valid() const { return feat_ != nullptr; }
+
+private:
+    symbolon_feature_lease_t* feat_;
 };
 
 } // namespace symbolon

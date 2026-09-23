@@ -25,21 +25,54 @@ int main(void)
     if (status == SYMBOLON_OK) {
         char lease_id[64];
         symbolon_lease_get_id(lease, lease_id, sizeof(lease_id));
-        printf("Seat successfully acquired! Lease ID: %s, Seat #%d\n",
+        printf("✓ Seat successfully acquired! Lease ID: %s, Seat #%d\n",
                lease_id, symbolon_lease_get_seat_number(lease));
 
-        // 4. Renew seat (heartbeat)
+        // 4. Check feature entitlements
+        int has_core = 0;
+        symbolon_lease_has_feature(lease, "core", &has_core);
+        printf("Has 'core' entitlement: %s\n", has_core ? "YES" : "NO");
+
+        int has_fea = 0;
+        symbolon_lease_has_feature(lease, "FEA_SOLVER", &has_fea);
+        printf("Has 'FEA_SOLVER' before acquire: %s\n", has_fea ? "YES" : "NO");
+
+        // 5. Dynamically acquire add-on feature
+        symbolon_feature_lease_t* feat_lease = NULL;
+        status = symbolon_acquire_feature(lease, "FEA_SOLVER", "2026.1", &feat_lease);
+        if (status == SYMBOLON_OK) {
+            char feat_code[64];
+            symbolon_feature_lease_get_code(feat_lease, feat_code, sizeof(feat_code));
+            printf("✓ Dynamically acquired feature module: %s\n", feat_code);
+
+            symbolon_lease_has_feature(lease, "FEA_SOLVER", &has_fea);
+            printf("Has 'FEA_SOLVER' during execution: %s\n", has_fea ? "YES" : "NO");
+
+            // Execute FEA solver kernel...
+            printf("Running solver simulation calculations...\n");
+
+            // 6. Release feature module
+            symbolon_release_feature(feat_lease);
+            printf("Feature module released back to pool.\n");
+
+            symbolon_lease_has_feature(lease, "FEA_SOLVER", &has_fea);
+            printf("Has 'FEA_SOLVER' after release: %s\n", has_fea ? "YES" : "NO");
+        } else {
+            printf("Failed to acquire feature: error code %d\n", status);
+        }
+
+        // 7. Renew seat (heartbeat)
         symbolon_renew_seat(lease);
         printf("Heartbeat renewal sent.\n");
 
-        // 5. Release seat
+        // 8. Release seat
         symbolon_release_seat(lease);
         printf("Seat released back to pool.\n");
     } else if (status == SYMBOLON_ERR_CAPACITY_EXHAUSTED) {
         printf("Capacity exhausted: No floating seats available.\n");
     }
 
-    // 6. Cleanup client
+    // 9. Cleanup client
     symbolon_client_destroy(client);
     printf("Done.\n");
     return 0;

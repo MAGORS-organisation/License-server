@@ -25,6 +25,8 @@ a projekt striktne dodržiava [Sémantické Verziovanie (Semantic Versioning 2.0
   - **Multi-Language Client SDK Integrácie**:
     - **C# SDK (`Symbolon.Client`)**: `FeatureLease` (`IAsyncDisposable`, `IDisposable`), `lease.HasFeature()`, `await using var feat = await lease.UseFeatureAsync("FEA_SOLVER")`, `lease.AcquireFeatureAsync()`, `lease.ReleaseFeatureAsync()`, `SymbolonFeatureDeniedException`.
     - **Python SDK (`symbolon`)**: `FeatureLease` context manager, `lease.has_feature()`, `with lease.use_feature("FEA_SOLVER"):`, `lease.acquire_feature()`, `lease.release_feature()`, výnimka `FeatureDenied`.
+    - **Rust SDK (`symbolon-client`)**: RAII štruktúra `FeatureLease<'a>` s implementáciou `Drop` pre automatické uvoľnenie pri zániku scope, `lease.has_feature()`, `lease.acquire_feature()`, `lease.use_feature(...)` uzáverový helper, chybové stavy `FeatureDenied` a `FeatureCapacityExceeded`.
+    - **C / C++ SDK (`symbolon.h`)**: ANSI C API `symbolon_lease_has_feature`, `symbolon_acquire_feature`, `symbolon_release_feature`, `symbolon_feature_lease_get_code`, moderná C++17 RAII trieda `ScopedFeatureLease`.
     - **Wasm SDK (`symbolon-validator.js`)**: Funkcia `checkFeatureEntitlement(claims, featureCode, requestedVersion)` pre offline validáciu modulov a suít.
   - **CLI Nástroje (`symbolon features`)**:
     - Príkazy `symbolon features list`, `create`, `delete`, `suites`, `create-suite`, `delete-suite`, `grant`, `usage` so Spectre.Console tabuľkami a live grafickými teplomermi vyťaženia.

@@ -142,7 +142,7 @@ Rieši to, čo dnešné cloud-first platformy ponúkajú iba ako obmedzený dopl
     - **Nezávislé kvóty sedadiel modulov**: Nezávislé concurrency limity pre funkčné moduly a add-ony oddelené od kapacity hlavnej licencie podľa vzoru FlexNet/RLM/Sentinel RMS.
     - **Balíkové suity (Package Suites)**: Automatická dekompozícia suít na dcérske moduly pri checkoutoch s deterministickou kontrolou verzií (`*`, `2026.*`, intervaly `>= 2025.0 and <= 2027.0`).
     - **Dynamická alokácia za behu**: Získavanie a uvoľňovanie funkcií za behu bez nutnosti re-checkoutu hlavného sedadla aplikácie (`POST /v1/leases/{id}/features/acquire`, `POST /v1/leases/{id}/features/release`, `GET /v1/leases/{id}/features`).
-    - **RAII Správa v SDK**: Plná integrácia do C# (`await using var feat = await lease.UseFeatureAsync("FEA_SOLVER")`) a Pythonu (`with lease.use_feature("FEA_SOLVER"):`) s garantovaným uvoľnením zdrojov.
+    - **RAII Správa vo Viacjazyčných SDK**: Plná integrácia do C# (`await using var feat = await lease.UseFeatureAsync("FEA_SOLVER")`), Pythonu (`with lease.use_feature("FEA_SOLVER"):`), Rustu (`let _feat = lease.acquire_feature("FEA_SOLVER", ...)` s `Drop`) a C/C++ (`ScopedFeatureLease`) s deterministickým uvoľnením zdrojov.
     - **Live Concurrency Teplomery & FoxPro TUI**: Grafické gauge merače vyťaženia modulov, katalóg balíkov a suít vo webovom paneli aj v retro FoxPro TUI (klávesová skratka `U`).
 
 ---
