@@ -628,12 +628,26 @@ function initModals() {
 }
 
 function openModal(id) {
-    document.getElementById(id)?.classList.add("active");
+    const el = document.getElementById(id);
+    if (el) {
+        el.classList.add("active");
+        el.style.display = "flex";
+    }
 }
 
 function closeModal(id) {
-    document.getElementById(id)?.classList.remove("active");
+    const el = document.getElementById(id);
+    if (el) {
+        el.classList.remove("active");
+        el.style.display = "none";
+        if (window.location.hash.toLowerCase() === "#help" && id === "modal-retro-help") {
+            history.replaceState(null, "", window.location.pathname + window.location.search);
+        }
+    }
 }
+
+window.openModal = openModal;
+window.closeModal = closeModal;
 
 function downloadTextFile(filename, text) {
     const blob = new Blob([text], { type: "text/plain;charset=utf-8" });

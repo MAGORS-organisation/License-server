@@ -445,11 +445,20 @@ tr.selected td,
   left: 0 !important;
   width: 100vw !important;
   height: 100vh !important;
-  background-color: rgba(0, 0, 0, 0.45) !important;
-  display: flex !important;
+  background-color: rgba(0, 0, 0, 0.55) !important;
+  display: none !important;
   align-items: center !important;
   justify-content: center !important;
   z-index: 9999 !important;
+  opacity: 0 !important;
+  visibility: hidden !important;
+}
+
+.modal-overlay.active,
+.retro-modal-overlay.active {
+  display: flex !important;
+  opacity: 1 !important;
+  visibility: visible !important;
 }
 
 .modal-box,

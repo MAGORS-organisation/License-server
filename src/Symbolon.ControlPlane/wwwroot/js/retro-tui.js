@@ -229,14 +229,14 @@
      */
     function createHelpModal() {
         const modal = document.createElement('div');
-        modal.className = 'retro-modal-overlay';
+        modal.className = 'retro-modal-overlay modal-overlay';
         modal.id = 'modal-retro-help';
         modal.style.display = 'none';
         modal.innerHTML = `
             <div class="retro-modal-box">
                 <div class="retro-modal-titlebar">
                     <span>NÁPOVEDA KLÁVESOVÉHO OVLÁDANIA (F1)</span>
-                    <button class="retro-btn" onclick="closeModal('modal-retro-help')">✕</button>
+                    <button class="retro-btn" onclick="closeHelpModal()">✕</button>
                 </div>
                 <div class="retro-modal-content" style="font-size: 13px; line-height: 1.6;">
                     <p style="margin-bottom: 8px;"><strong>Systém je 100% ovládateľný bez použitia myši:</strong></p>
@@ -255,10 +255,15 @@
                     <p style="font-size: 12px; color: #555;">Žlté a jantárové podčiarknuté písmená sú akcelerátory – ich stlačením priamo aktivujete danú voľbu.</p>
                 </div>
                 <div class="retro-modal-footer">
-                    <button class="retro-btn retro-btn-primary" onclick="closeModal('modal-retro-help')">[ Pokračovať (Enter) ]</button>
+                    <button class="retro-btn retro-btn-primary" onclick="closeHelpModal()">[ Pokračovať (Enter) ]</button>
                 </div>
             </div>
         `;
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) {
+                closeHelpModal();
+            }
+        });
         document.body.appendChild(modal);
     }
 
@@ -364,6 +369,12 @@
 
             // Enter (potvrdenie / spustenie)
             if (e.key === 'Enter') {
+                const helpModal = document.getElementById('modal-retro-help');
+                if (helpModal && (helpModal.classList.contains('active') || helpModal.style.display === 'flex')) {
+                    e.preventDefault();
+                    window.closeHelpModal();
+                    return;
+                }
                 e.preventDefault();
                 executeCurrentSelection();
                 return;
@@ -505,12 +516,15 @@
      */
     function handleEscKey() {
         // 1. Ak je otvorený modal, zatvor ho
-        const openModals = document.querySelectorAll('.retro-modal-overlay:not([style*="display: none"]), .modal-overlay.active');
+        const openModals = document.querySelectorAll('.retro-modal-overlay.active, .modal-overlay.active, .retro-modal-overlay:not([style*="display: none"])');
         if (openModals.length > 0) {
             openModals.forEach(m => {
                 m.style.display = 'none';
                 m.classList.remove('active');
             });
+            if (window.location.hash.toLowerCase() === "#help") {
+                history.replaceState(null, "", window.location.pathname + window.location.search);
+            }
             return;
         }
 
@@ -658,8 +672,33 @@
      * Otvorenie pomocníka klávesnice
      */
     window.openHelpModal = function () {
-        const modal = document.getElementById('modal-retro-help');
-        if (modal) modal.style.display = 'flex';
+        if (typeof window.openModal === 'function') {
+            window.openModal('modal-retro-help');
+        } else {
+            const modal = document.getElementById('modal-retro-help');
+            if (modal) {
+                modal.classList.add('active');
+                modal.style.display = 'flex';
+            }
+        }
+    };
+
+    /**
+     * Zatvorenie pomocníka klávesnice
+     */
+    window.closeHelpModal = function () {
+        if (typeof window.closeModal === 'function') {
+            window.closeModal('modal-retro-help');
+        } else {
+            const modal = document.getElementById('modal-retro-help');
+            if (modal) {
+                modal.classList.remove('active');
+                modal.style.display = 'none';
+            }
+        }
+        if (window.location.hash.toLowerCase() === '#help') {
+            history.replaceState(null, '', window.location.pathname + window.location.search);
+        }
     };
 
     /**
@@ -724,6 +763,7 @@
         state,
         switchView: window.switchRetroView,
         openHelp: window.openHelpModal,
+        closeHelp: window.closeHelpModal,
         closeSubmenu
     };
 
