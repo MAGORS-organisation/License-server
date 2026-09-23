@@ -55,6 +55,9 @@ function initNavigation() {
                 activeSec.classList.add("active");
                 const pageTitle = link.querySelector("span:not(.nav-icon)")?.textContent || "Dashboard";
                 document.getElementById("page-title").textContent = pageTitle;
+                if (targetView === "view-features") {
+                    loadFeaturesView();
+                }
             }
         });
     });
@@ -77,7 +80,8 @@ async function refreshAllData() {
         loadApiKeys(),
         loadTransparencyRoot(),
         loadMeshAndAlerts(),
-        loadScimDirectory()
+        loadScimDirectory(),
+        loadFeaturesView()
     ]);
 }
 
@@ -2616,6 +2620,308 @@ async function importKeygenSubmit(apply) {
         } else {
             showToast("Náhľad Keygen importu vygenerovaný!", "info");
         }
+    } catch (e) {
+        showToast("Chyba: " + e.message, "error");
+    }
+}
+
+// ==========================================
+// Dynamic Entitlements & Features Management
+// ==========================================
+
+async function loadFeaturesView() {
+    await Promise.allSettled([
+        loadFeaturesCatalog(),
+        loadPackageSuites(),
+        loadFeatureUsageMeters()
+    ]);
+}
+
+async function loadFeaturesCatalog() {
+    try {
+        const res = await fetch("/admin/v1/entitlements/features");
+        if (!res.ok) return;
+
+        const list = await res.json();
+        const totalEl = document.getElementById("feat-kpi-total");
+        if (totalEl) totalEl.textContent = list.length;
+
+        const tbody = document.getElementById("features-table-body");
+        if (!tbody) return;
+
+        if (list.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="8" style="text-align: center; color: var(--text-muted); padding: 18px;">Žiadne definované moduly v katalógu. Vytvorte prvý modul tlačidlom vyššie.</td></tr>`;
+            return;
+        }
+
+        tbody.innerHTML = list.map(f => {
+            const verRange = (!f.minVersion && !f.maxVersion)
+                ? `<span class="badge" style="background: rgba(16, 185, 129, 0.15); color: var(--accent-emerald);">Všetky (*)</span>`
+                : `<span class="badge badge-indigo">${escapeHtml(f.minVersion || "0")} – ${escapeHtml(f.maxVersion || "latest")}</span>`;
+
+            const maxSeatsStr = f.defaultMaxSeats != null
+                ? `<strong style="color: var(--accent-emerald);">${f.defaultMaxSeats}</strong>`
+                : `<span style="color: var(--text-muted);">Neobmedzené (∞)</span>`;
+
+            const typeBadge = f.isFloating
+                ? `<span class="badge" style="background: rgba(59, 130, 246, 0.15); color: var(--accent-indigo);">Floating Seat</span>`
+                : `<span class="badge" style="background: rgba(139, 92, 246, 0.15); color: var(--accent-purple);">Seatless / Node</span>`;
+
+            const createdDate = f.createdAt ? new Date(f.createdAt).toLocaleDateString("sk-SK") : "-";
+
+            return `
+                <tr>
+                    <td><strong style="color: var(--accent-cyan); font-family: monospace;">${escapeHtml(f.code)}</strong></td>
+                    <td><strong>${escapeHtml(f.name)}</strong>${f.description ? `<br><small style="color: var(--text-muted);">${escapeHtml(f.description)}</small>` : ""}</td>
+                    <td>${f.productId ? `<span class="badge badge-amber">${escapeHtml(f.productId)}</span>` : '<span style="color: var(--text-muted);">-</span>'}</td>
+                    <td>${typeBadge}</td>
+                    <td>${verRange}</td>
+                    <td>${maxSeatsStr}</td>
+                    <td style="font-size: 12px; color: var(--text-secondary);">${createdDate}</td>
+                    <td>
+                        <button type="button" class="btn btn-secondary btn-sm" style="color: var(--accent-rose); border-color: rgba(244, 63, 94, 0.3);" onclick="deleteFeature('${escapeHtml(f.id)}')">🗑 Zmazať</button>
+                    </td>
+                </tr>
+            `;
+        }).join("");
+    } catch (e) {
+        console.error("Chyba pri načítaní katalógu funkcií:", e);
+    }
+}
+
+async function loadPackageSuites() {
+    try {
+        const res = await fetch("/admin/v1/entitlements/suites");
+        if (!res.ok) return;
+
+        const list = await res.json();
+        const suitesEl = document.getElementById("feat-kpi-suites");
+        if (suitesEl) suitesEl.textContent = list.length;
+
+        const tbody = document.getElementById("suites-table-body");
+        if (!tbody) return;
+
+        if (list.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="6" style="text-align: center; color: var(--text-muted); padding: 18px;">Žiadne balíčky (suites). Vytvorte nový balíček pre agregovaný predaj modulov.</td></tr>`;
+            return;
+        }
+
+        tbody.innerHTML = list.map(s => {
+            const featsBadges = (s.featureCodes || []).map(fc =>
+                `<span class="badge" style="background: rgba(6, 182, 212, 0.15); color: var(--accent-cyan); font-family: monospace; margin: 2px;">${escapeHtml(fc)}</span>`
+            ).join(" ");
+
+            const createdDate = s.createdAt ? new Date(s.createdAt).toLocaleDateString("sk-SK") : "-";
+
+            return `
+                <tr>
+                    <td><strong style="color: var(--accent-indigo); font-family: monospace;">${escapeHtml(s.code)}</strong></td>
+                    <td><strong>${escapeHtml(s.name)}</strong>${s.description ? `<br><small style="color: var(--text-muted);">${escapeHtml(s.description)}</small>` : ""}</td>
+                    <td>${s.productId ? `<span class="badge badge-amber">${escapeHtml(s.productId)}</span>` : '<span style="color: var(--text-muted);">-</span>'}</td>
+                    <td>${featsBadges || '<span style="color: var(--text-muted);">(prázdny balíček)</span>'}</td>
+                    <td style="font-size: 12px; color: var(--text-secondary);">${createdDate}</td>
+                    <td>
+                        <button type="button" class="btn btn-secondary btn-sm" style="color: var(--accent-rose); border-color: rgba(244, 63, 94, 0.3);" onclick="deleteSuite('${escapeHtml(s.id)}')">🗑 Zmazať</button>
+                    </td>
+                </tr>
+            `;
+        }).join("");
+    } catch (e) {
+        console.error("Chyba pri načítaní balíčkov:", e);
+    }
+}
+
+async function loadFeatureUsageMeters() {
+    try {
+        const res = await fetch("/admin/v1/entitlements/usage");
+        if (!res.ok) return;
+
+        const metrics = await res.json();
+
+        let totalInUse = 0;
+        let totalDenials = 0;
+        for (const m of metrics) {
+            totalInUse += (m.inUseSeats || 0);
+            totalDenials += (m.denialsCount || 0);
+        }
+
+        const inUseEl = document.getElementById("feat-kpi-in-use");
+        if (inUseEl) inUseEl.textContent = totalInUse;
+
+        const denialsEl = document.getElementById("feat-kpi-denials");
+        if (denialsEl) denialsEl.textContent = totalDenials;
+
+        const container = document.getElementById("feature-gauges-container");
+        if (!container) return;
+
+        if (metrics.length === 0) {
+            container.innerHTML = `<div style="text-align: center; color: var(--text-muted); padding: 16px;">V systéme zatiaľ nie sú registrované žiadne moduly pre sledovanie obsadenosti.</div>`;
+            return;
+        }
+
+        container.innerHTML = `
+            <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px;">
+                ${metrics.map(m => {
+                    const max = m.maxSeats != null ? m.maxSeats : 0;
+                    const inUse = m.inUseSeats || 0;
+                    const percent = max > 0 ? Math.min(100, Math.round((inUse / max) * 100)) : (inUse > 0 ? 100 : 0);
+                    const color = percent >= 90 ? "var(--accent-rose)" : percent >= 60 ? "var(--accent-amber)" : "var(--accent-emerald)";
+
+                    return `
+                        <div style="background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border-color); border-radius: 8px; padding: 14px;">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                                <div>
+                                    <strong style="font-size: 13px; font-family: monospace; color: var(--accent-cyan);">${escapeHtml(m.featureCode)}</strong>
+                                    <div style="font-size: 12px; color: var(--text-secondary);">${escapeHtml(m.name)}</div>
+                                </div>
+                                ${m.denialsCount > 0 ? `<span class="badge badge-revoked" title="Odmietnuté požiadavky">${m.denialsCount} zamietnutí</span>` : ""}
+                            </div>
+                            <div style="display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 6px;">
+                                <span>Obsadené: <strong>${inUse}</strong> ${max > 0 ? `/ ${max}` : '(neobmedzené)'}</span>
+                                <span style="color: ${color}; font-weight: bold;">${max > 0 ? `${percent}%` : 'Aktívne'}</span>
+                            </div>
+                            <div style="background: rgba(255, 255, 255, 0.08); height: 8px; border-radius: 4px; overflow: hidden;">
+                                <div style="background: ${color}; width: ${percent}%; height: 100%; border-radius: 4px; transition: width 0.3s ease;"></div>
+                            </div>
+                        </div>
+                    `;
+                }).join("")}
+            </div>
+        `;
+    } catch (e) {
+        console.error("Chyba pri načítaní meračov obsadenosti:", e);
+    }
+}
+
+async function createFeatureSubmit(event) {
+    event.preventDefault();
+
+    const code = document.getElementById("feat-code").value.trim().toUpperCase();
+    const name = document.getElementById("feat-name").value.trim();
+    const productId = document.getElementById("feat-product").value.trim() || null;
+    const description = document.getElementById("feat-description").value.trim() || null;
+    const minVersion = document.getElementById("feat-min-ver").value.trim() || null;
+    const maxVersion = document.getElementById("feat-max-ver").value.trim() || null;
+    const maxSeatsVal = document.getElementById("feat-max-seats").value.trim();
+    const isFloating = document.getElementById("feat-is-floating").checked;
+
+    const defaultMaxSeats = maxSeatsVal ? parseInt(maxSeatsVal, 10) : null;
+
+    if (!code || !name) {
+        showToast("Kód a názov modulu sú povinné.", "error");
+        return;
+    }
+
+    try {
+        const res = await fetch("/admin/v1/entitlements/features", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                code,
+                name,
+                productId,
+                description,
+                minVersion,
+                maxVersion,
+                isFloating,
+                defaultMaxSeats
+            })
+        });
+
+        if (!res.ok) {
+            const err = await res.json().catch(() => ({}));
+            showToast(`Chyba pri vytváraní modulu: ${err.detail || res.status}`, "error");
+            return;
+        }
+
+        closeModal("modal-create-feature");
+        document.getElementById("form-create-feature").reset();
+        showToast(`Modul '${code}' bol úspešne zaregistrovaný v katalógu!`, "success");
+        loadFeaturesView();
+    } catch (e) {
+        showToast("Chyba spojenia: " + e.message, "error");
+    }
+}
+
+async function deleteFeature(id) {
+    if (!confirm("Naozaj chcete vymazať túto definíciu modulu z katalógu?")) return;
+
+    try {
+        const res = await fetch(`/admin/v1/entitlements/features/${encodeURIComponent(id)}`, {
+            method: "DELETE"
+        });
+
+        if (!res.ok) {
+            showToast("Chyba pri mazaní modulu.", "error");
+            return;
+        }
+
+        showToast("Modul bol úspešne vymazaný.", "success");
+        loadFeaturesView();
+    } catch (e) {
+        showToast("Chyba: " + e.message, "error");
+    }
+}
+
+async function createSuiteSubmit(event) {
+    event.preventDefault();
+
+    const code = document.getElementById("suite-code").value.trim().toUpperCase();
+    const name = document.getElementById("suite-name").value.trim();
+    const productId = document.getElementById("suite-product").value.trim() || null;
+    const description = document.getElementById("suite-description").value.trim() || null;
+    const featsStr = document.getElementById("suite-features").value.trim();
+
+    if (!code || !name || !featsStr) {
+        showToast("Kód, názov a zoznam modulov sú povinné.", "error");
+        return;
+    }
+
+    const featureCodes = featsStr.split(",").map(f => f.trim().toUpperCase()).filter(f => f.length > 0);
+
+    try {
+        const res = await fetch("/admin/v1/entitlements/suites", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                code,
+                name,
+                productId,
+                description,
+                featureCodes
+            })
+        });
+
+        if (!res.ok) {
+            const err = await res.json().catch(() => ({}));
+            showToast(`Chyba pri vytváraní balíčka: ${err.detail || res.status}`, "error");
+            return;
+        }
+
+        closeModal("modal-create-suite");
+        document.getElementById("form-create-suite").reset();
+        showToast(`Balíček '${code}' (${featureCodes.length} modulov) bol úspešne vytvorený!`, "success");
+        loadFeaturesView();
+    } catch (e) {
+        showToast("Chyba spojenia: " + e.message, "error");
+    }
+}
+
+async function deleteSuite(id) {
+    if (!confirm("Naozaj chcete vymazať tento balíček (suite)?")) return;
+
+    try {
+        const res = await fetch(`/admin/v1/entitlements/suites/${encodeURIComponent(id)}`, {
+            method: "DELETE"
+        });
+
+        if (!res.ok) {
+            showToast("Chyba pri mazaní balíčka.", "error");
+            return;
+        }
+
+        showToast("Balíček bol úspešne vymazaný.", "success");
+        loadFeaturesView();
     } catch (e) {
         showToast("Chyba: " + e.message, "error");
     }

@@ -76,6 +76,8 @@ builder.Services.AddSingleton<Symbolon.Domain.Security.IFraudDetectionService, S
 builder.Services.AddSingleton<Symbolon.ControlPlane.Security.Sso.SsoSessionManager>();
 builder.Services.AddSingleton<Symbolon.ControlPlane.Security.Sso.SsoEngine>();
 builder.Services.AddSingleton<Symbolon.ControlPlane.Security.KmsHierarchyManager>();
+builder.Services.AddScoped<Symbolon.Domain.Entitlements.IFeatureEntitlementStore, Symbolon.Data.Stores.EfFeatureEntitlementStore>();
+builder.Services.AddScoped<Symbolon.Domain.Entitlements.FeatureEntitlementEngine>();
 builder.Services.AddScoped<LeaseEngine>();
 
 // Rate Limiting (STRIDE T11, T12, SEC-05: Partitioned by Client IP / Admin Key)
@@ -213,6 +215,7 @@ app.UseRateLimiter();
 // Map Endpoints with Rate Limiting (STRIDE T11, T12)
 app.MapPublicEndpoints().RequireRateLimiting("public-leases");
 app.MapEntitlementEndpoints().RequireRateLimiting("public-leases");
+app.MapAdminEntitlementEndpoints().RequireAuthorization().RequireRateLimiting("admin");
 app.MapTransparencyEndpoints().RequireRateLimiting("public-leases");
 app.MapComplianceEndpoints().RequireRateLimiting("public-leases");
 app.MapAdminEndpoints().RequireAuthorization().RequireRateLimiting("admin");

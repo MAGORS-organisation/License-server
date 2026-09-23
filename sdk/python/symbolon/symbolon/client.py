@@ -6,10 +6,11 @@ import threading
 import time
 import urllib.request
 import urllib.error
+from contextlib import contextmanager
 from datetime import datetime, timezone
 from typing import Dict, List, Optional, Union
 
-from .models import LeaseToken, SymbolonException, SeatAllocationDenied
+from .models import LeaseToken, SymbolonException, SeatAllocationDenied, FeatureDenied
 from .fingerprint import get_hardware_components, compute_canonical_fingerprint
 
 
@@ -18,6 +19,32 @@ def _generate_w3c_traceparent() -> str:
     trace_id = f"{random.getrandbits(128):032x}"
     span_id = f"{random.getrandbits(64):016x}"
     return f"00-{trace_id}-{span_id}-01"
+
+
+class FeatureLease:
+    """Represents an acquired feature entitlement with RAII context manager support."""
+
+    def __init__(self, parent: "SeatLease", feature_code: str, version: Optional[str] = None):
+        self._parent = parent
+        self.feature_code = feature_code
+        self.version = version
+        self._is_released = False
+
+    @property
+    def is_active(self) -> bool:
+        return not self._is_released and self._parent.is_active
+
+    def release(self) -> bool:
+        if not self._is_released:
+            self._is_released = True
+            return self._parent.release_feature(self.feature_code)
+        return False
+
+    def __enter__(self) -> "FeatureLease":
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb) -> None:
+        self.release()
 
 
 class SeatLease:
@@ -29,6 +56,7 @@ class SeatLease:
         self.seq = seq
         self._is_released = False
         self._is_borrowed = False
+        self._active_features: Dict[str, FeatureLease] = {}
 
     @property
     def lease_id(self) -> str:
@@ -45,6 +73,46 @@ class SeatLease:
     @property
     def is_borrowed(self) -> bool:
         return self._is_borrowed
+
+    def has_feature(self, feature_code: str) -> bool:
+        """Returns True if the feature was included in entitlements or acquired dynamically."""
+        if not feature_code:
+            return False
+        code_lower = feature_code.lower()
+        if any(e.lower() == code_lower for e in self.token.entitlements):
+            return True
+        return any(k.lower() == code_lower for k in self._active_features.keys())
+
+    def acquire_feature(
+        self,
+        feature_code: str,
+        version: Optional[str] = None,
+        ttl_seconds: Optional[int] = None,
+    ) -> FeatureLease:
+        """Dynamically acquires a feature seat on the server."""
+        self._client.acquire_feature(self.lease_id, feature_code, version, ttl_seconds)
+        feat_lease = FeatureLease(self, feature_code, version)
+        self._active_features[feature_code] = feat_lease
+        return feat_lease
+
+    def release_feature(self, feature_code: str) -> bool:
+        """Releases an acquired feature seat."""
+        self._active_features.pop(feature_code, None)
+        return self._client.release_feature(self.lease_id, feature_code)
+
+    @contextmanager
+    def use_feature(
+        self,
+        feature_code: str,
+        version: Optional[str] = None,
+        ttl_seconds: Optional[int] = None,
+    ):
+        """RAII context manager: acquires feature on entry, releases on exit."""
+        feat = self.acquire_feature(feature_code, version, ttl_seconds)
+        try:
+            yield feat
+        finally:
+            feat.release()
 
     def borrow(self, days: int) -> dict:
         """Borrows this seat for offline use for the specified number of days."""
@@ -257,3 +325,52 @@ class SymbolonClient:
             raise SymbolonException(f"HTTP error {e.code}: {err_text}")
         except Exception as e:
             raise SymbolonException(f"Network error: {e}")
+
+    def acquire_feature(
+        self,
+        lease_id: str,
+        feature_code: str,
+        version: Optional[str] = None,
+        ttl_seconds: Optional[int] = None,
+    ) -> dict:
+        """Acquires a granular feature seat for an active lease."""
+        url = f"{self.server_url}/v1/leases/{lease_id}/features/acquire"
+        payload = {"featureCode": feature_code}
+        if version:
+            payload["version"] = version
+        if ttl_seconds:
+            payload["ttlSeconds"] = ttl_seconds
+        try:
+            return self._post_json(url, payload)
+        except SeatAllocationDenied:
+            raise FeatureDenied(f"Feature capacity exceeded for '{feature_code}'.")
+        except SymbolonException as e:
+            raise FeatureDenied(f"Failed to acquire feature '{feature_code}': {e}")
+
+    def release_feature(self, lease_id: str, feature_code: str) -> bool:
+        """Releases an acquired feature seat."""
+        url = f"{self.server_url}/v1/leases/{lease_id}/features/release"
+        payload = {"featureCode": feature_code}
+        try:
+            self._post_json(url, payload)
+            return True
+        except Exception:
+            return False
+
+    def get_features(self, lease_id: str) -> List[dict]:
+        """Gets currently active features held by the lease."""
+        url = f"{self.server_url}/v1/leases/{lease_id}/features"
+        req = urllib.request.Request(
+            url,
+            headers={
+                "User-Agent": "Symbolon-Python-SDK/1.0",
+                "traceparent": _generate_w3c_traceparent(),
+            },
+            method="GET",
+        )
+        try:
+            with urllib.request.urlopen(req, timeout=self.timeout) as res:
+                return json.loads(res.read().decode("utf-8"))
+        except Exception:
+            return []
+

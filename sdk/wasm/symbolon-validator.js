@@ -17,6 +17,7 @@
     // Also expose SymbolonOfflineValidator directly on window / root
     root.SymbolonOfflineValidator = root.SymbolonValidator.SymbolonOfflineValidator;
     root.generateBrowserFingerprint = root.SymbolonValidator.generateBrowserFingerprint;
+    root.checkFeatureEntitlement = root.SymbolonValidator.checkFeatureEntitlement;
   }
 }(typeof self !== 'undefined' ? self : this, function () {
   'use strict';
@@ -597,11 +598,36 @@
     }
   }
 
+  /**
+   * Helper to verify if a feature code is allowed by an active lease / license payload.
+   * Matches exact code, wildcard '*' or package suite inclusion.
+   * @param {Object} claims - Lease or license payload claims
+   * @param {string} featureCode - Feature code to check (e.g. 'FEA_SOLVER')
+   * @param {string} [requestedVersion] - Optional application module version
+   * @returns {boolean}
+   */
+  function checkFeatureEntitlement(claims, featureCode, requestedVersion) {
+    if (!claims || !featureCode) return false;
+    const code = featureCode.trim().toLowerCase();
+    const entitlements = claims.entitlements || claims.features || [];
+    if (entitlements.some(e => e.toLowerCase() === '*' || e.toLowerCase() === code)) {
+      return true;
+    }
+    if (claims.feature_map && claims.feature_map[code]) {
+      const allowedRange = claims.feature_map[code];
+      if (!requestedVersion || allowedRange === '*' || allowedRange === requestedVersion) {
+        return true;
+      }
+    }
+    return false;
+  }
+
   return {
     SymbolonOfflineValidator,
     ValidationResult,
     generateBrowserFingerprint,
     validateLic34Key,
-    unwrapPemArmor
+    unwrapPemArmor,
+    checkFeatureEntitlement
   };
 }));

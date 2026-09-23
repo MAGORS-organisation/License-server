@@ -27,3 +27,9 @@ class SeatAllocationDenied(SymbolonException):
 class ClockSkewDetected(SymbolonException):
     """Raised when client and server clocks diverge beyond acceptable window."""
     pass
+
+
+class FeatureDenied(SymbolonException):
+    """Raised when feature entitlement or concurrency limit is denied."""
+    pass
+

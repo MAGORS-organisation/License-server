@@ -99,6 +99,12 @@
                 </a>
             </li>
             <li class="nav-item">
+                <a class="nav-link" data-view="view-features">
+                    <span class="nav-icon">🧩</span>
+                    <span>Moduly &amp; Funkcie</span>
+                </a>
+            </li>
+            <li class="nav-item">
                 <a class="nav-link" data-view="view-system">
                     <span class="nav-icon">⚡</span>
                     <span>API &amp; Diagnostika</span>
@@ -1363,6 +1369,117 @@
                 </div>
             </section>
 
+            <!-- VIEW: Moduly & Funkcie (Dynamic Entitlements) -->
+            <section id="view-features" class="view-section" style="display: none;">
+                <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 24px;">
+                    <div>
+                        <h2 style="font-size: 20px; font-weight: 700; color: var(--text-primary); margin-bottom: 4px;">
+                            🧩 Dynamické Oprávnenia &amp; Katalóg Modulov
+                        </h2>
+                        <p style="color: var(--text-secondary); font-size: 13px;">
+                            Správa modulov, balíčkov (suites), verziových obmedzení a živé sledovanie obsadenosti plávajúcich sedadiel.
+                        </p>
+                    </div>
+                    <div style="display: flex; gap: 8px;">
+                        <button type="button" class="btn btn-secondary btn-sm" onclick="loadFeaturesView()">🔄 Obnoviť</button>
+                        <button type="button" class="btn btn-secondary btn-sm" onclick="openModal('modal-create-suite')">📦 Nový Balíček (Suite)</button>
+                        <button type="button" class="btn btn-primary btn-sm" onclick="openModal('modal-create-feature')">+ Nový Modul</button>
+                    </div>
+                </div>
+
+                <div class="kpi-grid">
+                    <div class="kpi-card" style="border-left: 3px solid var(--accent-cyan);">
+                        <div class="kpi-label">Registrované Moduly</div>
+                        <div class="kpi-value" id="feat-kpi-total">0</div>
+                        <div class="kpi-subtext">V katalógu funkcií</div>
+                    </div>
+                    <div class="kpi-card" style="border-left: 3px solid var(--accent-indigo);">
+                        <div class="kpi-label">Balíčky &amp; Suity</div>
+                        <div class="kpi-value" id="feat-kpi-suites">0</div>
+                        <div class="kpi-subtext">Agregované balíky modulov</div>
+                    </div>
+                    <div class="kpi-card" style="border-left: 3px solid var(--accent-emerald);">
+                        <div class="kpi-label">Aktívne Pridelené Sedadlá</div>
+                        <div class="kpi-value" id="feat-kpi-in-use">0</div>
+                        <div class="kpi-subtext">Živé floating alokácie</div>
+                    </div>
+                    <div class="kpi-card" style="border-left: 3px solid var(--accent-rose);">
+                        <div class="kpi-label">Zamietnuté Prístupy</div>
+                        <div class="kpi-value" id="feat-kpi-denials">0</div>
+                        <div class="kpi-subtext">Prekročená kapacita</div>
+                    </div>
+                </div>
+
+                <!-- Live Concurrency Meters / Gauges -->
+                <div class="table-card" style="margin-bottom: 24px;">
+                    <div class="table-header">
+                        <div>
+                            <div class="table-title">📊 Živá Obsadenosť Plávajúcich Modulov (Live Concurrency Gauges)</div>
+                            <div class="table-subtitle">Monitorovanie vyťaženia jednotlivých modulov a limitov v reálnom čase</div>
+                        </div>
+                    </div>
+                    <div style="padding: 16px;" id="feature-gauges-container">
+                        <div style="text-align: center; color: var(--text-muted); padding: 16px;">Načítavam merače obsadenosti...</div>
+                    </div>
+                </div>
+
+                <!-- Feature Catalog Table -->
+                <div class="table-card" style="margin-bottom: 24px;">
+                    <div class="table-header">
+                        <div>
+                            <div class="table-title">Katalóg Modulov a Funkcií (Feature Catalog)</div>
+                            <div class="table-subtitle">Zoznam všetkých definovaných modulov v systéme</div>
+                        </div>
+                    </div>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Kód</th>
+                                <th>Názov</th>
+                                <th>Produkt</th>
+                                <th>Typ</th>
+                                <th>Verziové Rozpätie</th>
+                                <th>Max Sedadlá</th>
+                                <th>Vytvorené</th>
+                                <th>Akcie</th>
+                            </tr>
+                        </thead>
+                        <tbody id="features-table-body">
+                            <tr>
+                                <td colspan="8" style="text-align: center; color: var(--text-muted); padding: 18px;">Načítavam katalóg modulov...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Package Suites Table -->
+                <div class="table-card">
+                    <div class="table-header">
+                        <div>
+                            <div class="table-title">Balíčky Modulov (Package Suites)</div>
+                            <div class="table-subtitle">Zoskupenia viacerých modulov pod jednotným licenčným kódom</div>
+                        </div>
+                    </div>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Kód Suity</th>
+                                <th>Názov</th>
+                                <th>Produkt</th>
+                                <th>Zahrnuté Moduly</th>
+                                <th>Vytvorené</th>
+                                <th>Akcie</th>
+                            </tr>
+                        </thead>
+                        <tbody id="suites-table-body">
+                            <tr>
+                                <td colspan="6" style="text-align: center; color: var(--text-muted); padding: 18px;">Načítavam balíčky...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
             <!-- VIEW 6: API & Diagnostika -->
             <section id="view-system" class="view-section">
                 <div class="kpi-grid">
@@ -1899,6 +2016,96 @@
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" onclick="closeModal('modal-set-rate')">Zrušiť</button>
                     <button type="submit" class="btn btn-primary">Uložiť Sadzbu</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal: Create Feature Definition -->
+    <div class="modal-overlay" id="modal-create-feature">
+        <div class="modal-box" style="max-width: 520px;">
+            <div class="modal-header">
+                <div class="modal-title">Nový Modul / Funkcia</div>
+                <button class="modal-close" onclick="closeModal('modal-create-feature')">&times;</button>
+            </div>
+            <form id="form-create-feature" onsubmit="createFeatureSubmit(event)">
+                <div class="form-group">
+                    <label class="form-label" for="feat-code">Kód Modulu (Unikátny identifikátor)</label>
+                    <input type="text" class="form-control" id="feat-code" required placeholder="napr. FEA_SOLVER, CAD_3D, GPU_ACCEL" style="text-transform: uppercase;">
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="feat-name">Názov Modulu</label>
+                    <input type="text" class="form-control" id="feat-name" required placeholder="napr. Finite Element Analysis Solver">
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="feat-product">Kód Produktu (voliteľné)</label>
+                    <input type="text" class="form-control" id="feat-product" placeholder="napr. cad-pro">
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="feat-description">Popis</label>
+                    <input type="text" class="form-control" id="feat-description" placeholder="Stručný popis modulu">
+                </div>
+                <div class="form-group" style="display: flex; gap: 12px;">
+                    <div style="flex: 1;">
+                        <label class="form-label" for="feat-min-ver">Min. Verzia (voliteľné)</label>
+                        <input type="text" class="form-control" id="feat-min-ver" placeholder="napr. 2025.0">
+                    </div>
+                    <div style="flex: 1;">
+                        <label class="form-label" for="feat-max-ver">Max. Verzia (voliteľné)</label>
+                        <input type="text" class="form-control" id="feat-max-ver" placeholder="napr. 2027.0">
+                    </div>
+                </div>
+                <div class="form-group" style="display: flex; gap: 12px; align-items: center;">
+                    <div style="flex: 1;">
+                        <label class="form-label" for="feat-max-seats">Predvolený Limit Sedadiel</label>
+                        <input type="number" class="form-control" id="feat-max-seats" min="1" placeholder="Prázdne = Neobmedzené">
+                    </div>
+                    <div style="flex: 1; padding-top: 20px;">
+                        <label style="cursor: pointer; display: flex; align-items: center; gap: 8px; font-size: 13px;">
+                            <input type="checkbox" id="feat-is-floating" checked> <strong>Plávajúce sedadlo (Floating)</strong>
+                        </label>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" onclick="closeModal('modal-create-feature')">Zrušiť</button>
+                    <button type="submit" class="btn btn-primary">Vytvoriť Modul</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal: Create Package Suite -->
+    <div class="modal-overlay" id="modal-create-suite">
+        <div class="modal-box" style="max-width: 520px;">
+            <div class="modal-header">
+                <div class="modal-title">Nový Balíček Modulov (Suite)</div>
+                <button class="modal-close" onclick="closeModal('modal-create-suite')">&times;</button>
+            </div>
+            <form id="form-create-suite" onsubmit="createSuiteSubmit(event)">
+                <div class="form-group">
+                    <label class="form-label" for="suite-code">Kód Balíčka</label>
+                    <input type="text" class="form-control" id="suite-code" required placeholder="napr. SUITE_ULTIMATE, BUNDLE_ENG" style="text-transform: uppercase;">
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="suite-name">Názov Balíčka</label>
+                    <input type="text" class="form-control" id="suite-name" required placeholder="napr. Ultimate Engineering Suite">
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="suite-product">Kód Produktu (voliteľné)</label>
+                    <input type="text" class="form-control" id="suite-product" placeholder="napr. cad-pro">
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="suite-features">Zahrnuté Moduly (oddelené čiarkou)</label>
+                    <input type="text" class="form-control" id="suite-features" required placeholder="CAD_3D, FEA_SOLVER, GPU_ACCEL">
+                    <div style="font-size: 11px; color: var(--text-muted); margin-top: 4px;">Pri checkoutovaní tohto balíčka sa automaticky aktivujú všetky uvedené moduly.</div>
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="suite-description">Popis</label>
+                    <input type="text" class="form-control" id="suite-description" placeholder="Stručný popis balíčka">
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" onclick="closeModal('modal-create-suite')">Zrušiť</button>
+                    <button type="submit" class="btn btn-primary">Vytvoriť Balíček</button>
                 </div>
             </form>
         </div>

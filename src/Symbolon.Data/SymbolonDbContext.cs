@@ -36,6 +36,10 @@ public class SymbolonDbContext : DbContext
     public DbSet<TokenRateEntity> TokenRates => Set<TokenRateEntity>();
     public DbSet<TokenReservationEntity> TokenReservations => Set<TokenReservationEntity>();
     public DbSet<TokenLedgerEntryEntity> TokenLedgerEntries => Set<TokenLedgerEntryEntity>();
+    public DbSet<FeatureDefinitionEntity> FeatureDefinitions => Set<FeatureDefinitionEntity>();
+    public DbSet<PackageSuiteEntity> PackageSuites => Set<PackageSuiteEntity>();
+    public DbSet<LicenseEntitlementEntity> LicenseEntitlements => Set<LicenseEntitlementEntity>();
+    public DbSet<ActiveFeatureLeaseEntity> ActiveFeatureLeases => Set<ActiveFeatureLeaseEntity>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -450,6 +454,72 @@ public class SymbolonDbContext : DbContext
              .WithMany(r => r.LedgerEntries)
              .HasForeignKey(e => e.ReservationId)
              .OnDelete(DeleteBehavior.SetNull);
+        });
+
+        // FeatureDefinition
+        modelBuilder.Entity<FeatureDefinitionEntity>(b =>
+        {
+            b.ToTable("feature_definitions");
+            b.HasKey(f => f.Id);
+            b.Property(f => f.TenantId).HasMaxLength(64).IsRequired();
+            b.Property(f => f.ProductId).HasMaxLength(64);
+            b.Property(f => f.Code).HasMaxLength(64).IsRequired();
+            b.Property(f => f.Name).HasMaxLength(128).IsRequired();
+            b.Property(f => f.Description).HasMaxLength(512);
+            b.Property(f => f.MinVersion).HasMaxLength(32);
+            b.Property(f => f.MaxVersion).HasMaxLength(32);
+            b.HasIndex(f => new { f.TenantId, f.Code }).IsUnique();
+            b.HasOne(f => f.Tenant).WithMany().HasForeignKey(f => f.TenantId).OnDelete(DeleteBehavior.Cascade);
+            b.HasOne(f => f.Product).WithMany().HasForeignKey(f => f.ProductId).OnDelete(DeleteBehavior.SetNull);
+        });
+
+        // PackageSuite
+        modelBuilder.Entity<PackageSuiteEntity>(b =>
+        {
+            b.ToTable("package_suites");
+            b.HasKey(s => s.Id);
+            b.Property(s => s.TenantId).HasMaxLength(64).IsRequired();
+            b.Property(s => s.ProductId).HasMaxLength(64);
+            b.Property(s => s.Code).HasMaxLength(64).IsRequired();
+            b.Property(s => s.Name).HasMaxLength(128).IsRequired();
+            b.Property(s => s.Description).HasMaxLength(512);
+            b.Property(s => s.FeatureCodesJson).HasMaxLength(4000).IsRequired();
+            b.HasIndex(s => new { s.TenantId, s.Code }).IsUnique();
+            b.HasOne(s => s.Tenant).WithMany().HasForeignKey(s => s.TenantId).OnDelete(DeleteBehavior.Cascade);
+            b.HasOne(s => s.Product).WithMany().HasForeignKey(s => s.ProductId).OnDelete(DeleteBehavior.SetNull);
+        });
+
+        // LicenseEntitlement
+        modelBuilder.Entity<LicenseEntitlementEntity>(b =>
+        {
+            b.ToTable("license_entitlements");
+            b.HasKey(e => e.Id);
+            b.Property(e => e.TenantId).HasMaxLength(64).IsRequired();
+            b.Property(e => e.LicenseId).HasMaxLength(64).IsRequired();
+            b.Property(e => e.FeatureCode).HasMaxLength(64).IsRequired();
+            b.Property(e => e.AllowedVersionRange).HasMaxLength(128);
+            b.Property(e => e.ParametersJson).HasMaxLength(4000);
+            b.HasIndex(e => new { e.LicenseId, e.FeatureCode }).IsUnique();
+            b.HasIndex(e => new { e.TenantId, e.FeatureCode });
+            b.HasOne(e => e.Tenant).WithMany().HasForeignKey(e => e.TenantId).OnDelete(DeleteBehavior.Cascade);
+            b.HasOne(e => e.License).WithMany(l => l.Entitlements).HasForeignKey(e => e.LicenseId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // ActiveFeatureLease
+        modelBuilder.Entity<ActiveFeatureLeaseEntity>(b =>
+        {
+            b.ToTable("active_feature_leases");
+            b.HasKey(a => a.Id);
+            b.Property(a => a.TenantId).HasMaxLength(64).IsRequired();
+            b.Property(a => a.LicenseId).HasMaxLength(64).IsRequired();
+            b.Property(a => a.LeaseId).HasMaxLength(128).IsRequired();
+            b.Property(a => a.FeatureCode).HasMaxLength(64).IsRequired();
+            b.Property(a => a.AcquiredVersion).HasMaxLength(32);
+            b.HasIndex(a => new { a.LeaseId, a.FeatureCode }).IsUnique();
+            b.HasIndex(a => new { a.LicenseId, a.FeatureCode });
+            b.HasIndex(a => a.ExpiresAt);
+            b.HasOne(a => a.Tenant).WithMany().HasForeignKey(a => a.TenantId).OnDelete(DeleteBehavior.Cascade);
+            b.HasOne(a => a.License).WithMany(l => l.ActiveFeatureLeases).HasForeignKey(a => a.LicenseId).OnDelete(DeleteBehavior.Cascade);
         });
 
         if (Database.IsSqlite())

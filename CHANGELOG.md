@@ -10,6 +10,30 @@ a projekt striktne dodržiava [Sémantické Verziovanie (Semantic Versioning 2.0
 ## [Unreleased]
 
 ### Pridané (Added)
+- **Dynamic Entitlements & Granular Feature Flagging Engine (Tiered Modules, Package Suites, Per-Feature Concurrency Limits, SDK RAII Context Managers, Web UI, CLI & Multi-Language SDK Integration)**:
+  - **Dátová a doménová vrstva (`FeatureDefinitionEntity`, `PackageSuiteEntity`, `LicenseEntitlementEntity`, `ActiveFeatureLeaseEntity`)**:
+    - Nezávislé kvóty sedadiel pre jednotlivé funkčné moduly a add-ony oddelené od kapacity hlavnej licencie podľa vzoru FlexNet/RLM/Sentinel RMS.
+    - Balíkové suity (Package Suites) s automatickou dekompozíciou a expanziou na dcérske moduly pri chekoute.
+    - Deterministický `VersionRangeMatcher` podporujúci verzie `*`, presnú zhodu, divokú kartu (napr. `2026.*`) a intervalové porovnávanie (`>= 2025.0 and <= 2027.0`).
+    - Atómové prideľovanie a uvoľňovanie sedadiel modulov v `EfFeatureEntitlementStore` s garanciou kapacity a automatickým cleanupom expirovaných prenájmov.
+  - **Protokol a REST API**:
+    - `POST /v1/leases/{id}/features/acquire` - Dynamická alokácia modulu za behu s kontrolou kvóty a kompatibility verzie bez nutnosti opätovného checkoutu celej aplikácie.
+    - `POST /v1/leases/{id}/features/release` - Explicitné uvoľnenie modulu späť do zdieľaného fondu.
+    - `GET /v1/leases/{id}/features` - Zoznam aktuálne držaných dynamických modulov pre daný lease.
+    - Kaskádové uvoľnenie všetkých modulov pri uvoľnení hlavného sedadla (`DELETE /v1/leases/{id}`).
+    - Plnohodnotná administrátorská správa na `/admin/v1/entitlements/features`, `/suites`, `/licenses/{id}`, `/usage`.
+  - **Multi-Language Client SDK Integrácie**:
+    - **C# SDK (`Symbolon.Client`)**: `FeatureLease` (`IAsyncDisposable`, `IDisposable`), `lease.HasFeature()`, `await using var feat = await lease.UseFeatureAsync("FEA_SOLVER")`, `lease.AcquireFeatureAsync()`, `lease.ReleaseFeatureAsync()`, `SymbolonFeatureDeniedException`.
+    - **Python SDK (`symbolon`)**: `FeatureLease` context manager, `lease.has_feature()`, `with lease.use_feature("FEA_SOLVER"):`, `lease.acquire_feature()`, `lease.release_feature()`, výnimka `FeatureDenied`.
+    - **Wasm SDK (`symbolon-validator.js`)**: Funkcia `checkFeatureEntitlement(claims, featureCode, requestedVersion)` pre offline validáciu modulov a suít.
+  - **CLI Nástroje (`symbolon features`)**:
+    - Príkazy `symbolon features list`, `create`, `delete`, `suites`, `create-suite`, `delete-suite`, `grant`, `usage` so Spectre.Console tabuľkami a live grafickými teplomermi vyťaženia.
+  - **Web Dashboard & Retro FoxPro TUI**:
+    - Moderný dashboard pohľad `view-features` so zobrazením live concurrency gauge meračov vyťaženia, katalógom modulov a balíkových suít a interaktívnymi modálmi pre vytvorenie.
+    - Retro FoxPro TUI ponuka `F[u]nkcie & Moduly` (klávesová skratka `U`) a katalóg modulov a suít v `Číselníkoch`.
+  - **Testovacie Pokrytie**:
+    - 298 .NET unit/integration testov naprieč všetkými 10 projektmi (100% pass rate), 14 Python SDK testov, 12 Wasm validator testov (celkovo 324 automatizovaných testov).
+
 - **Enterprise Webhook & Event Notification Engine (HMAC-SHA256, Slack/Teams Integration, Dead-Letter Queue & Automated License Expiration Lifecycle)**:
   - **Kryptografické HMAC-SHA256 Podpisy & Anti-Replay Ochrana (`WebhookSecurity`)**:
     - Generovanie štandardizovanej podpisovej hlavičky `X-Symbolon-Signature: t={timestamp},v1={hex_signature}`.

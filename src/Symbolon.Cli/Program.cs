@@ -53,6 +53,7 @@ internal static class Program
                 "K8S" or "OPERATOR" => await Commands.K8sCommands.HandleK8sAsync(args[1..]).ConfigureAwait(false),
                 "KMS" => await HandleKmsAsync(args[1..]).ConfigureAwait(false),
                 "TOKENS" or "CREDITS" => await Commands.TokenCommands.HandleTokensAsync(args[1..]).ConfigureAwait(false),
+                "FEATURES" or "ENTITLEMENTS" => await Commands.FeatureCommands.HandleFeaturesAsync(args[1..]).ConfigureAwait(false),
                 "MIGRATE" => await Commands.MigrateCommands.HandleMigrateAsync(args[1..]).ConfigureAwait(false),
                 "WEBHOOKS" or "WEBHOOK" => await Commands.WebhookCommands.HandleWebhooksAsync(args[1..]).ConfigureAwait(false),
                 _ => UnknownCommand(args[0])
@@ -692,6 +693,7 @@ internal static class Program
               k8s crd|export-license|generate-cluster   Kubernetes Operator CRD a GitOps licenčné manifesty
               kms status [--provider <env|azure|aws|pkcs11>] Stav Cloud KMS / HSM a správa hardvérových kľúčov
               tokens wallets|create|credit|rates|balance   Kreditové peňaženky a metered pay-as-you-go licencie
+              features list|create|suites|grant|usage   Granulárne moduly, balíčky a živé merače konkurencie
               migrate flexnet|options|log|keygen        Migračný nástroj a transpiler z FlexNet a Keygen.sh
               webhooks list|create|delete|test|deliveries Outbound webhooky, Slack/Teams alerty a DLQ replay
             """);

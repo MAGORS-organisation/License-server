@@ -11,6 +11,7 @@ using Symbolon.Crypto;
 using Symbolon.Data;
 using Symbolon.Data.Entities;
 using Symbolon.Domain;
+using Symbolon.Domain.Entitlements;
 using Symbolon.Domain.Security;
 using Symbolon.Domain.Webhooks;
 using Symbolon.Format;
@@ -36,6 +37,18 @@ public static class PublicEndpoints
         group.MapDelete("/leases/{id}", ReleaseAsync)
             .WithName("ReleaseLease")
             .WithSummary("Uvoľní pridelené sedadlo.");
+
+        group.MapPost("/leases/{id}/features/acquire", AcquireFeatureAsync)
+            .WithName("AcquireLeaseFeature")
+            .WithSummary("Vyžiada dynamickú licenciu/modul pre aktívny lease.");
+
+        group.MapPost("/leases/{id}/features/release", ReleaseFeatureAsync)
+            .WithName("ReleaseLeaseFeature")
+            .WithSummary("Uvoľní dynamickú licenciu/modul priradenú k danému lease.");
+
+        group.MapGet("/leases/{id}/features", GetLeaseFeaturesAsync)
+            .WithName("GetLeaseFeatures")
+            .WithSummary("Vráti zoznam aktívnych modulov/funkcií držaných daným lease.");
 
         group.MapPost("/leases/{id}/borrow", BorrowAsync)
             .WithName("BorrowLease")
@@ -85,6 +98,7 @@ public static class PublicEndpoints
         HttpContext context,
         SymbolonDbContext db,
         LeaseEngine engine,
+        FeatureEntitlementEngine featureEngine,
         Queuing.IQueueManager queueManager,
         Webhooks.IWebhookDispatcher webhooks,
         TimeProvider time,
@@ -197,12 +211,16 @@ public static class PublicEndpoints
         int quantity = dto.Quantity ?? 1;
         var ttl = TimeSpan.FromSeconds(license.Policy?.LeaseTtlSeconds ?? 600);
 
+        var expandedFeatures = dto.Features is { Count: > 0 }
+            ? await featureEngine.ExpandFeaturesAsync(license.TenantId, dto.Features, ct).ConfigureAwait(false)
+            : (dto.Features ?? ["core"]);
+
         var cmd = new CheckoutCommand(
             license.Id,
             fingerprint,
             dto.MachineId,
             quantity,
-            dto.Features,
+            expandedFeatures,
             idempotencyKey,
             dto.AllowQueue ?? false,
             ttl);
@@ -230,7 +248,22 @@ public static class PublicEndpoints
                 }
                 await db.SaveChangesAsync(ct).ConfigureAwait(false);
             }
-            var entitlements = dto.Features ?? ["core"];
+
+            if (dto.Features is { Count: > 0 } && !string.IsNullOrWhiteSpace(alloc.LeaseId))
+            {
+                foreach (var feat in expandedFeatures)
+                {
+                    var req = new FeatureAcquisitionRequest(
+                        LeaseId: alloc.LeaseId,
+                        LicenseId: license.Id,
+                        TenantId: license.TenantId,
+                        FeatureCode: feat,
+                        Version: null,
+                        Ttl: ttl);
+                    await featureEngine.AcquireFeatureAsync(req, ct).ConfigureAwait(false);
+                }
+            }
+
             activity?.SetTag(SymbolonTracing.TagLeaseId, alloc.LeaseId ?? string.Empty);
             activity?.SetStatus(ActivityStatusCode.Ok);
             return TypedResults.Ok(new CheckoutResponseDto
@@ -239,7 +272,7 @@ public static class PublicEndpoints
                 Token = result.Tokens[0],
                 ExpiresAt = alloc.ExpiresAt,
                 Seat = alloc.SeatNo,
-                Entitlements = entitlements
+                Entitlements = expandedFeatures
             });
         }
 
@@ -374,6 +407,7 @@ public static class PublicEndpoints
         string id,
         SymbolonDbContext db,
         LeaseEngine engine,
+        FeatureEntitlementEngine featureEngine,
         Queuing.IQueueManager queueManager,
         Observability.SymbolonMetrics metrics,
         CancellationToken ct)
@@ -387,6 +421,7 @@ public static class PublicEndpoints
         bool released = await engine.ReleaseAsync(id, ct).ConfigureAwait(false);
         if (released)
         {
+            await featureEngine.ReleaseAllFeaturesForLeaseAsync(id, ct).ConfigureAwait(false);
             metrics.RecordSeatReleased(1);
             if (!string.IsNullOrWhiteSpace(licenseId))
             {
@@ -399,6 +434,127 @@ public static class PublicEndpoints
             activity?.SetStatus(ActivityStatusCode.Error, "Release failed");
         }
         return TypedResults.Ok(new ReleaseResponseDto { Success = released });
+    }
+
+    private static async Task<IResult> AcquireFeatureAsync(
+        string id,
+        AcquireFeatureRequestDto dto,
+        SymbolonDbContext db,
+        FeatureEntitlementEngine featureEngine,
+        TimeProvider time,
+        CancellationToken ct)
+    {
+        ArgumentNullException.ThrowIfNull(dto);
+        if (string.IsNullOrWhiteSpace(dto.FeatureCode))
+        {
+            return TypedResults.Problem(
+                statusCode: StatusCodes.Status400BadRequest,
+                title: "Invalid Feature Code",
+                detail: "Feature code cannot be empty.",
+                type: ProblemTypes.InvalidRequest);
+        }
+
+        var now = time.GetUtcNow();
+        var seat = await db.Seats
+            .Include(s => s.License)
+            .FirstOrDefaultAsync(s => s.LeaseId == id, ct)
+            .ConfigureAwait(false);
+
+        if (seat is null || !seat.ExpiresAt.HasValue || seat.ExpiresAt.Value <= now)
+        {
+            return TypedResults.Problem(
+                statusCode: StatusCodes.Status404NotFound,
+                title: "Lease Not Found or Expired",
+                detail: $"No active lease found with ID '{id}'.",
+                type: ProblemTypes.LeaseUnknown);
+        }
+
+        var leaseRemaining = seat.ExpiresAt.Value - now;
+        var ttl = dto.TtlSeconds.HasValue && dto.TtlSeconds.Value > 0
+            ? TimeSpan.FromSeconds(Math.Min(dto.TtlSeconds.Value, leaseRemaining.TotalSeconds))
+            : leaseRemaining;
+
+        string tenantId = seat.License?.TenantId ?? "default";
+
+        var req = new FeatureAcquisitionRequest(
+            LeaseId: id,
+            LicenseId: seat.LicenseId,
+            TenantId: tenantId,
+            FeatureCode: dto.FeatureCode,
+            Version: dto.Version,
+            Ttl: ttl);
+
+        var result = await featureEngine.AcquireFeatureAsync(req, ct).ConfigureAwait(false);
+
+        var response = new FeatureAcquisitionResponseDto
+        {
+            Success = result.Success,
+            FeatureCode = result.FeatureCode,
+            Version = result.Version,
+            Reason = result.Reason,
+            InUse = result.InUse,
+            MaxSeats = result.MaxSeats
+        };
+
+        if (result.Success)
+        {
+            return TypedResults.Ok(response);
+        }
+
+        return TypedResults.Problem(
+            statusCode: StatusCodes.Status409Conflict,
+            title: "Feature Acquisition Denied",
+            detail: result.Reason ?? "Unable to acquire feature seat.",
+            type: ProblemTypes.FeatureCapacityExceeded);
+    }
+
+    private static async Task<IResult> ReleaseFeatureAsync(
+        string id,
+        ReleaseFeatureRequestDto dto,
+        FeatureEntitlementEngine featureEngine,
+        CancellationToken ct)
+    {
+        ArgumentNullException.ThrowIfNull(dto);
+        if (string.IsNullOrWhiteSpace(dto.FeatureCode))
+        {
+            return TypedResults.Problem(
+                statusCode: StatusCodes.Status400BadRequest,
+                title: "Invalid Feature Code",
+                detail: "Feature code cannot be empty.",
+                type: ProblemTypes.InvalidRequest);
+        }
+
+        var result = await featureEngine.ReleaseFeatureAsync(id, dto.FeatureCode, ct).ConfigureAwait(false);
+        var response = new ReleaseFeatureResponseDto
+        {
+            Success = result.Success,
+            FeatureCode = result.FeatureCode,
+            Reason = result.Reason
+        };
+
+        if (result.Success)
+        {
+            return TypedResults.Ok(response);
+        }
+
+        return TypedResults.NotFound(response);
+    }
+
+    private static async Task<IResult> GetLeaseFeaturesAsync(
+        string id,
+        IFeatureEntitlementStore store,
+        CancellationToken ct)
+    {
+        var activeFeatures = await store.GetActiveFeaturesForLeaseAsync(id, ct).ConfigureAwait(false);
+        var dtoList = activeFeatures.Select(f => new ActiveFeatureInfoDto
+        {
+            FeatureCode = f.FeatureCode,
+            Version = f.AcquiredVersion,
+            AcquiredAt = f.AcquiredAt,
+            ExpiresAt = f.ExpiresAt
+        }).ToList();
+
+        return TypedResults.Ok(dtoList);
     }
 
     private static async Task<IResult> BorrowAsync(

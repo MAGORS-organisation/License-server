@@ -98,6 +98,8 @@ public sealed class LicenseEntity
     public ICollection<QueueTicketEntity> QueueTickets { get; set; } = new List<QueueTicketEntity>();
     public ICollection<LicenseQuotaEntity> Quotas { get; set; } = new List<LicenseQuotaEntity>();
     public ICollection<TokenWalletEntity> TokenWallets { get; set; } = new List<TokenWalletEntity>();
+    public ICollection<LicenseEntitlementEntity> Entitlements { get; set; } = new List<LicenseEntitlementEntity>();
+    public ICollection<ActiveFeatureLeaseEntity> ActiveFeatureLeases { get; set; } = new List<ActiveFeatureLeaseEntity>();
 }
 
 public sealed class SeatEntity
@@ -443,5 +445,73 @@ public sealed class TokenLedgerEntryEntity
     public TokenWalletEntity? Wallet { get; set; }
     public TokenReservationEntity? Reservation { get; set; }
 }
+
+public sealed class FeatureDefinitionEntity
+{
+    public string Id { get; set; } = string.Empty;
+    public string TenantId { get; set; } = string.Empty;
+    public string? ProductId { get; set; }
+    public string Code { get; set; } = string.Empty;
+    public string Name { get; set; } = string.Empty;
+    public string? Description { get; set; }
+    public string? MinVersion { get; set; }
+    public string? MaxVersion { get; set; }
+    public bool IsFloating { get; set; } = true;
+    public int? DefaultMaxSeats { get; set; }
+    public DateTimeOffset CreatedAt { get; set; }
+    public DateTimeOffset UpdatedAt { get; set; }
+
+    public Tenant? Tenant { get; set; }
+    public Product? Product { get; set; }
+}
+
+public sealed class PackageSuiteEntity
+{
+    public string Id { get; set; } = string.Empty;
+    public string TenantId { get; set; } = string.Empty;
+    public string? ProductId { get; set; }
+    public string Code { get; set; } = string.Empty;
+    public string Name { get; set; } = string.Empty;
+    public string? Description { get; set; }
+    public string FeatureCodesJson { get; set; } = "[]";
+    public DateTimeOffset CreatedAt { get; set; }
+    public DateTimeOffset UpdatedAt { get; set; }
+
+    public Tenant? Tenant { get; set; }
+    public Product? Product { get; set; }
+}
+
+public sealed class LicenseEntitlementEntity
+{
+    public string Id { get; set; } = string.Empty;
+    public string TenantId { get; set; } = string.Empty;
+    public string LicenseId { get; set; } = string.Empty;
+    public string FeatureCode { get; set; } = string.Empty;
+    public int? MaxSeats { get; set; }
+    public string? AllowedVersionRange { get; set; }
+    public bool IsEnabled { get; set; } = true;
+    public string? ParametersJson { get; set; }
+    public DateTimeOffset CreatedAt { get; set; }
+    public DateTimeOffset UpdatedAt { get; set; }
+
+    public Tenant? Tenant { get; set; }
+    public LicenseEntity? License { get; set; }
+}
+
+public sealed class ActiveFeatureLeaseEntity
+{
+    public string Id { get; set; } = string.Empty;
+    public string TenantId { get; set; } = string.Empty;
+    public string LicenseId { get; set; } = string.Empty;
+    public string LeaseId { get; set; } = string.Empty;
+    public string FeatureCode { get; set; } = string.Empty;
+    public string? AcquiredVersion { get; set; }
+    public DateTimeOffset AcquiredAt { get; set; }
+    public DateTimeOffset ExpiresAt { get; set; }
+
+    public Tenant? Tenant { get; set; }
+    public LicenseEntity? License { get; set; }
+}
+
 
 

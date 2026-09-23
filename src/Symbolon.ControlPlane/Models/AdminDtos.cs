@@ -253,4 +253,30 @@ public sealed record ApiKeyResponseDto(
     DateTimeOffset CreatedAt,
     string? SecretKey = null);
 
+public sealed record CreateFeatureDto(
+    [Required, MaxLength(64)] string Code,
+    [Required, MaxLength(128)] string Name,
+    string? ProductId = null,
+    string? Description = null,
+    string? MinVersion = null,
+    string? MaxVersion = null,
+    bool IsFloating = true,
+    int? DefaultMaxSeats = null);
+
+public sealed record CreatePackageSuiteDto(
+    [Required, MaxLength(64)] string Code,
+    [Required, MaxLength(128)] string Name,
+    [Required] IReadOnlyList<string> FeatureCodes,
+    string? ProductId = null,
+    string? Description = null);
+
+public sealed record SetLicenseEntitlementDto(
+    [Required, MaxLength(64)] string FeatureCode,
+    int? MaxSeats = null,
+    string? AllowedVersionRange = null,
+    bool IsEnabled = true,
+    string? ParametersJson = null);
+
+
+
 

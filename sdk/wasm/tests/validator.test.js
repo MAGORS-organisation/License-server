@@ -4,7 +4,8 @@ const {
   SymbolonOfflineValidator,
   generateBrowserFingerprint,
   validateLic34Key,
-  unwrapPemArmor
+  unwrapPemArmor,
+  checkFeatureEntitlement
 } = require('../symbolon-validator.js');
 
 // Helper to Base64Url encode string or Uint8Array/ArrayBuffer
@@ -255,3 +256,34 @@ test('SymbolonOfflineValidator - unwrapPemArmor extracts inner token', () => {
   assert.equal(unwrapPemArmor(pem), rawToken);
   assert.equal(unwrapPemArmor(rawToken), rawToken);
 });
+
+test('checkFeatureEntitlement - Validates features, wildcards and version matches', () => {
+  // 1. Direct entitlement match
+  const claims1 = { entitlements: ['CAD_3D', 'FEA_SOLVER'] };
+  assert.equal(checkFeatureEntitlement(claims1, 'CAD_3D'), true);
+  assert.equal(checkFeatureEntitlement(claims1, 'cad_3d'), true);
+  assert.equal(checkFeatureEntitlement(claims1, 'CAM_POST'), false);
+
+  // 2. Wildcard all-access match
+  const claims2 = { entitlements: ['*'] };
+  assert.equal(checkFeatureEntitlement(claims2, 'ANY_FEATURE_XYZ'), true);
+
+  // 3. Feature map with version constraints
+  const claims3 = {
+    features: ['BASE_UI'],
+    feature_map: {
+      'fea_solver': '2026.1',
+      'cam_post': '*'
+    }
+  };
+  assert.equal(checkFeatureEntitlement(claims3, 'fea_solver', '2026.1'), true);
+  assert.equal(checkFeatureEntitlement(claims3, 'fea_solver', '2025.4'), false);
+  assert.equal(checkFeatureEntitlement(claims3, 'cam_post', 'any-version'), true);
+  assert.equal(checkFeatureEntitlement(claims3, 'non_existent'), false);
+
+  // 4. Null / empty claims handling
+  assert.equal(checkFeatureEntitlement(null, 'CAD_3D'), false);
+  assert.equal(checkFeatureEntitlement(claims1, null), false);
+  assert.equal(checkFeatureEntitlement(claims1, ''), false);
+});
+

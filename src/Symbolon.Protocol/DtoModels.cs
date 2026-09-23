@@ -282,6 +282,82 @@ public sealed record ServerTelemetryDto(
     [property: JsonPropertyName("uptimeSeconds")] long UptimeSeconds,
     [property: JsonPropertyName("activeSeats")] long ActiveSeats);
 
+public sealed record AcquireFeatureRequestDto
+{
+    [Required]
+    [JsonPropertyName("featureCode")]
+    public required string FeatureCode { get; init; }
+
+    [JsonPropertyName("version")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Version { get; init; }
+
+    [JsonPropertyName("ttlSeconds")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public int? TtlSeconds { get; init; }
+}
+
+public sealed record FeatureAcquisitionResponseDto
+{
+    [JsonPropertyName("success")]
+    public required bool Success { get; init; }
+
+    [JsonPropertyName("featureCode")]
+    public required string FeatureCode { get; init; }
+
+    [JsonPropertyName("version")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Version { get; init; }
+
+    [JsonPropertyName("reason")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Reason { get; init; }
+
+    [JsonPropertyName("inUse")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public int? InUse { get; init; }
+
+    [JsonPropertyName("maxSeats")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public int? MaxSeats { get; init; }
+}
+
+public sealed record ReleaseFeatureRequestDto
+{
+    [Required]
+    [JsonPropertyName("featureCode")]
+    public required string FeatureCode { get; init; }
+}
+
+public sealed record ReleaseFeatureResponseDto
+{
+    [JsonPropertyName("success")]
+    public required bool Success { get; init; }
+
+    [JsonPropertyName("featureCode")]
+    public required string FeatureCode { get; init; }
+
+    [JsonPropertyName("reason")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Reason { get; init; }
+}
+
+public sealed record ActiveFeatureInfoDto
+{
+    [JsonPropertyName("featureCode")]
+    public required string FeatureCode { get; init; }
+
+    [JsonPropertyName("version")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Version { get; init; }
+
+    [JsonPropertyName("acquiredAt")]
+    public required DateTimeOffset AcquiredAt { get; init; }
+
+    [JsonPropertyName("expiresAt")]
+    public required DateTimeOffset ExpiresAt { get; init; }
+}
+
 public static class ProblemTypes
 {
     public const string LicenseNotFound = "https://symbolon.dev/errors/license-not-found";
@@ -293,6 +369,8 @@ public static class ProblemTypes
     public const string InvalidRequest = "https://symbolon.dev/errors/invalid-request";
     public const string UserNotAuthorized = "https://symbolon.dev/errors/user-not-authorized";
     public const string QuotaExhausted = "https://symbolon.dev/errors/quota-exhausted";
+    public const string FeatureDenied = "https://symbolon.dev/errors/feature-denied";
+    public const string FeatureCapacityExceeded = "https://symbolon.dev/errors/feature-capacity-exceeded";
     public const string Unauthorized = "https://symbolon.dev/errors/unauthorized";
     public const string Forbidden = "https://symbolon.dev/errors/forbidden";
 }

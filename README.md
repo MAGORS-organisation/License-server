@@ -2,7 +2,7 @@
 
 [![Platform](https://img.shields.io/badge/.NET-10.0%20LTS-512BD4?logo=dotnet)](https://dotnet.microsoft.com/)
 [![Language](https://img.shields.io/badge/C%23-14.0-239120?logo=csharp)](https://learn.microsoft.com/dotnet/csharp/)
-[![Tests](https://img.shields.io/badge/tests-280%20passed%20(+13%20Python%2C%20+11%20Wasm)-brightgreen)](#výsledky-testovania)
+[![Tests](https://img.shields.io/badge/tests-298%20passed%20(+14%20Python%2C%20+12%20Wasm)-brightgreen)](#výsledky-testovania)
 [![License: AGPL-3.0](https://img.shields.io/badge/license-AGPL--3.0-blue.svg)](LICENSE)
 [![License: Apache-2.0](https://img.shields.io/badge/client%20SDK-Apache--2.0-blue.svg)](LICENSES/Apache-2.0.txt)
 [![CRA Compliant](https://img.shields.io/badge/CRA%20Compliance-EU%202024%2F2847-success)](SECURITY.md)
@@ -138,6 +138,12 @@ Rieši to, čo dnešné cloud-first platformy ponúkajú iba ako obmedzený dopl
     - **Engine pre Životný Cyklus Licencií (`LicenseLifecycleEngine`)**: Automatické monitorovanie a vyhodnocovanie expirácie licencií (`ExpiringSoon`, `SoftGrace`, `HardGrace`, `Expired`, `Perpetual`) s generovaním systémových alertov (`license.expiring_soon`, `license.grace_entered`, `license.expired`).
     - **Udalosťami Riadené Notifikácie (Event Hooking)**: Automatické odosielanie notifikácií pri zamietnutí sedadiel (`lease.denied`), detekcii bezpečnostných anomálií a klonovania (`fraud.detected`) a nízkom stave kreditových peňaženiek (`token.threshold_low`).
     - **CLI & Web Dashboard**: Kompletná sada príkazov `symbolon webhooks list|create|delete|test|deliveries|replay|lifecycle`, živý KPI panel doručení, filter pre DLQ a manuálna kontrola expirácií.
+30. **Dynamic Entitlements & Granular Feature Flagging Engine (Tiered Modules, Package Suites & RAII Context Managers)**
+    - **Nezávislé kvóty sedadiel modulov**: Nezávislé concurrency limity pre funkčné moduly a add-ony oddelené od kapacity hlavnej licencie podľa vzoru FlexNet/RLM/Sentinel RMS.
+    - **Balíkové suity (Package Suites)**: Automatická dekompozícia suít na dcérske moduly pri checkoutoch s deterministickou kontrolou verzií (`*`, `2026.*`, intervaly `>= 2025.0 and <= 2027.0`).
+    - **Dynamická alokácia za behu**: Získavanie a uvoľňovanie funkcií za behu bez nutnosti re-checkoutu hlavného sedadla aplikácie (`POST /v1/leases/{id}/features/acquire`, `POST /v1/leases/{id}/features/release`, `GET /v1/leases/{id}/features`).
+    - **RAII Správa v SDK**: Plná integrácia do C# (`await using var feat = await lease.UseFeatureAsync("FEA_SOLVER")`) a Pythonu (`with lease.use_feature("FEA_SOLVER"):`) s garantovaným uvoľnením zdrojov.
+    - **Live Concurrency Teplomery & FoxPro TUI**: Grafické gauge merače vyťaženia modulov, katalóg balíkov a suít vo webovom paneli aj v retro FoxPro TUI (klávesová skratka `U`).
 
 ---
 
@@ -321,6 +327,9 @@ dotnet run --project src/Symbolon.Cli -- doctor --file license.symlic --key ./my
 - `POST /v1/leases` — získanie plávajúceho sedadla (checkout) a vydanie podpísaného JWS lease tokenu.
 - `POST /v1/leases/{id}/renew` — predĺženie platnosti sedadla (heartbeat) s kontrolou seq monotónnosti.
 - `DELETE /v1/leases/{id}` — okamžité uvoľnenie sedadla.
+- `POST /v1/leases/{id}/features/acquire` — dynamická alokácia funkčného modulu / add-onu za behu s kontrolou kvóty.
+- `POST /v1/leases/{id}/features/release` — explicitné uvoľnenie funkčného modulu späť do fondu sedadiel.
+- `GET /v1/leases/{id}/features` — zoznam aktívne držaných modulov pre daný lease.
 - `POST /v1/leases/{id}/borrow` — vypožičanie sedadla pre offline roaming na $N$ dní.
 - `POST /v1/activations` — node-lock aktivácia viazaná na hardvérový fingerprint stanice.
 - `DELETE /v1/activations/{id}` — uvoľnenie node-lock aktivácie.
@@ -338,6 +347,12 @@ dotnet run --project src/Symbolon.Cli -- doctor --file license.symlic --key ./my
 - `POST /admin/v1/policies` — definícia licenčných šablón (TTL, grace periódy, borrow limity).
 - `POST /admin/v1/licenses` — vydanie licencie s materializáciou $N$ sedadiel a generovaním Crockford Base32 kľúča.
 - `POST /admin/v1/licenses/{id}/revoke` — okamžitá revokácia licencie.
+- `GET /admin/v1/entitlements/features` — zoznam definícií funkcií a modulov.
+- `POST /admin/v1/entitlements/features` — registrácia nového funkčného modulu.
+- `GET /admin/v1/entitlements/suites` — zoznam balíkových suít modulov.
+- `POST /admin/v1/entitlements/suites` — vytvorenie balíkovej suity modulov.
+- `POST /admin/v1/entitlements/licenses/{id}` — priradenie modulu a kvóty k licencii.
+- `GET /admin/v1/entitlements/usage` — live telemetria vyťaženia modulov a súbehu sedadiel.
 - `GET /admin/v1/keys` — inventár podpisových kľúčov (aktívne, deprecované a revokované).
 - `POST /admin/v1/keys/rotate` — bezvýpadková rotácia nového podpisového kľúča (ES256 / hybrid).
 - `POST /admin/v1/keys/{kid}/revoke` — okamžitá revokácia kompromitovaného kľúča a jeho vyradenie z JWKS.
@@ -369,19 +384,19 @@ Všetkých 10 testovacích projektov má 100% úspešnosť testov bez zlyhania:
 Passed!  - Failed: 0, Passed: 28, Skipped: 0, Total: 28 - Symbolon.Crypto.Tests.dll
 Passed!  - Failed: 0, Passed: 37, Skipped: 0, Total: 37 - Symbolon.Format.Tests.dll
 Passed!  - Failed: 0, Passed: 16, Skipped: 0, Total: 16 - Symbolon.Protocol.Tests.dll
-Passed!  - Failed: 0, Passed: 56, Skipped: 0, Total: 56 - Symbolon.Domain.Tests.dll
+Passed!  - Failed: 0, Passed: 65, Skipped: 0, Total: 65 - Symbolon.Domain.Tests.dll
 Passed!  - Failed: 0, Passed:  9, Skipped: 0, Total:  9 - Symbolon.Relay.Tests.dll
-Passed!  - Failed: 0, Passed: 11, Skipped: 0, Total: 11 - Symbolon.Client.Tests.dll
+Passed!  - Failed: 0, Passed: 14, Skipped: 0, Total: 14 - Symbolon.Client.Tests.dll
 Passed!  - Failed: 0, Passed: 24, Skipped: 0, Total: 24 - Symbolon.Cli.Tests.dll
-Passed!  - Failed: 0, Passed: 13, Skipped: 0, Total: 13 - Symbolon.Data.Tests.dll
+Passed!  - Failed: 0, Passed: 17, Skipped: 0, Total: 17 - Symbolon.Data.Tests.dll
 Passed!  - Failed: 0, Passed:  8, Skipped: 0, Total:  8 - Symbolon.Operator.Tests.dll
-Passed!  - Failed: 0, Passed: 78, Skipped: 0, Total: 78 - Symbolon.ControlPlane.Tests.dll
+Passed!  - Failed: 0, Passed: 80, Skipped: 0, Total: 80 - Symbolon.ControlPlane.Tests.dll
 
 Viacjazyčné SDK & WebAssembly testovacie sady:
-Passed!  - Failed: 0, Passed: 13, Skipped: 0, Total: 13 - Python SDK (unittest)
-Passed!  - Failed: 0, Passed: 11, Skipped: 0, Total: 11 - WebAssembly / WebCrypto SDK (node:test)
+Passed!  - Failed: 0, Passed: 14, Skipped: 0, Total: 14 - Python SDK (unittest)
+Passed!  - Failed: 0, Passed: 12, Skipped: 0, Total: 12 - WebAssembly / WebCrypto SDK (node:test)
 
-Celkovo: 304 úspešných automatizovaných testov (280 .NET + 13 Python + 11 Node/Wasm), 0 zlyhaní, 0 chýb.
+Celkovo: 324 úspešných automatizovaných testov (298 .NET + 14 Python + 12 Node/Wasm), 0 zlyhaní, 0 chýb.
 ```
 
 ---

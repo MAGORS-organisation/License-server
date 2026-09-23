@@ -77,6 +77,60 @@ class TestSymbolonPythonSdk(unittest.TestCase):
         int(parts[1], 16)
         int(parts[2], 16)
 
+    def test_has_feature_and_use_feature_raii(self):
+        from datetime import datetime, timezone
+        from symbolon.models import LeaseToken, FeatureDenied
+        from symbolon.client import SymbolonClient, SeatLease
+
+        client = SymbolonClient("http://localhost:5000", "test-product")
+        token = LeaseToken(
+            lease_id="lse_test_features",
+            token_jwt="jwt.token",
+            seat_number=1,
+            expires_at=datetime.now(timezone.utc),
+            entitlements=["CORE_CAD"]
+        )
+        lease = SeatLease(client, token)
+
+        # Baseline entitlement check
+        self.assertTrue(lease.has_feature("CORE_CAD"))
+        self.assertTrue(lease.has_feature("core_cad"))
+        self.assertFalse(lease.has_feature("FEA_SOLVER"))
+
+        acquired = []
+        released = []
+
+        def mock_acquire_feature(lease_id, code, version=None, ttl_seconds=None):
+            if code == "DENIED_MOD":
+                raise FeatureDenied("Capacity exceeded")
+            acquired.append((lease_id, code, version))
+            return {"success": True, "featureCode": code}
+
+        def mock_release_feature(lease_id, code):
+            released.append((lease_id, code))
+            return True
+
+        client.acquire_feature = mock_acquire_feature
+        client.release_feature = mock_release_feature
+
+        # Test RAII context manager
+        with lease.use_feature("FEA_SOLVER", version="2026.1") as feat:
+            self.assertEqual(feat.feature_code, "FEA_SOLVER")
+            self.assertEqual(feat.version, "2026.1")
+            self.assertTrue(lease.has_feature("FEA_SOLVER"))
+            self.assertEqual(len(acquired), 1)
+            self.assertEqual(len(released), 0)
+
+        # After exiting context manager, feature must be released
+        self.assertEqual(len(released), 1)
+        self.assertFalse(lease.has_feature("FEA_SOLVER"))
+
+        # Test denied feature raises FeatureDenied
+        with self.assertRaises(FeatureDenied):
+            with lease.use_feature("DENIED_MOD"):
+                pass
+
 
 if __name__ == "__main__":
     unittest.main()
+
