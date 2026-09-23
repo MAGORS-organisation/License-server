@@ -1,4 +1,5 @@
 using Symbolon.Client.Discovery;
+using Symbolon.Client.Revocation;
 using Symbolon.Crypto;
 using Symbolon.Format;
 
@@ -36,4 +37,9 @@ public sealed class SymbolonClientOptions
     public TimeSpan HeartbeatInterval { get; init; } = TimeSpan.FromMinutes(4);
     public TimeSpan GracePeriod { get; init; } = TimeSpan.FromHours(4);
     public IReadOnlyDictionary<string, string>? CustomFingerprint { get; init; }
+
+    /// <summary>
+    /// Optional revocation cache instance for real-time revocation enforcement (RVL-12 to RVL-16).
+    /// </summary>
+    public RevocationCache? RevocationCache { get; init; }
 }

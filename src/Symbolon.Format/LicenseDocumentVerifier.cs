@@ -27,6 +27,11 @@ public sealed class SymbolonVerifierOptions
     public TimeSpan ClockSkewTolerance { get; init; } = TimeSpan.FromMinutes(5);
     public long HighWaterMarkIat { get; init; }
     public string? ExpectedAudience { get; init; }
+
+    /// <summary>
+    /// Optional revocation predicate or lookup to reject revoked license IDs (LIC-31).
+    /// </summary>
+    public Func<string, bool>? IsLicenseRevoked { get; init; }
 }
 
 public sealed record VerificationResult(
@@ -273,7 +278,14 @@ public sealed class LicenseDocumentVerifier
             return VerificationResult.Fail("replayed-older-document");
         }
 
-        // ---- Step 5: License state & audience (LIC-13, LIC-17) ---------------
+        // ---- Step 5: License state & audience (LIC-13, LIC-17, LIC-31) ------
+        if (_options.IsLicenseRevoked is not null &&
+            (_options.IsLicenseRevoked(claims.Sub) ||
+             (claims.Symlic.License.Key is not null && _options.IsLicenseRevoked(claims.Symlic.License.Key))))
+        {
+            return VerificationResult.Fail($"revoked-license:{claims.Sub}");
+        }
+
         if (!string.Equals(claims.Symlic.License.State, "active", StringComparison.OrdinalIgnoreCase))
         {
             return VerificationResult.Fail($"license-not-active:{claims.Symlic.License.State}");

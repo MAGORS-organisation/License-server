@@ -58,6 +58,9 @@ function initNavigation() {
                 if (targetView === "view-features") {
                     loadFeaturesView();
                 }
+                if (targetView === "view-revocations") {
+                    loadRevocationsView();
+                }
             }
         });
     });
@@ -81,7 +84,8 @@ async function refreshAllData() {
         loadTransparencyRoot(),
         loadMeshAndAlerts(),
         loadScimDirectory(),
-        loadFeaturesView()
+        loadFeaturesView(),
+        loadRevocationsView()
     ]);
 }
 
@@ -2940,4 +2944,129 @@ async function deleteSuite(id) {
         showToast("Chyba: " + e.message, "error");
     }
 }
+
+// ==========================================
+// Revocations & CRL Management (Phase 17)
+// ==========================================
+async function loadRevocationsView() {
+    try {
+        const res = await fetch("/admin/v1/revocations");
+        if (!res.ok) {
+            console.error("Chyba pri načítaní revokácií:", res.status);
+            return;
+        }
+
+        const revs = await res.json();
+
+        // Update KPIs
+        const totalEl = document.getElementById("rev-kpi-total");
+        if (totalEl) totalEl.textContent = revs.length;
+
+        let maxSeq = 0;
+        let licensesCount = 0;
+        let keysHwCount = 0;
+
+        for (const r of revs) {
+            if (r.sequence > maxSeq) maxSeq = r.sequence;
+            if (r.subjectType === "license") {
+                licensesCount++;
+            } else {
+                keysHwCount++;
+            }
+        }
+
+        const seqEl = document.getElementById("rev-kpi-seq");
+        if (seqEl) seqEl.textContent = `#${maxSeq}`;
+
+        const licEl = document.getElementById("rev-kpi-licenses");
+        if (licEl) licEl.textContent = licensesCount;
+
+        const hwEl = document.getElementById("rev-kpi-keys-hw");
+        if (hwEl) hwEl.textContent = keysHwCount;
+
+        // Render Table
+        const tbody = document.getElementById("revocations-table-body");
+        if (!tbody) return;
+
+        if (revs.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="5" style="text-align: center; color: var(--text-muted); padding: 18px;">Žiadne aktívne revokácie. CRL zoznam je čistý.</td></tr>`;
+            return;
+        }
+
+        tbody.innerHTML = revs.map(r => {
+            let typeBadge = "";
+            switch (r.subjectType) {
+                case "license":
+                    typeBadge = `<span class="badge badge-rose" style="font-weight: bold;">license</span>`;
+                    break;
+                case "machine":
+                    typeBadge = `<span class="badge" style="background: rgba(168, 85, 247, 0.15); color: #c084fc;">machine</span>`;
+                    break;
+                case "kid":
+                case "key":
+                    typeBadge = `<span class="badge badge-amber">kid (kľúč)</span>`;
+                    break;
+                case "relay":
+                    typeBadge = `<span class="badge badge-cyan">relay</span>`;
+                    break;
+                case "lease":
+                    typeBadge = `<span class="badge badge-indigo">lease</span>`;
+                    break;
+                default:
+                    typeBadge = `<span class="badge">${escapeHtml(r.subjectType)}</span>`;
+                    break;
+            }
+
+            const revokedDate = r.revokedAt ? new Date(r.revokedAt).toLocaleString("sk-SK") : "-";
+
+            return `
+                <tr>
+                    <td><strong style="color: var(--accent-emerald); font-family: monospace;">#${r.sequence}</strong></td>
+                    <td>${typeBadge}</td>
+                    <td><code style="font-family: monospace; font-size: 12px; color: var(--text-primary);">${escapeHtml(r.subjectId)}</code></td>
+                    <td><span style="color: var(--text-secondary);">${escapeHtml(r.reason || "neuvedený")}</span></td>
+                    <td style="font-size: 12px; color: var(--text-muted);">${revokedDate}</td>
+                </tr>
+            `;
+        }).join("");
+    } catch (e) {
+        console.error("Chyba pri načítaní revokácií:", e);
+    }
+}
+
+async function createRevocationSubmit(event) {
+    event.preventDefault();
+    const typeEl = document.getElementById("rev-type");
+    const idEl = document.getElementById("rev-id");
+    const reasonEl = document.getElementById("rev-reason");
+
+    const payload = {
+        subjectType: typeEl.value,
+        subjectId: idEl.value.trim(),
+        reason: reasonEl.value.trim() || null
+    };
+
+    try {
+        const res = await fetch("/admin/v1/revocations", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload)
+        });
+
+        if (!res.ok) {
+            const err = await res.text();
+            showToast("Chyba pri revokácii: " + err, "error");
+            return;
+        }
+
+        const data = await res.json();
+        showToast(`Subjekt ${data.subjectId} bol úspešne revokovaný (seq #${data.sequence}).`, "success");
+        closeModal("modal-create-revocation");
+        event.target.reset();
+        await loadRevocationsView();
+    } catch (e) {
+        showToast("Chyba spojenia: " + e.message, "error");
+    }
+}
+
 

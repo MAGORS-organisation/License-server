@@ -204,6 +204,7 @@ public class SymbolonDbContext : DbContext
             b.Property(r => r.SubjectType).HasMaxLength(32).IsRequired();
             b.Property(r => r.SubjectId).HasMaxLength(128).IsRequired();
             b.HasIndex(r => new { r.TenantId, r.SubjectType, r.SubjectId });
+            b.HasIndex(r => new { r.TenantId, r.Sequence });
             b.HasOne(r => r.Tenant)
              .WithMany(t => t.Revocations)
              .HasForeignKey(r => r.TenantId)

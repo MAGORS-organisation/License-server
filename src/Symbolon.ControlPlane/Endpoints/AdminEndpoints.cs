@@ -46,6 +46,10 @@ public static class AdminEndpoints
         group.MapPost("/keys/rotate", RotateKeyAsync).WithName("RotateKey");
         group.MapPost("/keys/{kid}/revoke", RevokeKeyAsync).WithName("RevokeKey");
 
+        // Revocation List Management
+        group.MapGet("/revocations", GetRevocationsAdminAsync).WithName("GetRevocationsAdmin");
+        group.MapPost("/revocations", CreateRevocationAdminAsync).WithName("CreateRevocationAdmin");
+
         // Named Users & Options
         group.MapPost("/licenses/{id}/users", AssignLicenseUserAsync).WithName("AssignLicenseUser");
         group.MapGet("/licenses/{id}/users", GetLicenseUsersAsync).WithName("GetLicenseUsers");
@@ -443,6 +447,7 @@ public static class AdminEndpoints
         license.State = "revoked";
 
         var now = time.GetUtcNow();
+        long nextSeq = (await db.Revocations.MaxAsync(r => (long?)r.Sequence, ct).ConfigureAwait(false) ?? 0) + 1;
         var rev = new RevocationEntity
         {
             Id = $"rev_{Guid.NewGuid():N}",
@@ -450,7 +455,8 @@ public static class AdminEndpoints
             SubjectType = "license",
             SubjectId = license.Id,
             Reason = dto.Reason,
-            RevokedAt = now
+            RevokedAt = now,
+            Sequence = nextSeq
         };
         db.Revocations.Add(rev);
 
@@ -944,4 +950,91 @@ public static class AdminEndpoints
 
         return TypedResults.Ok(users);
     }
+
+    private static async Task<IResult> GetRevocationsAdminAsync(
+        SymbolonDbContext db,
+        CancellationToken ct)
+    {
+        var revs = await db.Revocations
+            .OrderByDescending(r => r.Sequence)
+            .Take(100)
+            .ToListAsync(ct)
+            .ConfigureAwait(false);
+
+        return TypedResults.Ok(revs);
+    }
+
+    private static async Task<IResult> CreateRevocationAdminAsync(
+        CreateRevocationDto dto,
+        HttpContext context,
+        SymbolonDbContext db,
+        IAuditLedger audit,
+        Webhooks.IWebhookDispatcher webhooks,
+        TimeProvider time,
+        CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(dto.SubjectType) || string.IsNullOrWhiteSpace(dto.SubjectId))
+        {
+            return TypedResults.Problem(
+                statusCode: StatusCodes.Status400BadRequest,
+                title: "Invalid Revocation Request",
+                detail: "SubjectType and SubjectId are required.",
+                type: Symbolon.Protocol.ProblemTypes.InvalidRequest);
+        }
+
+        string? tenantId = GetEffectiveTenantFilter(context) ?? "default";
+        var now = time.GetUtcNow();
+        long nextSeq = (await db.Revocations.MaxAsync(r => (long?)r.Sequence, ct).ConfigureAwait(false) ?? 0) + 1;
+
+        var rev = new RevocationEntity
+        {
+            Id = $"rev_{Guid.NewGuid():N}",
+            TenantId = tenantId,
+            SubjectType = dto.SubjectType.Trim().ToLowerInvariant(),
+            SubjectId = dto.SubjectId.Trim(),
+            Reason = dto.Reason?.Trim() ?? "Administrative revocation",
+            RevokedAt = now,
+            Sequence = nextSeq
+        };
+
+        db.Revocations.Add(rev);
+
+        // If license, update state
+        if (rev.SubjectType == "license")
+        {
+            var lic = await db.Licenses.FirstOrDefaultAsync(l => l.Id == rev.SubjectId, ct).ConfigureAwait(false);
+            if (lic is not null)
+            {
+                lic.State = "revoked";
+            }
+        }
+        else if (rev.SubjectType is "kid" or "key")
+        {
+            var keyEntity = await db.SigningKeys.FirstOrDefaultAsync(k => k.Kid == rev.SubjectId, ct).ConfigureAwait(false);
+            if (keyEntity is not null)
+            {
+                keyEntity.State = "revoked";
+            }
+        }
+
+        await db.SaveChangesAsync(ct).ConfigureAwait(false);
+
+        await audit.AppendAsync(new AuditEvent($"{rev.SubjectType}.revoked", rev.SubjectId, null, null, now, rev.Reason), ct).ConfigureAwait(false);
+        await webhooks.PublishEventAsync("revocation.created", new
+        {
+            revocationId = rev.Id,
+            subjectType = rev.SubjectType,
+            subjectId = rev.SubjectId,
+            sequence = rev.Sequence,
+            reason = rev.Reason,
+            revokedAt = now
+        }, tenantId, ct).ConfigureAwait(false);
+
+        return TypedResults.Created($"/admin/v1/revocations/{rev.Id}", rev);
+    }
 }
+
+public sealed record CreateRevocationDto(
+    string SubjectType,
+    string SubjectId,
+    string? Reason = null);

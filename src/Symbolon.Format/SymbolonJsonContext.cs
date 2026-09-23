@@ -24,6 +24,11 @@ namespace Symbolon.Format;
 [JsonSerializable(typeof(JwsProtectedHeader))]
 [JsonSerializable(typeof(JsonWebKeyDto))]
 [JsonSerializable(typeof(JsonWebKeySetDto))]
+[JsonSerializable(typeof(RevocationListClaims))]
+[JsonSerializable(typeof(RevocationPayload))]
+[JsonSerializable(typeof(RevocationItem))]
+[JsonSerializable(typeof(List<RevocationItem>))]
+[JsonSerializable(typeof(IReadOnlyList<RevocationItem>))]
 public sealed partial class SymbolonJsonContext : JsonSerializerContext
 {
 }

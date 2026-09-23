@@ -191,6 +191,7 @@ public sealed class RevocationEntity
     public string SubjectId { get; set; } = string.Empty;
     public string Reason { get; set; } = string.Empty;
     public DateTimeOffset RevokedAt { get; set; }
+    public long Sequence { get; set; }
 
     public Tenant? Tenant { get; set; }
 }

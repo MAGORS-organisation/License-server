@@ -68,7 +68,11 @@ public static class PublicEndpoints
 
         group.MapGet("/revocations/latest", GetRevocationsAsync)
             .WithName("GetRevocations")
-            .WithSummary("Vráti zoznam aktívnych revokácií.");
+            .WithSummary("Vráti zoznam aktívnych revokácií (.symrl a JSON metadata).");
+
+        group.MapGet("/revocations/latest.symrl", GetRevocationsSymrlAsync)
+            .WithName("GetRevocationsSymrl")
+            .WithSummary("Stiahne kryptograficky podpísaný .symrl revokačný zoznam.");
 
         group.MapGet("/.well-known/symbolon-keys", GetJwks)
             .WithName("GetJwks")
@@ -760,16 +764,117 @@ public static class PublicEndpoints
     }
 
     private static async Task<IResult> GetRevocationsAsync(
+        long? since,
         SymbolonDbContext db,
+        ISignatureProvider signingKey,
+        TimeProvider time,
         CancellationToken ct)
     {
-        var revs = await db.Revocations
-            .OrderByDescending(r => r.RevokedAt)
-            .Take(100)
-            .ToListAsync(ct)
-            .ConfigureAwait(false);
+        long currentMaxSeq = await db.Revocations.MaxAsync(r => (long?)r.Sequence, ct).ConfigureAwait(false) ?? 0;
+        bool full = true;
+        List<RevocationEntity> revs;
 
-        return TypedResults.Ok(revs);
+        if (since.HasValue && since.Value >= 0 && since.Value <= currentMaxSeq)
+        {
+            full = false;
+            revs = await db.Revocations
+                .Where(r => r.Sequence > since.Value)
+                .OrderBy(r => r.Sequence)
+                .ToListAsync(ct)
+                .ConfigureAwait(false);
+        }
+        else
+        {
+            revs = await db.Revocations
+                .OrderBy(r => r.Sequence)
+                .ToListAsync(ct)
+                .ConfigureAwait(false);
+        }
+
+        var now = time.GetUtcNow().ToUnixTimeSeconds();
+        var items = revs.Select(r => new RevocationItem(
+            T: r.SubjectType == "key" ? RevocationItem.TypeKid : r.SubjectType,
+            Id: r.SubjectId,
+            At: r.RevokedAt.ToUnixTimeSeconds(),
+            Reason: string.IsNullOrWhiteSpace(r.Reason) ? null : r.Reason
+        )).ToList();
+
+        var claims = new RevocationListClaims(
+            Iss: "symbolon:control-plane",
+            Iat: now,
+            Exp: now + 86400,
+            Symrl: new RevocationPayload(
+                V: 1,
+                Seq: currentMaxSeq,
+                Full: full,
+                Since: full ? null : since,
+                Revoked: items
+            )
+        );
+
+        var signer = new RevocationListSigner([signingKey]);
+        string pem = signer.Sign(claims);
+
+        return TypedResults.Ok(new
+        {
+            pem,
+            claims
+        });
+    }
+
+    private static async Task<IResult> GetRevocationsSymrlAsync(
+        long? since,
+        SymbolonDbContext db,
+        ISignatureProvider signingKey,
+        TimeProvider time,
+        CancellationToken ct)
+    {
+        long currentMaxSeq = await db.Revocations.MaxAsync(r => (long?)r.Sequence, ct).ConfigureAwait(false) ?? 0;
+        bool full = true;
+        List<RevocationEntity> revs;
+
+        if (since.HasValue && since.Value >= 0 && since.Value <= currentMaxSeq)
+        {
+            full = false;
+            revs = await db.Revocations
+                .Where(r => r.Sequence > since.Value)
+                .OrderBy(r => r.Sequence)
+                .ToListAsync(ct)
+                .ConfigureAwait(false);
+        }
+        else
+        {
+            revs = await db.Revocations
+                .OrderBy(r => r.Sequence)
+                .ToListAsync(ct)
+                .ConfigureAwait(false);
+        }
+
+        var now = time.GetUtcNow().ToUnixTimeSeconds();
+        var items = revs.Select(r => new RevocationItem(
+            T: r.SubjectType == "key" ? RevocationItem.TypeKid : r.SubjectType,
+            Id: r.SubjectId,
+            At: r.RevokedAt.ToUnixTimeSeconds(),
+            Reason: string.IsNullOrWhiteSpace(r.Reason) ? null : r.Reason
+        )).ToList();
+
+        var claims = new RevocationListClaims(
+            Iss: "symbolon:control-plane",
+            Iat: now,
+            Exp: now + 86400,
+            Symrl: new RevocationPayload(
+                V: 1,
+                Seq: currentMaxSeq,
+                Full: full,
+                Since: full ? null : since,
+                Revoked: items
+            )
+        );
+
+        var signer = new RevocationListSigner([signingKey]);
+        string pem = signer.Sign(claims);
+
+        return TypedResults.Content(pem, "application/x-pem-file");
     }
 
     private static async Task<IResult> GetJwks(

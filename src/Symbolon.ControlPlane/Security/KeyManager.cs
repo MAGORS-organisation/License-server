@@ -181,14 +181,16 @@ public sealed class KeyManager : IDisposable
 
             keyEntity.State = "revoked";
 
+            long nextSeq = (await _db.Revocations.MaxAsync(r => (long?)r.Sequence, ct).ConfigureAwait(false) ?? 0) + 1;
             var revocation = new RevocationEntity
             {
                 Id = $"rev_{Guid.NewGuid():N}",
                 TenantId = keyEntity.TenantId,
-                SubjectType = "key",
+                SubjectType = "kid",
                 SubjectId = kid,
                 Reason = reason,
-                RevokedAt = _time.GetUtcNow()
+                RevokedAt = _time.GetUtcNow(),
+                Sequence = nextSeq
             };
 
             _db.Revocations.Add(revocation);

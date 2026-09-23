@@ -57,6 +57,7 @@ internal static class Program
                 "MIGRATE" => await Commands.MigrateCommands.HandleMigrateAsync(args[1..]).ConfigureAwait(false),
                 "WEBHOOKS" or "WEBHOOK" => await Commands.WebhookCommands.HandleWebhooksAsync(args[1..]).ConfigureAwait(false),
                 "DISCOVER" or "SERVERS" => await Commands.DiscoverCommands.HandleDiscoverAsync(args[1..]).ConfigureAwait(false),
+                "REVOCATIONS" or "REVOCATION" or "CRL" => await Commands.RevocationCommands.HandleRevocationsAsync(args[1..]).ConfigureAwait(false),
                 _ => UnknownCommand(args[0])
             };
         }
@@ -698,6 +699,7 @@ internal static class Program
               migrate flexnet|options|log|keygen        Migračný nástroj a transpiler z FlexNet a Keygen.sh
               webhooks list|create|delete|test|deliveries Outbound webhooky, Slack/Teams alerty a DLQ replay
               discover | servers [resolve]              Zero-Config detekcia serverov cez UDP broadcast a riešenie SYMBOLON_LICENSE_SERVER
+              revocations fetch|inspect|revoke|list     Kryptografické revokačné zoznamy (.symrl), delta sync a CRL správa
             """);
     }
 }

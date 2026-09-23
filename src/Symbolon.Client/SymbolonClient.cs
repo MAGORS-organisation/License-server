@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.Net.Http.Json;
 using Microsoft.Extensions.Logging;
 using Symbolon.Client.Discovery;
+using Symbolon.Client.Revocation;
 using Symbolon.Format;
 using Symbolon.Protocol;
 using Symbolon.Protocol.Tracing;
@@ -19,10 +20,12 @@ public sealed class SymbolonClient : IDisposable
     private readonly ServerFailoverPool _failoverPool;
     private readonly bool _ownsPool;
     private readonly LeaseTokenVerifier? _verifier;
+    private readonly RevocationCache _revocationCache;
     private readonly IReadOnlyDictionary<string, string> _fingerprint;
     private readonly ILogger? _log;
 
     public ServerFailoverPool FailoverPool => _failoverPool;
+    public RevocationCache RevocationCache => _revocationCache;
 
     public SymbolonClient(SymbolonClientOptions options, ILogger? log = null)
     {
@@ -95,6 +98,7 @@ public sealed class SymbolonClient : IDisposable
             _verifier = new LeaseTokenVerifier(options.TrustedKeys, options.TimeProvider);
         }
 
+        _revocationCache = options.RevocationCache ?? new RevocationCache(options.TrustedKeys);
         _fingerprint = options.CustomFingerprint ?? DeviceFingerprint.Collect();
     }
 
@@ -107,6 +111,20 @@ public sealed class SymbolonClient : IDisposable
     {
         using var activity = SymbolonTracing.ActivitySource.StartActivity(SymbolonTracing.OpCheckout);
         activity?.SetTag(SymbolonTracing.TagLicenseId, _options.LicenseKey);
+
+        // Pre-flight revocation check (RVL-12, RVL-13)
+        if (_revocationCache.IsLicenseRevoked(_options.LicenseKey, out var revokedLicense))
+        {
+            activity?.SetStatus(ActivityStatusCode.Error, "License revoked");
+            throw new SymbolonRevocationException(revokedLicense);
+        }
+
+        string machineFpHash = FingerprintHelper.ComputeHash(_fingerprint);
+        if (_revocationCache.IsMachineRevoked(machineFpHash, out var revokedMachine))
+        {
+            activity?.SetStatus(ActivityStatusCode.Error, "Machine revoked");
+            throw new SymbolonRevocationException(revokedMachine);
+        }
 
         var checkoutDto = new CheckoutRequestDto
         {
@@ -149,6 +167,12 @@ public sealed class SymbolonClient : IDisposable
                 }
 
                 activity?.SetTag(SymbolonTracing.TagLeaseId, body.LeaseId);
+
+                if (_revocationCache.IsLeaseRevoked(body.LeaseId, out var revokedLease))
+                {
+                    activity?.SetStatus(ActivityStatusCode.Error, "Lease revoked");
+                    throw new SymbolonRevocationException(revokedLease);
+                }
 
                 // Verify the token if trusted keys are configured
                 if (_verifier is not null)
@@ -283,6 +307,25 @@ public sealed class SymbolonClient : IDisposable
         catch (SymbolonFailoverExhaustedException ex)
         {
             activity?.SetStatus(ActivityStatusCode.Error, ex.Message);
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Synchronizes the client's revocation cache with the cluster using the failover pool.
+    /// </summary>
+    public async Task<bool> SyncRevocationsAsync(RevocationListVerifier verifier, CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(verifier);
+        try
+        {
+            return await _failoverPool.ExecuteWithFailoverAsync(async (serverUri, http, token) =>
+            {
+                return await _revocationCache.SyncAsync(http, serverUri, verifier, token).ConfigureAwait(false);
+            }, ct).ConfigureAwait(false);
+        }
+        catch (SymbolonFailoverExhaustedException)
+        {
             return false;
         }
     }

@@ -33,6 +33,7 @@
         { id: 'tokens', label: 'Tokeny & Kredity', hotkey: 'E', view: 'view-tokens', hasSub: false },
         { id: 'migrate', label: 'Migrácia (FlexNet)', hotkey: 'I', view: 'view-migrate', hasSub: false },
         { id: 'features', label: 'F[u]nkcie & Moduly', hotkey: 'U', view: 'view-features', hasSub: false },
+        { id: 'revocations', label: 'Revokácie & CRL', hotkey: 'X', view: 'view-revocations', hasSub: false },
         { id: 'webhooky', label: 'Webhooky', hotkey: 'W', view: 'view-webhooks', hasSub: false },
         { isSeparator: true },
         { id: 'sulad', label: 'Súlad & CRA / SBOM', hotkey: 'S', view: 'view-system', hasSub: false },
@@ -82,6 +83,7 @@
                 <li class="retro-menu-item" onclick="switchRetroView('view-tokens')" tabindex="0">Tok<span class="hotkey">e</span>ny</li>
                 <li class="retro-menu-item" onclick="switchRetroView('view-migrate')" tabindex="0">M<span class="hotkey">i</span>grácia</li>
                 <li class="retro-menu-item" onclick="switchRetroView('view-webhooks')" tabindex="0"><span class="hotkey">W</span>ebhooky</li>
+                <li class="retro-menu-item" onclick="switchRetroView('view-revocations')" tabindex="0">Revo<span class="hotkey">k</span>ácie</li>
                 <li class="retro-menu-item" onclick="switchRetroView('view-system')" tabindex="0"><span class="hotkey">S</span>úlad CRA</li>
                 <li class="retro-menu-item" onclick="openModal('modal-auth-config')" tabindex="0">K<span class="hotkey">o</span>nfigurácia</li>
             </ul>
@@ -181,6 +183,7 @@
                 <button class="fkey-btn" onclick="switchRetroView('view-airgap')"><span class="fkey-badge">F7</span> AirGap</button>
                 <button class="fkey-btn" onclick="switchRetroView('view-webhooks')"><span class="fkey-badge">F8</span> Webhook</button>
                 <button class="fkey-btn" onclick="switchRetroView('view-system')"><span class="fkey-badge">F9</span> Súlad</button>
+                <button class="fkey-btn" onclick="switchRetroView('view-revocations')"><span class="fkey-badge">F11</span> Revokácie</button>
                 <button class="fkey-btn" onclick="toggleMainMenu()"><span class="fkey-badge">F10</span> Menu</button>
                 <button class="fkey-btn" onclick="handleEscKey()"><span class="fkey-badge">ESC</span> Späť</button>
             </div>
@@ -323,6 +326,10 @@
                 case 'F9':
                     e.preventDefault();
                     switchRetroView('view-system');
+                    return;
+                case 'F11':
+                    e.preventDefault();
+                    switchRetroView('view-revocations');
                     return;
                 case 'F10':
                 case 'Alt':
@@ -601,6 +608,7 @@
             'view-system': 'CYBER RESILIENCE ACT (CRA) & CYCLONEDX SBOM',
             'view-apikeys': 'SPRÁVA API KĽÚČOV & MERKLE STROM INTEGRITA',
             'view-features': 'GRANULÁRNE MODULY, BALÍKOVÉ SUITY & MERAČE VYŤAŽENIA',
+            'view-revocations': 'KRYPTOGRAFICKÝ REVOKAČNÝ ZOZNAM (.SYMRL) & ENTERPRISE CRL',
             'view-tokens': 'KREDITOVÉ PEŇAŽENKY & PAY-AS-YOU-GO SPOTREBA',
             'view-migrate': 'MIGRÁCIA Z FLEXNET PUBLISHER (FLEXLM) & KEYGEN.SH',
             'view-scim': 'SCIM 2.0 IDENTITA & FIREMNÁ SYNCHRONIZÁCIA'
@@ -625,6 +633,9 @@
         if (hash === 'features' || hash === 'moduly') {
             switchRetroView('view-features');
             if (typeof window.loadFeaturesView === 'function') window.loadFeaturesView();
+        } else if (hash === 'revocations' || hash === 'crl') {
+            switchRetroView('view-revocations');
+            if (typeof window.loadRevocationsView === 'function') window.loadRevocationsView();
         } else if (hash === 'licenses' || hash === 'licencie') {
             switchRetroView('view-licenses');
         } else if (hash === 'keys' || hash === 'kluce') {

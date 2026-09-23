@@ -24,4 +24,5 @@ public sealed record JwsProtectedHeader(
     [property: JsonPropertyName("kid")] string Kid,
     [property: JsonPropertyName("typ")] string Typ,
     [property: JsonPropertyName("crit")] IReadOnlyList<string>? Crit = null,
-    [property: JsonPropertyName("symlic")] string? Symlic = null);
+    [property: JsonPropertyName("symlic")] string? Symlic = null,
+    [property: JsonPropertyName("symrl")] string? Symrl = null);

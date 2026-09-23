@@ -105,6 +105,12 @@
                 </a>
             </li>
             <li class="nav-item">
+                <a class="nav-link" data-view="view-revocations">
+                    <span class="nav-icon">⛔</span>
+                    <span>Revokácie &amp; CRL</span>
+                </a>
+            </li>
+            <li class="nav-item">
                 <a class="nav-link" data-view="view-system">
                     <span class="nav-icon">⚡</span>
                     <span>API &amp; Diagnostika</span>
@@ -1480,6 +1486,73 @@
                 </div>
             </section>
 
+            <!-- VIEW: Revokácie & CRL (.symrl) -->
+            <section id="view-revocations" class="view-section">
+                <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 24px;">
+                    <div>
+                        <h2 style="font-size: 20px; font-weight: 700; color: var(--text-primary); margin-bottom: 4px;">
+                            ⛔ Kryptografické Revokácie (.symrl) &amp; Enterprise CRL
+                        </h2>
+                        <p style="color: var(--text-secondary); font-size: 13px;">
+                            Okamžité zneplatnenie licencií, kompromitovaných podpisových kľúčov (kid), odcudzených strojov a rogue relay uzlov.
+                        </p>
+                    </div>
+                    <div style="display: flex; gap: 8px;">
+                        <button type="button" class="btn btn-secondary btn-sm" onclick="loadRevocationsView()">🔄 Obnoviť</button>
+                        <a href="/v1/revocations/latest.symrl" download="latest.symrl" class="btn btn-secondary btn-sm">📥 Stiahnuť .symrl (CRL)</a>
+                        <button type="button" class="btn btn-primary btn-sm" onclick="openModal('modal-create-revocation')">+ Nová Revokácia</button>
+                    </div>
+                </div>
+
+                <div class="kpi-grid">
+                    <div class="kpi-card" style="border-left: 3px solid var(--accent-rose);">
+                        <div class="kpi-label">Celkovo Revokácií</div>
+                        <div class="kpi-value" id="rev-kpi-total">0</div>
+                        <div class="kpi-subtext">Aktívne záznamy v CRL</div>
+                    </div>
+                    <div class="kpi-card" style="border-left: 3px solid var(--accent-emerald);">
+                        <div class="kpi-label">Posledná Sekvencia (seq)</div>
+                        <div class="kpi-value" id="rev-kpi-seq">#0</div>
+                        <div class="kpi-subtext">Monotónne počítadlo verzií</div>
+                    </div>
+                    <div class="kpi-card" style="border-left: 3px solid var(--accent-amber);">
+                        <div class="kpi-label">Revokované Licencie</div>
+                        <div class="kpi-value" id="rev-kpi-licenses">0</div>
+                        <div class="kpi-subtext">Zablokované licenčné kľúče</div>
+                    </div>
+                    <div class="kpi-card" style="border-left: 3px solid var(--accent-indigo);">
+                        <div class="kpi-label">Revokované Kľúče &amp; Hardvér</div>
+                        <div class="kpi-value" id="rev-kpi-keys-hw">0</div>
+                        <div class="kpi-subtext">kid, machine, relay, lease</div>
+                    </div>
+                </div>
+
+                <div class="table-card">
+                    <div class="table-header">
+                        <div>
+                            <div class="table-title">Zoznam Aktívnych Revokácií (Enterprise CRL Tabuľka)</div>
+                            <div class="table-subtitle">Záznamy distribuované klientom cez endpoint /v1/revocations/latest s delta synchronizáciou</div>
+                        </div>
+                    </div>
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th style="width: 70px;">Sekvencia</th>
+                                <th style="width: 100px;">Typ Subjektu</th>
+                                <th>Identifikátor Subjektu</th>
+                                <th>Dôvod Revokácie</th>
+                                <th style="width: 170px;">Dátum Revokácie</th>
+                            </tr>
+                        </thead>
+                        <tbody id="revocations-table-body">
+                            <tr>
+                                <td colspan="5" style="text-align: center; color: var(--text-muted); padding: 18px;">Načítavam revokácie...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
             <!-- VIEW 6: API & Diagnostika -->
             <section id="view-system" class="view-section">
                 <div class="kpi-grid">
@@ -2106,6 +2179,40 @@
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" onclick="closeModal('modal-create-suite')">Zrušiť</button>
                     <button type="submit" class="btn btn-primary">Vytvoriť Balíček</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal: Nová Revokácia -->
+    <div class="modal-overlay" id="modal-create-revocation">
+        <div class="modal-box">
+            <div class="modal-header">
+                <div class="modal-title">Nová Revokácia (Zneplatnenie Subjektu)</div>
+                <button class="modal-close" onclick="closeModal('modal-create-revocation')">&times;</button>
+            </div>
+            <form id="form-create-revocation" onsubmit="createRevocationSubmit(event)">
+                <div class="form-group">
+                    <label class="form-label" for="rev-type">Typ Subjektu</label>
+                    <select class="form-control" id="rev-type" required>
+                        <option value="license">Licencia (license)</option>
+                        <option value="machine">Hardvérový Stroj (machine)</option>
+                        <option value="kid">Podpisový Kľúč (kid)</option>
+                        <option value="relay">Relay Uzol (relay)</option>
+                        <option value="lease">Lease Relácia (lease)</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="rev-id">Identifikátor (ID / Fingerprint / kid)</label>
+                    <input type="text" class="form-control" id="rev-id" required placeholder="napr. lic_01JQ..., SYM-4K7..., fp_hash, k-prod-2026">
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="rev-reason">Dôvod Revokácie</label>
+                    <input type="text" class="form-control" id="rev-reason" placeholder="napr. Kompromitácia privátneho kľúča, nezaplatená faktúra, odcudzený notebook">
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" onclick="closeModal('modal-create-revocation')">Zrušiť</button>
+                    <button type="submit" class="btn btn-primary" style="background: var(--accent-rose); border-color: var(--accent-rose);">Revokovať Subjekt</button>
                 </div>
             </form>
         </div>
