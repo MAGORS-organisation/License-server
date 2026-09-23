@@ -21,18 +21,24 @@
   --retro-font: 'Consolas', 'Courier New', 'Lucida Console', Monaco, monospace;
 }
 
-/* Reset a základné nastavenia plochy */
 body {
   font-family: var(--retro-font) !important;
   background-color: var(--retro-desktop) !important;
   color: var(--retro-text-dark) !important;
-  margin: 0;
-  padding: 0;
-  height: 100vh;
-  overflow: hidden;
-  user-select: none;
+  margin: 0 !important;
+  padding: 0 !important;
+  height: 100vh !important;
+  width: 100vw !important;
+  overflow: hidden !important;
+  user-select: none !important;
   -webkit-font-smoothing: none;
   -moz-osx-font-smoothing: grayscale;
+  display: flex !important;
+  flex-direction: column !important;
+}
+
+.main-wrapper {
+  display: none !important;
 }
 
 /* Horná lišta FoxPro Menu */
@@ -434,11 +440,22 @@ tr.selected td,
 /* Retro Dialógové Okná (Modaly) */
 .modal-overlay,
 .retro-modal-overlay {
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  width: 100vw !important;
+  height: 100vh !important;
   background-color: rgba(0, 0, 0, 0.45) !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  z-index: 9999 !important;
 }
 
 .modal-box,
 .retro-modal-box {
+  width: 620px !important;
+  max-width: 92vw !important;
   background-color: var(--retro-panel-bg) !important;
   border: 3px solid var(--retro-panel-border) !important;
   box-shadow: var(--retro-shadow) !important;
@@ -516,3 +533,14 @@ input:focus, select:focus, textarea:focus,
   padding: 0 !important;
   overflow: hidden !important;
 }
+
+.view-section {
+  display: none !important;
+}
+
+.view-section.active {
+  display: block !important;
+  height: 100% !important;
+  overflow-y: auto !important;
+}
+

@@ -37,3 +37,10 @@ __pycache__/
 *.py[cod]
 *$py.class
 .pytest_cache/
+
+## SQLite & Local Databases
+*.db
+*.db-shm
+*.db-wal
+symbolon*.db*
+

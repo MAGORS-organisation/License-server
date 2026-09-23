@@ -94,6 +94,7 @@
         // 2. Hlavný retro workspace obalujúci obsah
         const mainWrapper = document.querySelector('.main-wrapper');
         if (mainWrapper) {
+            mainWrapper.style.display = 'none';
             const workspace = document.createElement('div');
             workspace.className = 'retro-workspace';
 
@@ -584,7 +585,11 @@
             'view-webhooks': 'WEBHOOK NOTIFIKÁCIE & HISTÓRIA DORUČENIA',
             'view-mesh': 'RELAY MESH KLASTRE, DISKÉTNY KONSENZUS & HARDWARE ATTESTATION (PHASE 3.0)',
             'view-system': 'CYBER RESILIENCE ACT (CRA) & CYCLONEDX SBOM',
-            'view-apikeys': 'SPRÁVA API KĽÚČOV & MERKLE STROM INTEGRITA'
+            'view-apikeys': 'SPRÁVA API KĽÚČOV & MERKLE STROM INTEGRITA',
+            'view-features': 'GRANULÁRNE MODULY, BALÍKOVÉ SUITY & MERAČE VYŤAŽENIA',
+            'view-tokens': 'KREDITOVÉ PEŇAŽENKY & PAY-AS-YOU-GO SPOTREBA',
+            'view-migrate': 'MIGRÁCIA Z FLEXNET PUBLISHER (FLEXLM) & KEYGEN.SH',
+            'view-scim': 'SCIM 2.0 IDENTITA & FIREMNÁ SYNCHRONIZÁCIA'
         };
 
         const titleEl = document.getElementById('retro-window-title');
@@ -595,6 +600,41 @@
         // Zatvorenie podmenu pri prepnutí
         closeSubmenu();
     };
+
+    /**
+     * Podpora navigácie cez URL hash (#features, #licenses, #keys, atď.)
+     */
+    function checkHashNavigation() {
+        const hash = (window.location.hash || '').replace('#', '').toLowerCase();
+        if (!hash) return;
+
+        if (hash === 'features' || hash === 'moduly') {
+            switchRetroView('view-features');
+            if (typeof window.loadFeaturesView === 'function') window.loadFeaturesView();
+        } else if (hash === 'licenses' || hash === 'licencie') {
+            switchRetroView('view-licenses');
+        } else if (hash === 'keys' || hash === 'kluce') {
+            switchRetroView('view-keys');
+        } else if (hash === 'tokens' || hash === 'kredity') {
+            switchRetroView('view-tokens');
+            if (typeof window.loadTokenWallets === 'function') window.loadTokenWallets();
+        } else if (hash === 'migrate') {
+            switchRetroView('view-migrate');
+        } else if (hash === 'webhooks') {
+            switchRetroView('view-webhooks');
+        } else if (hash === 'audit') {
+            switchRetroView('view-audit');
+        } else if (hash === 'relays') {
+            switchRetroView('view-relays');
+        } else if (hash === 'mesh') {
+            switchRetroView('view-mesh');
+        } else if (hash === 'help') {
+            openHelpModal();
+        }
+    }
+
+    window.addEventListener('hashchange', checkHashNavigation);
+    setTimeout(checkHashNavigation, 200);
 
     /**
      * Kliknutie na položku hlavného menu
