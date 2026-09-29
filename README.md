@@ -2,7 +2,7 @@
 
 [![Platform](https://img.shields.io/badge/.NET-10.0%20LTS-512BD4?logo=dotnet)](https://dotnet.microsoft.com/)
 [![Language](https://img.shields.io/badge/C%23-14.0-239120?logo=csharp)](https://learn.microsoft.com/dotnet/csharp/)
-[![Tests](https://img.shields.io/badge/tests-305%20passed%20(+15%20Python%2C%20+12%20Wasm)-brightgreen)](#výsledky-testovania)
+[![Tests](https://img.shields.io/badge/tests-334%20passed%20(+15%20Python%2C%20+12%20Wasm)-brightgreen)](#výsledky-testovania)
 [![License: AGPL-3.0](https://img.shields.io/badge/license-AGPL--3.0-blue.svg)](LICENSE)
 [![License: Apache-2.0](https://img.shields.io/badge/client%20SDK-Apache--2.0-blue.svg)](LICENSES/Apache-2.0.txt)
 [![CRA Compliant](https://img.shields.io/badge/CRA%20Compliance-EU%202024%2F2847-success)](SECURITY.md)
@@ -198,6 +198,74 @@ Symbolon.slnx
 
 ---
 
+## Požiadavky na Systém (Hardvér a Softvér)
+
+Server Symbolon je optimalizovaný pre maximálnu priepustnosť a nízku latenciu vďaka natívnemu AOT kódu a deterministickému O(1) prideľovaniu sedadiel. Nasledujúce požiadavky definujú minimálne a odporúčané parametre pre jednotlivé prostredia.
+
+### 1. Hardvérové Požiadavky
+
+| Komponent / Režim Nasadenia | Minimálne Parametre (Min) | Odporúčané Parametre (Rec) | Poznámka |
+|---|---|---|---|
+| **On-Premise Edge Relay** | 1 vCPU, 512 MB RAM, 1 GB disk | 2 vCPU, 1–2 GB RAM, 5 GB NVMe | Zvláda tisíce lokálnych heartbeatov/s pri spotrebe pamäte < 80 MB. |
+| **Control Plane (do 10 000 sedadiel)** | 2 vCPU, 2 GB RAM, 10 GB SSD | 4 vCPU, 4–8 GB RAM, 25 GB NVMe | Vhodné pre stredné ISV inštalácie a podnikové privátne cloudy. |
+| **Control Plane Enterprise (> 50 000 sedadiel)** | 4 vCPU, 8 GB RAM, 50 GB NVMe | 8+ vCPU, 16–32 GB RAM, 100+ GB NVMe | Pre masívne súbehy, multi-region klastre a vysokofrekvenčný auditný ledger. |
+| **Klientske Stanice (ISV aplikácie)** | Architektúra x64 / ARM64 | 1 vCPU, < 10 MB voľnej RAM | Klientske SDK má zanedbateľný footprint (< 5 MB RAM, < 0.1% CPU). |
+
+- **Sieťová infraštruktúra**: 
+  - Control Plane: 1 Gbps Ethernet (pre enterprise klastre odporúčané 10 Gbps a nízka latencia k databáze < 5 ms).
+  - Relay a klienti: Štandardné lokálne alebo internetové pripojenie (prenos jedného heartbeatu vyžaduje len cca 350 bajtov).
+
+---
+
+### 2. Softvérové Požiadavky
+
+#### Podporované Operačné Systémy
+- **Linux (odporúčané pre produkciu)**:
+  - Ubuntu 22.04 LTS / 24.04 LTS
+  - Debian 12 (Bookworm) a novší
+  - Red Hat Enterprise Linux (RHEL) 9+ / Rocky Linux 9+ / AlmaLinux 9+
+  - Alpine Linux 3.19+ (glibc aj musl libc)
+- **Windows**:
+  - Windows Server 2019 / 2022 / 2025
+  - Windows 10 / 11 (64-bit x64 a ARM64)
+- **macOS**:
+  - macOS 13+ (Ventura, Sonoma, Sequoia — architektúry Apple Silicon M1/M2/M3/M4 aj Intel x64)
+- **Kontajnery & Orchestrácia**:
+  - Docker Engine 24+ / Podman 4+
+  - Docker Compose v2.20+
+  - Kubernetes 1.28+ (podporovaný natívny Helm Chart a Symbolon Kubernetes Operator)
+
+#### Runtime & Databázové Úložiská
+- **.NET Runtime**:
+  - **.NET 10.0 LTS** Runtime / ASP.NET Core Runtime (pre beh zo zdrojových kódov alebo framework-dependent nasadenie).
+  - *Poznámka*: Pre nasadenie cez oficiálne Docker kontajnery alebo self-contained single-file binárky **nie je potrebná žiadna predchádzajúca inštalácia .NET**, behové prostredie je pribalené priamo v obraze/binárke.
+- **Databázy**:
+  - **PostgreSQL 16 alebo 17** (odporúčané **PostgreSQL 17** pre produkčný Control Plane s transakčným zamykaním `FOR UPDATE SKIP LOCKED`).
+  - **SQLite 3.42+** (vstavané automaticky s WAL žurnálom; primárne pre on-premise Relay, edge nasadenia a offline vývoj).
+
+#### Sieťové Porty a Firewall Pravidlá
+- `8080/TCP`: Symbolon Control Plane (REST API, Web TUI, CRA compliance, Prometheus metriky).
+- `8081/TCP`: Symbolon On-Premise Relay (lokálne API a edge správa sedadiel).
+- `7584/UDP` (`0x1D90`): Zero-config discovery (lokálny broadcast a multicast pre automatické vyhľadávanie serverov).
+- `5432/TCP`: PostgreSQL databázový server (interná komunikácia medzi Control Plane a DB).
+- `9090/TCP` & `3000/TCP`: Prometheus zber metrík a Grafana dashboard (voliteľné pre observabilitu).
+
+#### Požiadavky pre Vývoj a Kompiláciu (Build & Dev)
+Ak plánujete kompilovať riešenie zo zdrojových kódov alebo vyvíjať vlastné integrácie:
+- **.NET SDK 10.0** (jazyk C# 14.0)
+- **Git 2.30+**
+- **Python 3.10+** (pre prácu s Python SDK a beh integračných testov)
+- **Node.js 18+** (pre offline WebAssembly a WebCrypto validátor)
+- **Rust 1.75+** (edícia 2021 s Cargo, pre zostavenie Rust SDK)
+- **C/C++ kompilátor** (GCC 9+, Clang 10+ alebo MSVC 2019+ pre C/C++ SDK s podporou C99 / C++17)
+
+#### Voliteľné Podnikové Rozšírenia
+- **Hardware Enclave Attestation**: Fyzický čip **TPM 2.0** a systémový balíček `tpm2-tools` (Linux) alebo ekvivalentné ovládače (Intel SGX, AMD SEV-SNP).
+- **eBPF Socket Enforcement**: Linuxové jadro verzie **5.15 alebo novšej** s povoleným BTF (`CONFIG_DEBUG_INFO_BTF=y`) a knižnicou `libbpf`.
+- **Cloud KMS & Hardware HSM**: Prístup k API Azure Key Vault, AWS KMS alebo sieťovému HSM zariadeniu s rozhraním **PKCS#11** pre bezpečnú úschovu Tier-1 master kľúčov.
+
+---
+
 ## Rýchly Štart (Quickstart)
 
 ### 1. Zostavenie riešenia a spustenie testov
@@ -388,21 +456,21 @@ Všetkých 10 testovacích projektov má 100% úspešnosť testov bez zlyhania:
 
 ```text
 Passed!  - Failed: 0, Passed: 28, Skipped: 0, Total: 28 - Symbolon.Crypto.Tests.dll
-Passed!  - Failed: 0, Passed: 37, Skipped: 0, Total: 37 - Symbolon.Format.Tests.dll
+Passed!  - Failed: 0, Passed: 44, Skipped: 0, Total: 44 - Symbolon.Format.Tests.dll
 Passed!  - Failed: 0, Passed: 16, Skipped: 0, Total: 16 - Symbolon.Protocol.Tests.dll
-Passed!  - Failed: 0, Passed: 65, Skipped: 0, Total: 65 - Symbolon.Domain.Tests.dll
+Passed!  - Failed: 0, Passed: 68, Skipped: 0, Total: 68 - Symbolon.Domain.Tests.dll
 Passed!  - Failed: 0, Passed:  9, Skipped: 0, Total:  9 - Symbolon.Relay.Tests.dll
-Passed!  - Failed: 0, Passed: 14, Skipped: 0, Total: 14 - Symbolon.Client.Tests.dll
-Passed!  - Failed: 0, Passed: 24, Skipped: 0, Total: 24 - Symbolon.Cli.Tests.dll
+Passed!  - Failed: 0, Passed: 27, Skipped: 0, Total: 27 - Symbolon.Client.Tests.dll
+Passed!  - Failed: 0, Passed: 30, Skipped: 0, Total: 30 - Symbolon.Cli.Tests.dll
 Passed!  - Failed: 0, Passed: 17, Skipped: 0, Total: 17 - Symbolon.Data.Tests.dll
 Passed!  - Failed: 0, Passed:  8, Skipped: 0, Total:  8 - Symbolon.Operator.Tests.dll
-Passed!  - Failed: 0, Passed: 80, Skipped: 0, Total: 80 - Symbolon.ControlPlane.Tests.dll
+Passed!  - Failed: 0, Passed: 87, Skipped: 0, Total: 87 - Symbolon.ControlPlane.Tests.dll
 
 Viacjazyčné SDK & WebAssembly testovacie sady:
-Passed!  - Failed: 0, Passed: 14, Skipped: 0, Total: 14 - Python SDK (unittest)
+Passed!  - Failed: 0, Passed: 15, Skipped: 0, Total: 15 - Python SDK (unittest)
 Passed!  - Failed: 0, Passed: 12, Skipped: 0, Total: 12 - WebAssembly / WebCrypto SDK (node:test)
 
-Celkovo: 324 úspešných automatizovaných testov (298 .NET + 14 Python + 12 Node/Wasm), 0 zlyhaní, 0 chýb.
+Celkovo: 361 úspešných automatizovaných testov (334 .NET + 15 Python + 12 Node/Wasm), 0 zlyhaní, 0 chýb.
 ```
 
 ---
