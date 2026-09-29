@@ -37,6 +37,7 @@
         { id: 'revocations', label: 'Revokácie & CRL', hotkey: 'X', view: 'view-revocations', hasSub: false },
         { id: 'queue', label: 'Licenčný Rad (FLT-31)', hotkey: 'Q', view: 'view-queue', hasSub: false },
         { id: 'policyrules', label: 'Pravidlá & Options', hotkey: 'Z', view: 'view-policy-rules', hasSub: false },
+        { id: 'machines', label: 'Stroje & Node-Lock', hotkey: 'N', view: 'view-machines', hasSub: false },
         { id: 'webhooky', label: 'Webhooky', hotkey: 'W', view: 'view-webhooks', hasSub: false },
         { isSeparator: true },
         { id: 'sulad', label: 'Súlad & CRA / SBOM', hotkey: 'S', view: 'view-system', hasSub: false },
@@ -57,7 +58,7 @@
         { id: 'sub-hierarchy', label: '3-Úrovňová Hierarchia (§9.3)', hotkey: '3', action: () => { switchRetroView('view-keys'); if (typeof verifyKeyHierarchy === 'function') verifyKeyHierarchy(); } },
         { id: 'sub-rates', label: 'Sadzby & Kredity (Tokeny)', hotkey: 'S', action: () => { switchRetroView('view-tokens'); if (typeof loadTokenRates === 'function') loadTokenRates(); } },
         { id: 'sub-borrow', label: 'Offline Roaming (.symlease)', hotkey: 'B', action: () => { switchRetroView('view-overview'); if (typeof openBorrowModal === 'function') openBorrowModal(); } },
-        { id: 'sub-nodes', label: 'Hardvérové odtlačky', hotkey: 'H', action: () => alert('Zoznam autorizovaných HW fingerprintov') }
+        { id: 'sub-nodes', label: 'Hardvérové odtlačky & Stroje', hotkey: 'H', action: () => { switchRetroView('view-machines'); if (typeof window.loadMachinesView === 'function') window.loadMachinesView(); } }
     ];
 
     // Inicializácia po načítaní DOM
@@ -92,6 +93,7 @@
                 <li class="retro-menu-item" onclick="switchRetroView('view-revocations')" tabindex="0">Revo<span class="hotkey">k</span>ácie</li>
                 <li class="retro-menu-item" onclick="switchRetroView('view-queue')" tabindex="0"><span class="hotkey">Q</span>ueue Rad</li>
                 <li class="retro-menu-item" onclick="switchRetroView('view-policy-rules')" tabindex="0"><span class="hotkey">Z</span>ásady (FLT-24)</li>
+                <li class="retro-menu-item" onclick="switchRetroView('view-machines')" tabindex="0"><span class="hotkey">N</span>ode-Lock</li>
                 <li class="retro-menu-item" onclick="switchRetroView('view-system')" tabindex="0"><span class="hotkey">S</span>úlad CRA</li>
                 <li class="retro-menu-item" onclick="openModal('modal-auth-config')" tabindex="0">K<span class="hotkey">o</span>nfigurácia</li>
             </ul>
@@ -625,6 +627,7 @@
             'view-revocations': 'KRYPTOGRAFICKÝ REVOKAČNÝ ZOZNAM (.SYMRL) & ENTERPRISE CRL',
             'view-queue': 'ENTERPRISE LICENČNÝ RAD & PRIORITNÁ REZERVÁCIA (FLT-31)',
             'view-policy-rules': 'ENTERPRISE OPTIONS PRAVIDLÁ & REZERVÁCIE SEDADIEL (FLT-24)',
+            'view-machines': 'NODE-LOCK STROJE & HARDVÉROVÉ FINGERPRINTY (FPR-1 – FPR-19, §8)',
             'view-tokens': 'KREDITOVÉ PEŇAŽENKY & PAY-AS-YOU-GO SPOTREBA',
             'view-migrate': 'MIGRÁCIA Z FLEXNET PUBLISHER (FLEXLM) & KEYGEN.SH',
             'view-scim': 'SCIM 2.0 IDENTITA & FIREMNÁ SYNCHRONIZÁCIA'
@@ -643,6 +646,9 @@
         }
         if (viewId === 'view-policy-rules' && typeof window.loadPolicyRulesView === 'function') {
             window.loadPolicyRulesView();
+        }
+        if (viewId === 'view-machines' && typeof window.loadMachinesView === 'function') {
+            window.loadMachinesView();
         }
 
         // Zatvorenie podmenu pri prepnutí
@@ -688,6 +694,9 @@
             switchRetroView('view-relays');
         } else if (hash === 'mesh') {
             switchRetroView('view-mesh');
+        } else if (hash === 'machines' || hash === 'stroje' || hash === 'nodelock') {
+            switchRetroView('view-machines');
+            if (typeof window.loadMachinesView === 'function') window.loadMachinesView();
         } else if (hash === 'help') {
             openHelpModal();
         }

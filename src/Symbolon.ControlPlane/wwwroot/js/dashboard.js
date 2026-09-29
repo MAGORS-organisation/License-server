@@ -70,6 +70,9 @@ function initNavigation() {
                 if (targetView === "view-policy-rules") {
                     loadPolicyRulesView();
                 }
+                if (targetView === "view-machines") {
+                    loadMachinesView();
+                }
             }
         });
     });
@@ -1109,9 +1112,10 @@ async function deleteWebhookPrompt(id) {
 // License Details (Named Users & Quotas) Modal
 function openLicenseDetailsModal(id, name) {
     document.getElementById("current-details-license-id").value = id;
-    document.getElementById("license-details-modal-title").textContent = `Používatelia & Kvóty: ${name}`;
+    document.getElementById("license-details-modal-title").textContent = `Používatelia, Kvóty & Stroje: ${name}`;
     loadLicenseUsers(id);
     loadLicenseQuotas(id);
+    loadLicenseActivations(id);
     openModal("modal-license-details");
 }
 
@@ -3896,6 +3900,246 @@ window.insertDefaultRulesTemplate = insertDefaultRulesTemplate;
 window.formatRulesYaml = formatRulesYaml;
 window.runRulesSimulation = runRulesSimulation;
 window.openLicenseRulesView = openLicenseRulesView;
+
+// ==============================================================================
+// Phase 22: Node-Lock Machines & Fuzzy Hardware Fingerprints (FPR-1 – FPR-19, §8)
+// ==============================================================================
+
+async function loadLicenseActivations(id) {
+    const tbody = document.getElementById("license-activations-table-body");
+    if (!tbody) return;
+
+    try {
+        const res = await fetch(`/admin/v1/licenses/${encodeURIComponent(id)}/activations`);
+        if (!res.ok) throw new Error("Chyba načítania");
+        const activations = await res.json();
+
+        if (!activations || activations.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="5" style="text-align: center; color: var(--text-muted); padding: 8px;">Žiadne aktivované stroje pre túto licenciu.</td></tr>`;
+            return;
+        }
+
+        tbody.innerHTML = activations.map(a => `
+            <tr>
+                <td><code>${escapeHtml(a.machineId || a.id)}</code></td>
+                <td><code style="font-size: 11px;">${escapeHtml(a.fingerprintHash ? a.fingerprintHash.substring(0, 18) + '...' : '-')}</code></td>
+                <td><span class="badge ${a.state === 'active' ? 'badge-success' : 'badge-secondary'}">${escapeHtml(a.state)}</span></td>
+                <td style="font-size: 11px; color: var(--text-secondary);">${a.firstSeen ? new Date(a.firstSeen).toLocaleDateString() : '-'}</td>
+                <td>
+                    ${a.state === 'active' ? `<button class="btn btn-danger btn-sm" onclick="deactivateMachineNode('${escapeHtml(a.id)}', '${escapeHtml(id)}')">Deaktivovať</button>` : '-'}
+                </td>
+            </tr>
+        `).join("");
+    } catch {
+        tbody.innerHTML = `<tr><td colspan="5" style="text-align: center; color: var(--accent-rose); padding: 8px;">Chyba pri načítaní aktivácií</td></tr>`;
+    }
+}
+
+async function deactivateMachineNode(activationId, licId) {
+    if (!confirm(`Naozaj chcete deaktivovať stroj (aktivácia: ${activationId})?`)) return;
+    try {
+        const res = await fetch(`/admin/v1/activations/${encodeURIComponent(activationId)}`, {
+            method: "DELETE"
+        });
+        if (res.ok) {
+            showToast("Stroj bol úspešne deaktivovaný (FPR-15)", "success");
+            if (licId) loadLicenseActivations(licId);
+            const select = document.getElementById("machines-license-select");
+            if (select && select.value) {
+                loadMachinesForLicense(select.value);
+            }
+        } else {
+            showToast("Zlyhanie pri deaktivácii stroja", "error");
+        }
+    } catch {
+        showToast("Sieťová chyba pri deaktivácii stroja", "error");
+    }
+}
+
+async function loadMachinesView() {
+    const select = document.getElementById("machines-license-select");
+    if (!select) return;
+
+    try {
+        const res = await fetch("/admin/v1/licenses");
+        if (!res.ok) throw new Error("Chyba načítania licencií");
+        const licenses = await res.json();
+
+        const currentVal = select.value;
+        select.innerHTML = '<option value="">-- Vyberte licenciu --</option>';
+
+        (licenses || []).forEach(lic => {
+            const opt = document.createElement("option");
+            opt.value = lic.id;
+            opt.textContent = `${lic.customer || lic.id} (${lic.productCode || 'N/A'}, ${lic.type || 'standard'})`;
+            select.appendChild(opt);
+        });
+
+        if (currentVal && Array.from(select.options).some(o => o.value === currentVal)) {
+            select.value = currentVal;
+            await loadMachinesForLicense(currentVal);
+        } else if (licenses && licenses.length > 0) {
+            select.value = licenses[0].id;
+            await loadMachinesForLicense(licenses[0].id);
+        }
+    } catch (e) {
+        showToast("Chyba načítania licencií: " + e.message, "error");
+    }
+}
+
+async function onMachineLicenseChanged() {
+    const select = document.getElementById("machines-license-select");
+    if (!select || !select.value) {
+        const tbody = document.getElementById("machines-table-body");
+        if (tbody) tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; color: var(--text-muted); padding: 16px;">Vyberte licenciu pre zobrazenie aktivovaných strojov.</td></tr>';
+        return;
+    }
+    await loadMachinesForLicense(select.value);
+}
+
+async function loadMachinesForLicense(licenseId) {
+    const tbody = document.getElementById("machines-table-body");
+    if (!tbody) return;
+
+    tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; color: var(--text-muted); padding: 16px;">Načítavam aktivované stroje...</td></tr>';
+
+    try {
+        const res = await fetch(`/admin/v1/licenses/${encodeURIComponent(licenseId)}/activations`);
+        if (!res.ok) throw new Error("Chyba načítania aktivácií");
+        const activations = await res.json();
+
+        if (!activations || activations.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; color: var(--text-muted); padding: 16px;">Žiadne aktivované stroje pre túto licenciu.</td></tr>';
+            return;
+        }
+
+        tbody.innerHTML = activations.map(a => `
+            <tr>
+                <td><strong>${escapeHtml(a.machineId || a.id)}</strong></td>
+                <td><code style="font-size: 11px;">${escapeHtml(a.fingerprintHash ? a.fingerprintHash.substring(0, 24) + '...' : '-')}</code></td>
+                <td><span class="badge ${a.state === 'active' ? 'badge-success' : 'badge-secondary'}">${escapeHtml(a.state)}</span></td>
+                <td style="font-size: 12px; color: var(--text-secondary);">${a.firstSeen ? new Date(a.firstSeen).toLocaleString() : '-'}</td>
+                <td>
+                    ${a.state === 'active' ? `<button class="btn btn-danger btn-sm" onclick="deactivateMachineNode('${escapeHtml(a.id)}', '${escapeHtml(licenseId)}')">Deaktivovať</button>` : '-'}
+                </td>
+            </tr>
+        `).join("");
+    } catch (e) {
+        tbody.innerHTML = `<tr><td colspan="5" style="text-align: center; color: var(--accent-rose); padding: 16px;">Chyba: ${escapeHtml(e.message)}</td></tr>`;
+    }
+}
+
+function loadSampleStoredFp() {
+    const el = document.getElementById("sim-stored-fp");
+    if (!el) return;
+    el.value = JSON.stringify({
+        machineId: "uuid-9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d",
+        board: "ASUSTeK COMPUTER INC. ROG STRIX B550-F",
+        cpu: "AMD Ryzen 9 5900X 12-Core Processor",
+        disk: "Samsung SSD 980 PRO 1TB S5GXNF0R123456",
+        mac: "00:1A:2B:3C:4D:5E",
+        host: "cad-station-01"
+    }, null, 2);
+}
+
+function loadSampleCurrentFp() {
+    const el = document.getElementById("sim-current-fp");
+    if (!el) return;
+    el.value = JSON.stringify({
+        machineId: "uuid-9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d",
+        board: "ASUSTeK COMPUTER INC. ROG STRIX B550-F",
+        cpu: "AMD Ryzen 9 5900X 12-Core Processor",
+        disk: "Kingston KC3000 2TB 50026B76854321",
+        mac: "00:1A:2B:3C:4D:5E",
+        host: "cad-station-01"
+    }, null, 2);
+}
+
+async function runFuzzyMatchSimulation() {
+    const storedText = document.getElementById("sim-stored-fp")?.value?.trim();
+    const currentText = document.getElementById("sim-current-fp")?.value?.trim();
+    const strategy = document.getElementById("sim-fp-strategy")?.value || "match-most";
+
+    if (!storedText || !currentText) {
+        showToast("Zadajte oba hardvérové profily na porovnanie.", "error");
+        return;
+    }
+
+    let stored, incoming;
+    try {
+        stored = JSON.parse(storedText);
+        incoming = JSON.parse(currentText);
+    } catch (e) {
+        showToast("Neplatný JSON formát jedného z profilov: " + e.message, "error");
+        return;
+    }
+
+    if (stored.components && typeof stored.components === "object") stored = stored.components;
+    if (incoming.components && typeof incoming.components === "object") incoming = incoming.components;
+
+    const resultBox = document.getElementById("fuzzy-sim-result");
+    const badge = document.getElementById("fuzzy-verdict-badge");
+    const stratUsed = document.getElementById("fuzzy-strategy-used");
+    const commonCount = document.getElementById("fuzzy-common-count");
+    const matchedCount = document.getElementById("fuzzy-matched-count");
+    const matchRatio = document.getElementById("fuzzy-match-ratio");
+    const keysDetail = document.getElementById("fuzzy-keys-detail");
+
+    try {
+        const res = await fetch("/v1/activations/verify-match", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                storedComponents: stored,
+                incomingComponents: incoming,
+                strategy: strategy
+            })
+        });
+
+        if (!res.ok) {
+            const err = await res.text();
+            throw new Error(`HTTP ${res.status}: ${err}`);
+        }
+
+        const data = await res.json();
+
+        if (resultBox) resultBox.style.display = "block";
+        if (stratUsed) stratUsed.textContent = data.strategyUsed || strategy;
+        if (commonCount) commonCount.textContent = data.commonComponentsCount ?? "-";
+        if (matchedCount) matchedCount.textContent = data.matchedComponentsCount ?? "-";
+        if (matchRatio) matchRatio.textContent = (data.matchRatio !== undefined) ? `${Math.round(data.matchRatio * 100)}%` : "-";
+
+        if (badge) {
+            if (data.isMatch) {
+                badge.className = "badge badge-success";
+                badge.textContent = "✔ ZHODA SCHVÁLENÁ (MATCH)";
+            } else {
+                badge.className = "badge badge-danger";
+                badge.textContent = "✖ ZHODA ZAMIETNUTÁ (MISMATCH)";
+            }
+        }
+
+        if (keysDetail) {
+            const matchedList = (data.matchedKeys || []).map(k => `<span class="badge badge-success" style="font-size:10px; margin-right:4px;">✔ ${escapeHtml(k)}</span>`).join("");
+            const mismatchedList = (data.mismatchedKeys || []).map(k => `<span class="badge badge-danger" style="font-size:10px; margin-right:4px;">✖ ${escapeHtml(k)}</span>`).join("");
+            keysDetail.innerHTML = `
+                <div style="margin-bottom: 4px;"><strong>Zhodné:</strong> ${matchedList || '<span style="color:var(--text-muted)">žiadne</span>'}</div>
+                <div><strong>Nezhodné:</strong> ${mismatchedList || '<span style="color:var(--text-muted)">žiadne</span>'}</div>
+            `;
+        }
+    } catch (e) {
+        showToast("Chyba pri overovaní zhody: " + e.message, "error");
+    }
+}
+
+window.loadLicenseActivations = loadLicenseActivations;
+window.deactivateMachineNode = deactivateMachineNode;
+window.loadMachinesView = loadMachinesView;
+window.onMachineLicenseChanged = onMachineLicenseChanged;
+window.loadSampleStoredFp = loadSampleStoredFp;
+window.loadSampleCurrentFp = loadSampleCurrentFp;
+window.runFuzzyMatchSimulation = runFuzzyMatchSimulation;
+
 
 
 

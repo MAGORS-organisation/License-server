@@ -46,6 +46,8 @@ public sealed record CreatePolicyDto
     public int BorrowMaxConcurrent { get; init; } = 5;
     public bool OfflineAllowed { get; init; } = true;
     public string CryptoProfile { get; init; } = "hybrid-v1";
+    public string MachineMatching { get; init; } = "match-most";
+    public string MachineUniqueness { get; init; } = "per-license";
     public IReadOnlyList<string>? Entitlements { get; init; }
 }
 
@@ -58,7 +60,9 @@ public sealed record PolicyDto(
     string LicenseModel,
     int MaxSeats,
     string SeatUnit,
-    int LeaseTtlSeconds);
+    int LeaseTtlSeconds,
+    string MachineMatching = "match-most",
+    string MachineUniqueness = "per-license");
 
 public sealed record CreateLicenseDto
 {
@@ -83,19 +87,15 @@ public sealed record LicenseResponseDto(
 public sealed record RevokeLicenseDto(
     [Required] string Reason);
 
-public sealed record ActivationRequestDto
-{
-    [Required] public required string LicenseKey { get; init; }
-    [Required] public required IReadOnlyDictionary<string, string> FingerprintComponents { get; init; }
-    public string? MachineId { get; init; }
-}
-
-public sealed record ActivationResponseDto(
-    string ActivationId,
+public sealed record MachineActivationAdminDto(
+    string Id,
     string LicenseId,
     string Fingerprint,
+    string? MachineId,
     string State,
-    DateTimeOffset ActivatedAt);
+    DateTimeOffset FirstSeen,
+    DateTimeOffset LastHeartbeat,
+    IReadOnlyDictionary<string, string>? Components);
 
 public sealed record BorrowedSeatAdminDto(
     string LeaseId,

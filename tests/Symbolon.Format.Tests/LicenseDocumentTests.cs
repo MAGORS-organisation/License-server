@@ -343,4 +343,117 @@ public sealed class LicenseDocumentTests
         result.IsValid.Should().BeTrue();
         result.VerifiedAlgs.Should().Contain(Alg.Es256);
     }
+
+    [Fact]
+    public void Verify_WithValidMachineBinding_LIC33_Succeeds()
+    {
+        using var ecKey = Es256SignatureProvider.GenerateKey("prd-ec-kid");
+        var signer = new LicenseDocumentSigner([ecKey]);
+
+        using var keyRing = new SymbolonKeyRing();
+        keyRing.Add(ecKey);
+
+        long now = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+        var claims = new LicenseClaims
+        {
+            Iss = "https://licenses.acme.example",
+            Sub = "lic_01JQ8ZK4N9V2X6M0",
+            Aud = "acme-cad",
+            Jti = "lf_01JQ8ZK5T3P7Q1R4",
+            Iat = now,
+            Exp = now + 3600,
+            Symlic = new SymlicClaims
+            {
+                V = 1,
+                Profile = "classical-v1",
+                RequiredAlgs = [Alg.Es256],
+                License = new LicenseMetadata { Model = "nodelock", State = "active" },
+                Limits = new LicenseLimits { SeatUnit = "machine" },
+                Binding = new BindingClaim
+                {
+                    Matching = "match-most",
+                    Components = new Dictionary<string, string>
+                    {
+                        ["machineId"] = "ID-12345",
+                        ["cpu"] = "CPU-INTEL",
+                        ["board"] = "BOARD-XYZ"
+                    }
+                }
+            }
+        };
+
+        string pem = signer.Sign(claims);
+
+        // Matching client components (2 out of 3 match -> majority under match-most)
+        var clientComponents = new Dictionary<string, string>
+        {
+            ["machineId"] = "ID-12345",
+            ["cpu"] = "CPU-INTEL",
+            ["board"] = "BOARD-UPGRADED"
+        };
+
+        var verifier = new LicenseDocumentVerifier(keyRing, new SymbolonVerifierOptions
+        {
+            ClientFingerprintComponents = clientComponents
+        });
+
+        var result = verifier.Verify(pem);
+        result.IsValid.Should().BeTrue();
+    }
+
+    [Fact]
+    public void Verify_WithMismatchedMachineBinding_LIC33_FailsWithBindingMismatch()
+    {
+        using var ecKey = Es256SignatureProvider.GenerateKey("prd-ec-kid");
+        var signer = new LicenseDocumentSigner([ecKey]);
+
+        using var keyRing = new SymbolonKeyRing();
+        keyRing.Add(ecKey);
+
+        long now = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+        var claims = new LicenseClaims
+        {
+            Iss = "https://licenses.acme.example",
+            Sub = "lic_01JQ8ZK4N9V2X6M0",
+            Aud = "acme-cad",
+            Jti = "lf_01JQ8ZK5T3P7Q1R4",
+            Iat = now,
+            Exp = now + 3600,
+            Symlic = new SymlicClaims
+            {
+                V = 1,
+                Profile = "classical-v1",
+                RequiredAlgs = [Alg.Es256],
+                License = new LicenseMetadata { Model = "nodelock", State = "active" },
+                Limits = new LicenseLimits { SeatUnit = "machine" },
+                Binding = new BindingClaim
+                {
+                    Matching = "match-all",
+                    Components = new Dictionary<string, string>
+                    {
+                        ["machineId"] = "ID-12345",
+                        ["cpu"] = "CPU-INTEL"
+                    }
+                }
+            }
+        };
+
+        string pem = signer.Sign(claims);
+
+        // Mismatched client components
+        var clientComponents = new Dictionary<string, string>
+        {
+            ["machineId"] = "ID-DIFFERENT",
+            ["cpu"] = "CPU-INTEL"
+        };
+
+        var verifier = new LicenseDocumentVerifier(keyRing, new SymbolonVerifierOptions
+        {
+            ClientFingerprintComponents = clientComponents
+        });
+
+        var result = verifier.Verify(pem);
+        result.IsValid.Should().BeFalse();
+        result.FailureReason.Should().StartWith("binding-mismatch");
+    }
 }

@@ -129,6 +129,12 @@
                 </a>
             </li>
             <li class="nav-item">
+                <a class="nav-link" data-view="view-machines">
+                    <span class="nav-icon">💻</span>
+                    <span>Node-Lock &amp; Stroje</span>
+                </a>
+            </li>
+            <li class="nav-item">
                 <a class="nav-link" data-view="view-system">
                     <span class="nav-icon">⚡</span>
                     <span>API &amp; Diagnostika</span>
@@ -2072,6 +2078,161 @@
                 </div>
             </section>
 
+            <!-- VIEW: Node-Lock & Stroje (Phase 22, FPR-1 – FPR-19, §8) -->
+            <section id="view-machines" class="view-section">
+                <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 24px;">
+                    <div>
+                        <h2 style="font-size: 20px; font-weight: 700; color: var(--text-primary); margin-bottom: 4px;">
+                            💻 Node-Lock Stroje &amp; Hardvérové Fingerprinty (FPR-1 – FPR-19, §8)
+                        </h2>
+                        <p style="color: var(--text-secondary); font-size: 13px;">
+                            Správa viazaných uzlov, fuzzy párovanie hardvérových komponentov, pseudonymizácia hostov (FPR-2) a anti-virtualizácia v cloud/kontajnerových prostrediach.
+                        </p>
+                    </div>
+                    <div style="display: flex; gap: 8px;">
+                        <button type="button" class="btn btn-secondary btn-sm" onclick="loadMachinesView()">🔄 Obnoviť</button>
+                    </div>
+                </div>
+
+                <!-- KPI Grid -->
+                <div class="kpi-grid" style="margin-bottom: 20px;">
+                    <div class="kpi-card">
+                        <div class="kpi-label">
+                            <span>Štandardné Komponenty</span>
+                            <span>🔑</span>
+                        </div>
+                        <div class="kpi-value" style="font-size: 18px; color: var(--accent-primary);">6 kľúčov</div>
+                        <div class="kpi-subtext">machineId, board, cpu, disk, mac, host (FPR-1)</div>
+                    </div>
+                    <div class="kpi-card">
+                        <div class="kpi-label">
+                            <span>Párovacia Stratégia</span>
+                            <span>⚖️</span>
+                        </div>
+                        <div class="kpi-value" style="font-size: 18px; color: var(--accent-emerald);">match-most</div>
+                        <div class="kpi-subtext">&gt;50% zhodných, auto-degradácia na match-all pri &lt;2 (FPR-8)</div>
+                    </div>
+                    <div class="kpi-card">
+                        <div class="kpi-label">
+                            <span>Pseudonymizácia Hostu</span>
+                            <span>🛡️</span>
+                        </div>
+                        <div class="kpi-value" style="font-size: 18px; color: var(--accent-amber);">Salted SHA-256</div>
+                        <div class="kpi-subtext">Ochrana osobných údajov a GDPR súlad (FPR-2)</div>
+                    </div>
+                    <div class="kpi-card">
+                        <div class="kpi-label">
+                            <span>Anti-Virtualizácia</span>
+                            <span>📦</span>
+                        </div>
+                        <div class="kpi-value" style="font-size: 18px; color: var(--accent-rose);">Docker / K8s / Cloud</div>
+                        <div class="kpi-subtext">Detekcia kontajnerov a persistentný volume UUID (FPR-10–14)</div>
+                    </div>
+                </div>
+
+                <!-- Main Layout: 2 Columns (Activations Table & Fuzzy Match Simulator) -->
+                <div style="display: grid; grid-template-columns: 1.1fr 0.9fr; gap: 20px; align-items: start;">
+                    <!-- Column 1: Registered Machine Activations -->
+                    <div class="table-card" style="padding: 16px 20px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                            <div class="table-title">🖥️ Evidované Stroje pre Licenciu</div>
+                        </div>
+                        <div style="margin-bottom: 14px;">
+                            <label class="form-label" for="machines-license-select" style="font-size: 12px; margin-bottom: 4px;">Vyberte Licenciu:</label>
+                            <select class="form-control" id="machines-license-select" onchange="onMachineLicenseChanged()" style="font-size: 13px;">
+                                <option value="">-- Vyberte licenciu --</option>
+                            </select>
+                        </div>
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Machine ID</th>
+                                    <th>Fingerprint Hash</th>
+                                    <th>Stav</th>
+                                    <th>Prvýkrát videný</th>
+                                    <th>Akcia</th>
+                                </tr>
+                            </thead>
+                            <tbody id="machines-table-body">
+                                <tr>
+                                    <td colspan="5" style="text-align: center; color: var(--text-muted); padding: 16px;">Vyberte licenciu pre zobrazenie aktivovaných strojov.</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- Column 2: Fuzzy Match Simulator -->
+                    <div class="table-card" style="padding: 16px 20px;">
+                        <div class="table-title" style="margin-bottom: 6px;">⚡ Fuzzy Node-Lock Simulator (FPR-5 – FPR-9)</div>
+                        <p style="color: var(--text-secondary); font-size: 12px; margin-bottom: 12px;">
+                            Otestujte zhodu dvoch hardvérových profilov cez API <code>/v1/activations/verify-match</code>.
+                        </p>
+                        <form id="form-fuzzy-simulator" onsubmit="event.preventDefault(); runFuzzyMatchSimulation();">
+                            <div style="margin-bottom: 10px;">
+                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+                                    <label class="form-label" for="sim-stored-fp" style="font-size: 11px; margin: 0;">Uložený Hardvér (Registrovaný v licencii):</label>
+                                    <button type="button" class="btn btn-secondary btn-sm" style="padding: 1px 6px; font-size: 11px;" onclick="loadSampleStoredFp()">Vzor A</button>
+                                </div>
+                                <textarea id="sim-stored-fp" class="form-control" rows="4" spellcheck="false" style="font-family: monospace; font-size: 11px;" placeholder='{"machineId":"m-1","cpu":"Intel i7","disk":"SN-100","mac":"00:1A:2B:3C:4D:5E"}'></textarea>
+                            </div>
+                            <div style="margin-bottom: 10px;">
+                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+                                    <label class="form-label" for="sim-current-fp" style="font-size: 11px; margin: 0;">Aktuálny Hardvér (Prichádzajúca aktivácia):</label>
+                                    <button type="button" class="btn btn-secondary btn-sm" style="padding: 1px 6px; font-size: 11px;" onclick="loadSampleCurrentFp()">Vzor B (Vymenený disk)</button>
+                                </div>
+                                <textarea id="sim-current-fp" class="form-control" rows="4" spellcheck="false" style="font-family: monospace; font-size: 11px;" placeholder='{"machineId":"m-1","cpu":"Intel i7","disk":"SN-NEW","mac":"00:1A:2B:3C:4D:5E"}'></textarea>
+                            </div>
+                            <div style="display: flex; gap: 10px; align-items: flex-end; margin-bottom: 12px;">
+                                <div style="flex: 1;">
+                                    <label class="form-label" for="sim-fp-strategy" style="font-size: 11px; margin-bottom: 2px;">Stratégia párovania:</label>
+                                    <select id="sim-fp-strategy" class="form-control" style="font-size: 12px; padding: 5px 8px;">
+                                        <option value="match-most" selected>match-most (predvolené, &gt;50%)</option>
+                                        <option value="match-two">match-two (aspoň 2 zhodné)</option>
+                                        <option value="match-any">match-any (aspoň 1 zhodný)</option>
+                                        <option value="match-all">match-all (100% zhoda)</option>
+                                    </select>
+                                </div>
+                                <button type="submit" class="btn btn-primary btn-sm" style="height: 33px; white-space: nowrap;">🔍 Overiť Zhodu</button>
+                            </div>
+                        </form>
+
+                        <!-- Simulator Result Box -->
+                        <div id="fuzzy-sim-result" style="display: none; background: #0b132b; border: 1px solid var(--border-color); border-radius: 8px; padding: 12px; margin-top: 10px;">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                                <span style="font-size: 12px; font-weight: 700; color: var(--text-muted);">VÝSLEDOK PÁROVANIA:</span>
+                                <span id="fuzzy-verdict-badge" class="badge">--</span>
+                            </div>
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px; font-size: 11px; margin-bottom: 8px;">
+                                <div><strong style="color: var(--text-secondary);">Použitá stratégia:</strong> <span id="fuzzy-strategy-used" style="color: var(--text-primary); font-family: monospace;">-</span></div>
+                                <div><strong style="color: var(--text-secondary);">Spoločných kľúčov:</strong> <span id="fuzzy-common-count" style="color: var(--text-primary); font-family: monospace;">-</span></div>
+                                <div><strong style="color: var(--text-secondary);">Zhodných kľúčov:</strong> <span id="fuzzy-matched-count" style="color: var(--text-emerald); font-family: monospace;">-</span></div>
+                                <div><strong style="color: var(--text-secondary);">Miera zhody:</strong> <span id="fuzzy-match-ratio" style="color: var(--text-primary); font-family: monospace;">-</span></div>
+                            </div>
+                            <div id="fuzzy-keys-detail" style="font-size: 11px; padding: 6px; background: rgba(0,0,0,0.2); border-radius: 4px;"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Anti-Virtualization & Spec Information Card -->
+                <div class="table-card" style="margin-top: 20px; padding: 16px 20px;">
+                    <div class="table-title" style="margin-bottom: 8px;">🛡️ Anti-Virtualizácia &amp; Kontajnerová Izolácia (FPR-10 – FPR-14, §8)</div>
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px; font-size: 12px; color: var(--text-secondary);">
+                        <div style="background: rgba(59, 130, 246, 0.08); border-left: 3px solid var(--accent-primary); padding: 8px 12px; border-radius: 0 6px 6px 0;">
+                            <strong style="color: var(--text-primary);">Detekcia Kontajnera (FPR-10, FPR-11)</strong><br>
+                            Kontrola <code>/.dockerenv</code>, <code>/proc/1/cgroup</code> (docker, containerd, kubepods), Kubernetes ENV a hypervisor MAC prefixov.
+                        </div>
+                        <div style="background: rgba(16, 185, 129, 0.08); border-left: 3px solid var(--accent-emerald); padding: 8px 12px; border-radius: 0 6px 6px 0;">
+                            <strong style="color: var(--text-primary);">Persistentný Volume UUID (FPR-12)</strong><br>
+                            Ukladanie deterministického UUID v pripojenom volume (<code>/var/lib/symbolon/machine-id</code>) pre prežitie reštartu kontajnera.
+                        </div>
+                        <div style="background: rgba(245, 158, 11, 0.08); border-left: 3px solid var(--accent-amber); padding: 8px 12px; border-radius: 0 6px 6px 0;">
+                            <strong style="color: var(--text-primary);">Floating Odporúčanie (FPR-13)</strong><br>
+                            Pre efemérne a škálované kontajnerové úlohy v klastroch sa odporúča použiť Floating licenčný model s heartbeat lízingom.
+                        </div>
+                    </div>
+                </div>
+            </section>
+
         </main>
     </div>
 
@@ -2231,6 +2392,29 @@
                     </thead>
                     <tbody id="license-quotas-table-body">
                         <tr><td colspan="4" style="text-align: center; color: var(--text-muted); padding: 8px;">Žiadne aktívne kvóty</td></tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <hr style="border: 0; border-top: 1px solid var(--border-color); margin: 16px 0;">
+
+            <!-- Section 3: Machine Activations -->
+            <div>
+                <div style="font-weight: 600; font-size: 14px; margin-bottom: 8px; color: var(--text-primary);">
+                    💻 Node-Locked Aktivované Stroje (FPR-1 – FPR-19, §8)
+                </div>
+                <table style="width: 100%;">
+                    <thead>
+                        <tr>
+                            <th>Machine ID</th>
+                            <th>Fingerprint Hash</th>
+                            <th>Stav</th>
+                            <th>Aktivovaný</th>
+                            <th>Akcia</th>
+                        </tr>
+                    </thead>
+                    <tbody id="license-activations-table-body">
+                        <tr><td colspan="5" style="text-align: center; color: var(--text-muted); padding: 8px;">Žiadne aktivované stroje</td></tr>
                     </tbody>
                 </table>
             </div>

@@ -594,6 +594,99 @@ public sealed class SymbolonClient : IDisposable
         }
     }
 
+    /// <summary>
+    /// Activates a node-locked machine for the license using the failover pool (FPR-15).
+    /// </summary>
+    [System.Diagnostics.CodeAnalysis.SuppressMessage("Usage", "CA1848:Use the LoggerMessage delegates", Justification = "SDK client warning logging")]
+    public async Task<ActivationResponseDto> ActivateMachineAsync(
+        IReadOnlyDictionary<string, string>? customComponents = null,
+        string? machineId = null,
+        CancellationToken ct = default)
+    {
+        using var activity = SymbolonTracing.ActivitySource.StartActivity("ActivateMachine");
+        activity?.SetTag("licenseKey", _options.LicenseKey);
+
+        var components = customComponents is not null
+            ? FingerprintHelper.FilterValidComponents(customComponents)
+            : DeviceFingerprint.Collect(_options.LicenseKey, warningLogger: msg => _log?.LogWarning("{Warning}", msg)).ToDictionary(kv => kv.Key, kv => kv.Value);
+
+        var requestDto = new ActivationRequestDto
+        {
+            LicenseKey = _options.LicenseKey,
+            FingerprintComponents = components,
+            MachineId = machineId ?? _options.MachineId ?? Environment.MachineName
+        };
+
+        return await _failoverPool.ExecuteWithFailoverAsync(async (serverUri, http, token) =>
+        {
+            var targetUri = new Uri(serverUri, "/v1/activations");
+            using var reqMsg = new HttpRequestMessage(HttpMethod.Post, targetUri)
+            {
+                Content = JsonContent.Create(requestDto, SymbolonProtocolJsonContext.Default.ActivationRequestDto)
+            };
+
+            var response = await http.SendAsync(reqMsg, token).ConfigureAwait(false);
+
+            if ((int)response.StatusCode is 502 or 503 or 504)
+            {
+                throw new HttpRequestException($"Server node {serverUri} returned {(int)response.StatusCode}");
+            }
+
+            if (!response.IsSuccessStatusCode)
+            {
+                var errorDetail = await response.Content.ReadAsStringAsync(token).ConfigureAwait(false);
+                activity?.SetStatus(ActivityStatusCode.Error, $"Activation failed: {response.StatusCode} {errorDetail}");
+                throw new HttpRequestException($"Activation failed with status code {response.StatusCode}: {errorDetail}");
+            }
+
+            var activation = await response.Content.ReadFromJsonAsync(
+                SymbolonProtocolJsonContext.Default.ActivationResponseDto,
+                token).ConfigureAwait(false);
+
+            activity?.SetStatus(ActivityStatusCode.Ok);
+            return activation ?? throw new InvalidOperationException("Empty activation response from server.");
+        }, ct).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Deactivates a node-locked machine by its activation ID (FPR-15).
+    /// </summary>
+    public async Task<bool> DeactivateMachineAsync(string activationId, CancellationToken ct = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(activationId);
+
+        using var activity = SymbolonTracing.ActivitySource.StartActivity("DeactivateMachine");
+        activity?.SetTag("activationId", activationId);
+
+        try
+        {
+            return await _failoverPool.ExecuteWithFailoverAsync(async (serverUri, http, token) =>
+            {
+                var targetUri = new Uri(serverUri, $"/v1/activations/{Uri.EscapeDataString(activationId)}");
+                var response = await http.DeleteAsync(targetUri, token).ConfigureAwait(false);
+
+                if ((int)response.StatusCode is 502 or 503 or 504)
+                {
+                    throw new HttpRequestException($"Server node {serverUri} returned {(int)response.StatusCode}");
+                }
+
+                if (response.IsSuccessStatusCode)
+                {
+                    activity?.SetStatus(ActivityStatusCode.Ok);
+                    return true;
+                }
+
+                activity?.SetStatus(ActivityStatusCode.Error, $"HTTP {(int)response.StatusCode}");
+                return false;
+            }, ct).ConfigureAwait(false);
+        }
+        catch (SymbolonFailoverExhaustedException ex)
+        {
+            activity?.SetStatus(ActivityStatusCode.Error, ex.Message);
+            return false;
+        }
+    }
+
     public void Dispose()
     {
         if (_ownsPool)

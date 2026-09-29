@@ -4,6 +4,8 @@ import json
 import random
 import threading
 import time
+import socket
+import urllib.parse
 import urllib.request
 import urllib.error
 from contextlib import contextmanager
@@ -11,7 +13,12 @@ from datetime import datetime, timezone
 from typing import Dict, List, Optional, Union
 
 from .models import LeaseToken, SymbolonException, SeatAllocationDenied, FeatureDenied
-from .fingerprint import get_hardware_components, compute_canonical_fingerprint
+from .fingerprint import (
+    get_hardware_components,
+    compute_canonical_fingerprint,
+    filter_valid_components,
+    evaluate_fingerprint_match,
+)
 
 
 def _generate_w3c_traceparent() -> str:
@@ -411,6 +418,48 @@ class SymbolonClient:
 
         self.release_seat(lease_id)
         return {"success": True, "leaseId": lease_id}
+
+    def activate_machine(
+        self,
+        license_key: Optional[str] = None,
+        components: Optional[Dict[str, str]] = None,
+        machine_id: Optional[str] = None,
+    ) -> dict:
+        """Activates a node-locked machine for the license (FPR-15)."""
+        key = license_key or self.product_code
+        if components is None:
+            components = get_hardware_components(license_salt=key)
+        else:
+            components = filter_valid_components(components)
+
+        url = f"{self.server_url}/v1/activations"
+        payload = {
+            "licenseKey": key,
+            "fingerprintComponents": components,
+            "machineId": machine_id or socket.gethostname(),
+        }
+        return self._post_json(url, payload)
+
+    def deactivate_machine(self, activation_id: str) -> dict:
+        """Deactivates a node-locked machine by activation ID (FPR-15)."""
+        url = f"{self.server_url}/v1/activations/{urllib.parse.quote(activation_id)}"
+        req = urllib.request.Request(
+            url,
+            headers={
+                "User-Agent": "Symbolon-Python-SDK/1.0",
+                "traceparent": _generate_w3c_traceparent(),
+            },
+            method="DELETE",
+        )
+        try:
+            with urllib.request.urlopen(req, timeout=self.timeout) as resp:
+                data = resp.read()
+                if data:
+                    return json.loads(data.decode("utf-8"))
+                return {"success": True, "activationId": activation_id}
+        except urllib.error.HTTPError as err:
+            err_body = err.read().decode("utf-8")
+            raise Exception(f"Deactivation failed (HTTP {err.code}): {err_body}") from err
 
     def _start_heartbeat(self, lease: SeatLease, components: Dict[str, str]) -> None:
         stop_event = threading.Event()

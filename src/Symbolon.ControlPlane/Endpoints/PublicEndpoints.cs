@@ -72,6 +72,10 @@ public static class PublicEndpoints
             .WithName("DeactivateMachine")
             .WithSummary("Deaktivuje stroj.");
 
+        group.MapPost("/activations/verify-match", VerifyActivationMatch)
+            .WithName("VerifyActivationMatch")
+            .WithSummary("Overí zhodu dvoch fingerprintov podľa FPR-5 až FPR-9.");
+
         group.MapGet("/licenses/{key}/file", GetLicenseFileAsync)
             .WithName("GetLicenseFile")
             .WithSummary("Vydá podpísaný .symlic licenčný súbor.");
@@ -972,22 +976,121 @@ public static class PublicEndpoints
         }
 
         string fp = FingerprintHelper.ComputeHash(dto.FingerprintComponents);
-        var existing = license.Machines.FirstOrDefault(m => m.Fingerprint == fp);
         var now = time.GetUtcNow();
+        string strategy = license.Policy?.MachineMatching ?? MatchingStrategies.MatchMost;
 
-        if (existing is not null)
+        // 1. Check if candidate machine matches by ID, exact fingerprint, or fuzzy matching (FPR-5 to FPR-9)
+        MachineEntity? matchedMachine = null;
+
+        // Check exact fingerprint match among active machines
+        matchedMachine = license.Machines.FirstOrDefault(m => m.State == "active" && string.Equals(m.Fingerprint, fp, StringComparison.OrdinalIgnoreCase));
+
+        // If MachineId is provided, check if machine exists on this license
+        if (matchedMachine is null && !string.IsNullOrWhiteSpace(dto.MachineId))
         {
-            existing.LastHeartbeat = now;
-            await db.SaveChangesAsync(ct).ConfigureAwait(false);
-            return TypedResults.Ok(new ActivationResponseDto(existing.Id, license.Id, fp, existing.State, existing.FirstSeen));
+            var targetMachine = license.Machines.FirstOrDefault(m => m.State == "active" && (string.Equals(m.Id, dto.MachineId, StringComparison.OrdinalIgnoreCase) || string.Equals(m.Fingerprint, dto.MachineId, StringComparison.OrdinalIgnoreCase)));
+            if (targetMachine is not null)
+            {
+                // Target machine identified! Evaluate fuzzy matching (FPR-17)
+                if (!string.IsNullOrWhiteSpace(targetMachine.ComponentsJson))
+                {
+                    try
+                    {
+                        var storedComp = JsonSerializer.Deserialize<Dictionary<string, string>>(targetMachine.ComponentsJson);
+                        var eval = FingerprintMatchingEngine.EvaluateMatch(storedComp, dto.FingerprintComponents, strategy);
+                        if (eval.IsMatch)
+                        {
+                            matchedMachine = targetMachine;
+                        }
+                        else
+                        {
+                            // FPR-17: Fingerprint mismatch MUST lead to HTTP 403 Forbidden with fingerprint-mismatch (FLT-29)
+                            return TypedResults.Problem(
+                                statusCode: StatusCodes.Status403Forbidden,
+                                title: "Fingerprint Mismatch",
+                                detail: $"Machine fingerprint failed verification against registered machine under strategy '{strategy}': {eval.FailureReason}",
+                                type: ProblemTypes.FingerprintMismatch);
+                        }
+                    }
+                    catch (JsonException)
+                    {
+                    }
+                }
+            }
         }
 
+        // Check other active machines on this license for fuzzy matching (hardware upgrade / drift tolerance)
+        if (matchedMachine is null)
+        {
+            foreach (var candidate in license.Machines.Where(m => m.State == "active" && !string.IsNullOrWhiteSpace(m.ComponentsJson)))
+            {
+                try
+                {
+                    var storedComp = JsonSerializer.Deserialize<Dictionary<string, string>>(candidate.ComponentsJson!);
+                    var eval = FingerprintMatchingEngine.EvaluateMatch(storedComp, dto.FingerprintComponents, strategy);
+                    if (eval.IsMatch)
+                    {
+                        matchedMachine = candidate;
+                        break;
+                    }
+                }
+                catch (JsonException)
+                {
+                }
+            }
+        }
+
+        // If matched machine found: refresh heartbeat and update components
+        if (matchedMachine is not null)
+        {
+            matchedMachine.LastHeartbeat = now;
+            matchedMachine.Fingerprint = fp;
+            matchedMachine.ComponentsJson = JsonSerializer.Serialize(dto.FingerprintComponents);
+            await db.SaveChangesAsync(ct).ConfigureAwait(false);
+
+            return TypedResults.Ok(new ActivationResponseDto
+            {
+                ActivationId = matchedMachine.Id,
+                LicenseId = license.Id,
+                Fingerprint = fp,
+                State = matchedMachine.State,
+                ActivatedAt = matchedMachine.FirstSeen
+            });
+        }
+
+        // 2. MachineUniqueness policy enforcement (FPR-16)
+        string uniqueness = license.Policy?.MachineUniqueness ?? "per-license";
+        if (string.Equals(uniqueness, "unique", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(uniqueness, "global", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(uniqueness, "per-tenant", StringComparison.OrdinalIgnoreCase))
+        {
+            bool usedElsewhere = await db.Machines
+                .Include(m => m.License)
+                .AnyAsync(m => m.LicenseId != license.Id && m.License != null && m.License.TenantId == license.TenantId && m.State == "active" && m.Fingerprint == fp, ct)
+                .ConfigureAwait(false);
+
+            if (usedElsewhere)
+            {
+                return TypedResults.Problem(
+                    statusCode: StatusCodes.Status409Conflict,
+                    title: "Machine Already Registered",
+                    detail: "This machine fingerprint is already active on another license under uniqueness policy (FPR-16).",
+                    type: ProblemTypes.PoolExhausted);
+            }
+        }
+
+        // 3. Quota check: ensure active machines do not exceed license limit
         int activeMachines = license.Machines.Count(m => m.State == "active");
         if (activeMachines >= license.MaxSeats)
         {
-            return TypedResults.Problem(statusCode: 409, title: "Max Machine Activations Reached", type: ProblemTypes.PoolExhausted);
+            return TypedResults.Problem(
+                statusCode: StatusCodes.Status409Conflict,
+                title: "Max Machine Activations Reached",
+                detail: $"License has reached its maximum machine activation limit ({activeMachines}/{license.MaxSeats}).",
+                type: ProblemTypes.PoolExhausted);
         }
 
+        // 4. Create new activation
         string machineId = $"mch_{Guid.NewGuid():N}";
         var machine = new MachineEntity
         {
@@ -1003,7 +1106,7 @@ public static class PublicEndpoints
         db.Machines.Add(machine);
         await db.SaveChangesAsync(ct).ConfigureAwait(false);
 
-        await audit.AppendAsync(new AuditEvent("activate", license.Id, null, fp, now, $"Node-lock machine activated: {dto.MachineId}"), ct).ConfigureAwait(false);
+        await audit.AppendAsync(new AuditEvent("activate", license.Id, null, fp, now, $"Node-lock machine activated: {dto.MachineId ?? machineId} (strategy: {strategy})"), ct).ConfigureAwait(false);
 
         await webhooks.PublishEventAsync("machine.activated", new
         {
@@ -1011,10 +1114,17 @@ public static class PublicEndpoints
             licenseId = license.Id,
             tenantId = license.TenantId,
             fingerprint = fp,
-            machineId = dto.MachineId
+            machineId = dto.MachineId ?? machineId
         }, license.TenantId, ct).ConfigureAwait(false);
 
-        return TypedResults.Ok(new ActivationResponseDto(machine.Id, license.Id, fp, "active", now));
+        return TypedResults.Ok(new ActivationResponseDto
+        {
+            ActivationId = machine.Id,
+            LicenseId = license.Id,
+            Fingerprint = fp,
+            State = "active",
+            ActivatedAt = now
+        });
     }
 
     private static async Task<IResult> DeactivateAsync(
@@ -1044,7 +1154,32 @@ public static class PublicEndpoints
             fingerprint = machine.Fingerprint
         }, null, ct).ConfigureAwait(false);
 
-        return TypedResults.NoContent();
+        return TypedResults.Ok(new DeactivateResponseDto
+        {
+            Success = true,
+            ActivationId = machine.Id
+        });
+    }
+
+    private static IResult VerifyActivationMatch(VerifyFingerprintMatchRequestDto dto)
+    {
+        ArgumentNullException.ThrowIfNull(dto);
+        var result = FingerprintMatchingEngine.EvaluateMatch(
+            dto.StoredComponents,
+            dto.IncomingComponents,
+            dto.Strategy);
+
+        return TypedResults.Ok(new VerifyFingerprintMatchResponseDto
+        {
+            IsMatch = result.IsMatch,
+            StrategyUsed = result.StrategyUsed,
+            CommonComponentsCount = result.CommonComponentsCount,
+            MatchedComponentsCount = result.MatchedComponentsCount,
+            MatchedKeys = result.MatchedKeys,
+            MismatchedKeys = result.MismatchedKeys,
+            FailureReason = result.FailureReason,
+            MatchRatio = result.MatchRatio
+        });
     }
 
     private static async Task<IResult> GetLicenseFileAsync(

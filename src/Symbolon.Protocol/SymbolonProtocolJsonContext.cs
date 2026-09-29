@@ -82,6 +82,12 @@ namespace Symbolon.Protocol;
 [JsonSerializable(typeof(UpdatePolicyRulesRequestDto))]
 [JsonSerializable(typeof(SimulateRuleEvaluationRequestDto))]
 [JsonSerializable(typeof(SimulateRuleEvaluationResponseDto))]
+[JsonSerializable(typeof(VerifyFingerprintMatchRequestDto))]
+[JsonSerializable(typeof(VerifyFingerprintMatchResponseDto))]
+[JsonSerializable(typeof(FingerprintMatchResult))]
+[JsonSerializable(typeof(ActivationRequestDto))]
+[JsonSerializable(typeof(ActivationResponseDto))]
+[JsonSerializable(typeof(DeactivateResponseDto))]
 public sealed partial class SymbolonProtocolJsonContext : JsonSerializerContext
 {
 }

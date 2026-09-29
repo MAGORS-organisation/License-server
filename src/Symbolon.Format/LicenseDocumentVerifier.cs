@@ -3,6 +3,7 @@ using System.Globalization;
 using System.Text;
 using System.Text.Json;
 using Symbolon.Crypto;
+using Symbolon.Protocol;
 
 namespace Symbolon.Format;
 
@@ -32,6 +33,16 @@ public sealed class SymbolonVerifierOptions
     /// Optional revocation predicate or lookup to reject revoked license IDs (LIC-31).
     /// </summary>
     public Func<string, bool>? IsLicenseRevoked { get; init; }
+
+    /// <summary>
+    /// Optional client machine components to verify against license binding claim (LIC-33, FPR-5 to FPR-9).
+    /// </summary>
+    public IReadOnlyDictionary<string, string>? ClientFingerprintComponents { get; init; }
+
+    /// <summary>
+    /// Optional client machine fingerprint hash to verify against license binding claim (LIC-33).
+    /// </summary>
+    public string? ClientFingerprintHash { get; init; }
 }
 
 public sealed record VerificationResult(
@@ -68,6 +79,13 @@ public sealed class LicenseDocumentVerifier
         _keyRing = keyRing ?? throw new ArgumentNullException(nameof(keyRing));
         _timeProvider = timeProvider ?? TimeProvider.System;
         _options = options ?? new SymbolonVerifierOptions();
+    }
+
+    public LicenseDocumentVerifier(
+        IKeyRing keyRing,
+        SymbolonVerifierOptions options)
+        : this(keyRing, null, options)
+    {
     }
 
     /// <summary>
@@ -295,6 +313,31 @@ public sealed class LicenseDocumentVerifier
             !string.Equals(claims.Aud, _options.ExpectedAudience, StringComparison.Ordinal))
         {
             return VerificationResult.Fail($"audience-mismatch:{claims.Aud}");
+        }
+
+        // ---- Step 7: Machine binding verification (LIC-33, LIC-34) -----------
+        var binding = claims.Symlic.Binding;
+        if (binding is not null)
+        {
+            if (_options.ClientFingerprintComponents is not null && binding.Components is not null && binding.Components.Count > 0)
+            {
+                var matchResult = FingerprintMatchingEngine.EvaluateMatch(
+                    binding.Components,
+                    _options.ClientFingerprintComponents,
+                    binding.Matching);
+
+                if (!matchResult.IsMatch)
+                {
+                    return VerificationResult.Fail($"binding-mismatch:{matchResult.FailureReason ?? "Fingerprint components do not match license binding (LIC-33)"}");
+                }
+            }
+            else if (!string.IsNullOrWhiteSpace(_options.ClientFingerprintHash) && !string.IsNullOrWhiteSpace(binding.Fingerprint))
+            {
+                if (!string.Equals(_options.ClientFingerprintHash.Trim(), binding.Fingerprint.Trim(), StringComparison.OrdinalIgnoreCase))
+                {
+                    return VerificationResult.Fail($"binding-mismatch:Client fingerprint hash does not match license binding ({_options.ClientFingerprintHash} != {binding.Fingerprint})");
+                }
+            }
         }
 
         return VerificationResult.Success(claims, verifiedAlgs, unverifiableAlgs);

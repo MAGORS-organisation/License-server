@@ -61,6 +61,7 @@ internal static class Program
                 "REPORTS" or "REPORT" => await Commands.ReportCommands.HandleReportsAsync(args[1..]).ConfigureAwait(false),
                 "QUEUE" => await Commands.QueueCommands.HandleQueueAsync(args[1..]).ConfigureAwait(false),
                 "POLICY" or "OPTIONS" or "RULES" => await Commands.PolicyCommands.HandlePolicyAsync(args[1..]).ConfigureAwait(false),
+                "MACHINE" or "FINGERPRINT" or "ACTIVATION" or "ACTIVATIONS" => await Commands.MachineCommands.HandleMachineAsync(args[1..]).ConfigureAwait(false),
                 _ => UnknownCommand(args[0])
             };
         }
@@ -882,6 +883,7 @@ internal static class Program
               reports concurrency|true-up|denials|verify-audit Enterprise audit výkazy, peak concurrency (FLT-38), true-up a overenie integrity
               queue list|status|cancel|promote          Prioritný licenčný rad (FLT-31), monitoring ticketov a auto-wait
               policy rules get|set|test                 Options file pravidlá (FLT-23, FLT-24, FLT-25), rezervácie, zákazy a kvóty
+              machine fingerprint|activate|deactivate|test-match|list Hardvérový fingerprint, fuzzy node-lock matching a aktivácie
             """);
     }
 }

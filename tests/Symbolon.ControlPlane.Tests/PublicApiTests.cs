@@ -132,7 +132,7 @@ public sealed class PublicApiTests : IClassFixture<ControlPlaneFactory>
 
         // 3. Deactivate first machine
         var deactRes = await _client.DeleteAsync($"/v1/activations/{act.ActivationId}");
-        Assert.Equal(HttpStatusCode.NoContent, deactRes.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, deactRes.StatusCode);
     }
 
     [Fact]

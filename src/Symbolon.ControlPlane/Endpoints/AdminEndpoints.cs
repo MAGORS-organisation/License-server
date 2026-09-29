@@ -40,6 +40,8 @@ public static class AdminEndpoints
         group.MapGet("/licenses", GetLicensesAsync).WithName("GetLicenses");
         group.MapGet("/licenses/{id}", GetLicenseByIdAsync).WithName("GetLicenseById");
         group.MapPost("/licenses/{id}/revoke", RevokeLicenseAsync).WithName("RevokeLicense");
+        group.MapGet("/licenses/{id}/activations", GetLicenseActivationsAsync).WithName("GetLicenseActivations");
+        group.MapDelete("/activations/{id}", DeactivateMachineAdminAsync).WithName("DeactivateMachineAdmin");
 
         // Audit, Reports & Alerts
         group.MapGet("/audit", GetAuditEventsAsync).WithName("GetAuditEvents");
@@ -279,13 +281,15 @@ public static class AdminEndpoints
             BorrowMaxConcurrent = dto.BorrowMaxConcurrent,
             OfflineAllowed = dto.OfflineAllowed,
             CryptoProfile = dto.CryptoProfile,
+            MachineMatching = dto.MachineMatching,
+            MachineUniqueness = dto.MachineUniqueness,
             EntitlementsJson = JsonSerializer.Serialize(dto.Entitlements ?? ["core"])
         };
 
         db.Policies.Add(policy);
         await db.SaveChangesAsync(ct).ConfigureAwait(false);
 
-        return TypedResults.Created($"/admin/v1/policies/{id}", new PolicyDto(policy.Id, policy.TenantId, policy.ProductId, policy.Code, policy.Name, policy.LicenseModel, policy.MaxSeats, policy.SeatUnit, policy.LeaseTtlSeconds));
+        return TypedResults.Created($"/admin/v1/policies/{id}", new PolicyDto(policy.Id, policy.TenantId, policy.ProductId, policy.Code, policy.Name, policy.LicenseModel, policy.MaxSeats, policy.SeatUnit, policy.LeaseTtlSeconds, policy.MachineMatching, policy.MachineUniqueness));
     }
 
     private static async Task<IResult> GetPoliciesAsync(
@@ -301,7 +305,7 @@ public static class AdminEndpoints
         }
 
         var list = await query
-            .Select(p => new PolicyDto(p.Id, p.TenantId, p.ProductId, p.Code, p.Name, p.LicenseModel, p.MaxSeats, p.SeatUnit, p.LeaseTtlSeconds))
+            .Select(p => new PolicyDto(p.Id, p.TenantId, p.ProductId, p.Code, p.Name, p.LicenseModel, p.MaxSeats, p.SeatUnit, p.LeaseTtlSeconds, p.MachineMatching, p.MachineUniqueness))
             .ToListAsync(ct)
             .ConfigureAwait(false);
         return TypedResults.Ok(list);
@@ -494,6 +498,81 @@ public static class AdminEndpoints
         }, license.TenantId, ct).ConfigureAwait(false);
 
         return TypedResults.Ok(new { message = $"License {id} revoked.", reason = dto.Reason });
+    }
+
+    private static async Task<IResult> GetLicenseActivationsAsync(
+        string id,
+        HttpContext context,
+        SymbolonDbContext db,
+        CancellationToken ct)
+    {
+        var license = await db.Licenses
+            .Include(l => l.Machines)
+            .FirstOrDefaultAsync(l => l.Id == id, ct)
+            .ConfigureAwait(false);
+
+        if (license is null) return TypedResults.NotFound();
+
+        if (!IsSuperAdmin(context) && license.TenantId != GetCallerTenantId(context))
+        {
+            return TypedResults.NotFound();
+        }
+
+        var dtos = license.Machines.Select(m =>
+        {
+            Dictionary<string, string>? components = null;
+            if (!string.IsNullOrWhiteSpace(m.ComponentsJson))
+            {
+                try
+                {
+                    components = JsonSerializer.Deserialize<Dictionary<string, string>>(m.ComponentsJson);
+                }
+                catch (JsonException)
+                {
+                }
+            }
+
+            return new MachineActivationAdminDto(
+                m.Id,
+                m.LicenseId,
+                m.Fingerprint,
+                m.Id,
+                m.State,
+                m.FirstSeen,
+                m.LastHeartbeat,
+                components);
+        }).ToList();
+
+        return TypedResults.Ok(dtos);
+    }
+
+    private static async Task<IResult> DeactivateMachineAdminAsync(
+        string id,
+        HttpContext context,
+        SymbolonDbContext db,
+        IAuditLedger audit,
+        TimeProvider time,
+        CancellationToken ct)
+    {
+        var machine = await db.Machines
+            .Include(m => m.License)
+            .FirstOrDefaultAsync(m => m.Id == id, ct)
+            .ConfigureAwait(false);
+
+        if (machine is null) return TypedResults.NotFound();
+
+        if (!IsSuperAdmin(context) && machine.License?.TenantId != GetCallerTenantId(context))
+        {
+            return TypedResults.NotFound();
+        }
+
+        machine.State = "deactivated";
+        await db.SaveChangesAsync(ct).ConfigureAwait(false);
+
+        var now = time.GetUtcNow();
+        await audit.AppendAsync(new AuditEvent("deactivate", machine.LicenseId, null, machine.Fingerprint, now, $"Admin deactivated machine node-lock: {machine.Id}"), ct).ConfigureAwait(false);
+
+        return TypedResults.Ok(new { success = true, id = machine.Id });
     }
 
     private static async Task<IResult> GetAuditEventsAsync(

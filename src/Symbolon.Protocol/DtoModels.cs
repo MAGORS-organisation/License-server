@@ -504,3 +504,86 @@ public static class ProblemTypes
     public const string ChallengeExpired = "https://symbolon.dev/problems/challenge-expired";
 }
 
+public sealed record VerifyFingerprintMatchRequestDto
+{
+    [JsonPropertyName("storedComponents")]
+    public required Dictionary<string, string> StoredComponents { get; init; }
+
+    [JsonPropertyName("incomingComponents")]
+    public required Dictionary<string, string> IncomingComponents { get; init; }
+
+    [JsonPropertyName("strategy")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Strategy { get; init; }
+}
+
+public sealed record VerifyFingerprintMatchResponseDto
+{
+    [JsonPropertyName("isMatch")]
+    public required bool IsMatch { get; init; }
+
+    [JsonPropertyName("strategyUsed")]
+    public required string StrategyUsed { get; init; }
+
+    [JsonPropertyName("commonComponentsCount")]
+    public required int CommonComponentsCount { get; init; }
+
+    [JsonPropertyName("matchedComponentsCount")]
+    public required int MatchedComponentsCount { get; init; }
+
+    [JsonPropertyName("matchedKeys")]
+    public required IReadOnlyList<string> MatchedKeys { get; init; }
+
+    [JsonPropertyName("mismatchedKeys")]
+    public required IReadOnlyList<string> MismatchedKeys { get; init; }
+
+    [JsonPropertyName("failureReason")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? FailureReason { get; init; }
+
+    [JsonPropertyName("matchRatio")]
+    public double MatchRatio { get; init; }
+}
+
+public sealed record ActivationRequestDto
+{
+    [Required]
+    [JsonPropertyName("licenseKey")]
+    public required string LicenseKey { get; init; }
+
+    [Required]
+    [JsonPropertyName("fingerprintComponents")]
+    public required Dictionary<string, string> FingerprintComponents { get; init; }
+
+    [JsonPropertyName("machineId")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? MachineId { get; init; }
+}
+
+public sealed record ActivationResponseDto
+{
+    [JsonPropertyName("activationId")]
+    public required string ActivationId { get; init; }
+
+    [JsonPropertyName("licenseId")]
+    public required string LicenseId { get; init; }
+
+    [JsonPropertyName("fingerprint")]
+    public required string Fingerprint { get; init; }
+
+    [JsonPropertyName("state")]
+    public required string State { get; init; }
+
+    [JsonPropertyName("activatedAt")]
+    public required DateTimeOffset ActivatedAt { get; init; }
+}
+
+public sealed record DeactivateResponseDto
+{
+    [JsonPropertyName("success")]
+    public required bool Success { get; init; }
+
+    [JsonPropertyName("activationId")]
+    public required string ActivationId { get; init; }
+}
+

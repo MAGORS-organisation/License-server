@@ -10,6 +10,37 @@ a projekt striktne dodržiava [Sémantické Verziovanie (Semantic Versioning 2.0
 ## [Unreleased]
 
 ### Pridané (Added)
+- **Advanced Multi-Component Hardware Fingerprinting, Fuzzy Node-Lock Matching & Anti-Virtualization/Container Isolation (FPR-1 – FPR-19, LIC-33, §7.6, §8)**:
+  - **Formátová a Protokolová vrstva (`Symbolon.Format`, `Symbolon.Protocol`)**:
+    - `FingerprintHelper`: Zber a normalizácia 6 štandardných kľúčov (`machineId`, `board`, `cpu`, `disk`, `mac`, `host`) podľa **FPR-1**. Pseudonymizácia názvu hostu so salted SHA-256 (`PseudonymizeHost(rawHost, licenseSalt)`) chrániaca PII a zabezpečujúca GDPR súlad (**FPR-2**). Striktné filtrovanie zástupných hodnôt a placeholderov (`"unknown"`, `"none"`, zeros) podľa **FPR-3**. Kanonický formát triedených kľúčov `CODE=value\n` a výpočet súhrnného SHA-256 odtlačku (**FPR-4**).
+    - `FingerprintMatchingEngine`: Implementácia 4 párovacích stratégií (**FPR-5**): `match-any` (aspoň 1 zhoda), `match-two` (aspoň 2 zhody), `match-most` (>50% zhodných), a `match-all` (100% zhoda). Spoločný prienik komponentov podľa **FPR-7**. Bezpečnostné pravidlo **FPR-8**: pri počte spoločných komponentov < 2 automatická degradácia `match-most` na `match-all`.
+    - `LicenseDocumentVerifier`: Integrácia Kroku 7 (`LIC-33`, `LIC-34`) — hardvérová verifikácia viazaných uzlov priamo pri overovaní `.symlic` licenčného dokumentu s podporou `ClientFingerprintComponents` a `ClientFingerprintHash` v `SymbolonVerifierOptions`.
+    - DTO kontrakty: `ActivationRequestDto`, `ActivationResponseDto`, `DeactivateResponseDto`, `VerifyFingerprintMatchRequestDto`, `VerifyFingerprintMatchResponseDto` registrované v `SymbolonProtocolJsonContext` pre Native AOT kompiláciu.
+    - Problémový typ `ProblemTypes.FingerprintMismatch` (`https://symbolon.dev/errors/fingerprint-mismatch`) v `Symbolon.Protocol`.
+  - **Klientske SDK (`Symbolon.Client`, Python SDK)**:
+    - `DeviceFingerprint`: Cross-platform multi-komponentový zberač hardvérových odtlačkov (Windows Registry/WMI/SMBIOS, Linux `/etc/machine-id`, `/sys/class/dmi`, `/proc/cpuinfo`, macOS `IOPlatformUUID` / `sysctl`).
+    - Detekcia kontajnerov a cloud prostredí (`IsContainerOrCloud()`): kontrola `/.dockerenv`, `/proc/1/cgroup` (`docker`, `containerd`, `kubepods`), Kubernetes premenných a cloud hypervízor MAC prefixov (**FPR-10**, **FPR-11**).
+    - Persistentný volume UUID generátor pre kontajnerové úlohy (**FPR-12**) a diagnostické varovania s odporúčaním floating lízingu pre efemérne kontajnery (**FPR-13**).
+    - `SymbolonClient.ActivateMachineAsync` a `DeactivateMachineAsync` s automatickým failoverom a failover pool manažérom (**FPR-15**).
+    - Python SDK (`symbolon.fingerprint` & `SymbolonClient`): Plná parita funkcií `collect_device_fingerprint`, `evaluate_fingerprint_match`, `is_container_or_cloud`, `activate_machine`, `deactivate_machine`.
+  - **Serverové riadenie a Dátová vrstva (`Symbolon.ControlPlane`, `Symbolon.Data`)**:
+    - Rozšírenie `Policy` o `MachineMatching` (predvolené `"match-most"`) a `MachineUniqueness` (predvolené `"per-license"`).
+    - `POST /v1/activations`: Viazanie stanice s fuzzy hardvérovým párovaním (`FPR-5` – `FPR-9`), kontrola `MachineUniqueness` (**FPR-16**) a návrat `403 Forbidden` (`ProblemTypes.FingerprintMismatch`) pri nezhode (**FPR-17**).
+    - `DELETE /v1/activations/{id}`: Deaktivácia stanice s návratom `DeactivateResponseDto` a okamžité uvoľnenie node-lock slotu (**FPR-15**).
+    - `POST /v1/activations/verify-match`: Verejný endpoint pre simuláciu a overenie zhody dvoch fingerprintov.
+    - `GET /admin/v1/licenses/{id}/activations` a `DELETE /admin/v1/activations/{id}` v administratívnom API.
+  - **CLI Nástroje (`Symbolon.Cli`)**:
+    - `symbolon machine fingerprint [--license <key>] [--json]`: Zobrazenie lokálneho hardvérového fingerprintu, kontajnerového statusu a súhrnného hashu.
+    - `symbolon machine activate <licenseKey> [--server <url>] [--machine-id <id>]`: Registrácia a aktivácia uzla voči serveru.
+    - `symbolon machine deactivate <activationId> [--server <url>]`: Deaktivácia uzla a uvoľnenie slotu.
+    - `symbolon machine test-match --stored <f1.json> --current <f2.json> [--strategy <strat>]`: CLI simulátor zhody fingerprintov.
+    - `symbolon machine list <licenseId> [--server <url>]`: Výpis registrovaných staníc pre licenciu.
+  - **Web Dashboard & Retro FoxPro TUI**:
+    - Sekcia evidovaných strojov priamo v modále licencie s možnosťou okamžitej deaktivácie.
+    - Dedikovaný modul `Node-Lock & Stroje` (`#machines` / `view-machines`) s KPI kartami, prehľadom aktivovaných uzlov a interaktívnym simulátorom fuzzy párovania (`/v1/activations/verify-match`).
+    - Aktualizované retro menu, klávesové skratky a FoxPro kaskádové podmenu.
+  - **Testovacie Pokrytie**:
+    - Viac ako 420 testov naprieč celým riešením, vrátane unit testov protokolu, formátu, API integrácií, CLI príkazov a 25 testov Python SDK (100% úspešnosť).
 - **Enterprise Offline Roaming, Self-Verifiable `.symlease` Artifact & Cryptographic Proof-of-Possession Early Return (FLT-17 – FLT-22, §7.4)**:
   - **Formátová vrstva (`Symbolon.Format`)**:
     - `SymleaseClaims` & `SymleaseBorrowPayload`: JWT/JWS claims štruktúra pre offline roaming v súlade s RFC 7519, RFC 7515 a Symbolon §7.4.

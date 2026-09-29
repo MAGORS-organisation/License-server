@@ -68,6 +68,8 @@ public sealed class Policy
     public bool OfflineAllowed { get; set; } = true;
     public int OfflineFileTtlDays { get; set; } = 30;
     public string CryptoProfile { get; set; } = "hybrid-v1";
+    public string MachineMatching { get; set; } = "match-most";
+    public string MachineUniqueness { get; set; } = "per-license";
     public string EntitlementsJson { get; set; } = "[]";
     public string? RulesYaml { get; set; }
 
