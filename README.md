@@ -156,6 +156,16 @@ Rieši to, čo dnešné cloud-first platformy ponúkajú iba ako obmedzený dopl
     - **FLT-25 Aktualizácia za Behu s Auditom**: Zmena pravidiel cez `PUT /admin/v1/licenses/{id}/rules` vyvoláva auditnú udalosť `policy.rules_updated`, dynamicky synchronizuje rezervácie a zachováva aktívne leasingy až do vypršania TTL.
     - **Wildcard & CIDR Matching**: Presné priraďovanie skupín používateľov (`eng-*`), hostiteľov (`srv-*`) a IP podsietí (IPv4/IPv6 CIDR notácia `10.0.0.0/8`, `192.168.1.0/24`).
     - **Multi-Interface Parita**: REST API endpointy, lokálny engine v on-premise Relay serveri, CLI príkazy `symbolon policy rules get|set|test`, obojsmerný YAML editor a interaktívny simulátor vo Web Dashboarde aj v Retro FoxPro TUI.
+33. **Enterprise Offline Roaming, Self-Verifiable `.symlease` Artifact & Cryptographic Proof-of-Possession Early Return (FLT-17 – FLT-22, §7.4)**
+    - **Offline Roaming & Zapožičanie Sedadla**: Možnosť zapožičať plávajúce sedadlo na offline použitie na definovaný počet dní (FLT-17).
+    - **Samostatne Verifikovateľný `.symlease` Artefakt**: JWS General JSON formát s PEM obálkou (`-----BEGIN SYMBOLON LEASE-----`), hybridným podpisom (ES256 + ML-DSA-65) a deterministickou verifikáciou offline klientom.
+    - **Cryptographic Proof-of-Possession Early Return (FLT-21)**: Predčasné vrátenie sedadla cez challenge-response mechanizmus — server vydá jednorazovú výzvu (nonce s 5-minútovou TTL) a klient ju podpíše efemérnym privátnym kľúčom vytvoreným pri zapožičaní.
+    - **Ochrana Proti Neautorizovanému Uvoľneniu (FLT-22)**: Bežné uvoľnenie (`DELETE /v1/leases/{id}`) bez dôkazu o držbe zapožičaného sedadla zlyháva s chybou `403 Forbidden` (`ProofOfPossessionRequired`).
+34. **Advanced Multi-Component Hardware Fingerprinting, Fuzzy Node-Lock Matching & Anti-Virtualization/Container Isolation (FPR-1 – FPR-19, LIC-33, §7.6, §8)**
+    - **Multi-Component Hardvérový Odtlačok (FPR-1 – FPR-4)**: Deterministický zber 6 štandardných kľúčov (`machineId`, `board`, `cpu`, `disk`, `mac`, `host`) s vynechaním placeholderov a GDPR-kompatibilnou salted SHA-256 pseudonymizáciou hostname.
+    - **Fuzzy Node-Lock Matching Engine (FPR-5 – FPR-9)**: Podpora stratégií `match-any`, `match-two`, `match-most` (predvolená, >50%) a `match-all` s automatickou degradáciou na `match-all` pri menej ako 2 spoločných komponentoch (FPR-8).
+    - **Anti-Virtualizácia & Kontajnerová Izolácia (FPR-10 – FPR-14)**: Detekcia Docker, Containerd, Kubernetes a hypervízorových prostredí, persistentný volume UUID manažment a odporúčanie prechodu na floating lízing.
+    - **Životný Cyklus Aktivácie & Správa Uzlov (FPR-15 – FPR-17)**: Registrácia uzlov cez `POST /v1/activations`, kontrola unikátnosti podľa politiky, overenie zhody cez `POST /v1/activations/verify-match` a okamžité uvoľnenie slotu pri deaktivácii.
 
 ---
 
