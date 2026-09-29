@@ -16,6 +16,7 @@ public sealed class EfSeatStore(SymbolonDbContext db) : ISeatStore
         string? machineId,
         DateTimeOffset now,
         TimeSpan ttl,
+        string? reservationTarget = null,
         CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(licenseId);
@@ -31,9 +32,17 @@ public sealed class EfSeatStore(SymbolonDbContext db) : ISeatStore
                 .ToListAsync(ct)
                 .ConfigureAwait(false);
 
-            var candidate = seats.FirstOrDefault(s =>
+            var freeSeats = seats.Where(s =>
                 (s.LeaseId == null || s.ExpiresAt < now) &&
-                (s.BorrowedUntil == null || s.BorrowedUntil < now));
+                (s.BorrowedUntil == null || s.BorrowedUntil < now)).ToList();
+
+            SeatEntity? candidate = null;
+            if (!string.IsNullOrWhiteSpace(reservationTarget))
+            {
+                candidate = freeSeats.FirstOrDefault(s => string.Equals(s.ReservedFor, reservationTarget, StringComparison.OrdinalIgnoreCase));
+            }
+
+            candidate ??= freeSeats.FirstOrDefault(s => s.ReservedFor == null);
 
             if (candidate is null)
             {
@@ -85,6 +94,7 @@ public sealed class EfSeatStore(SymbolonDbContext db) : ISeatStore
         int quantity,
         DateTimeOffset now,
         TimeSpan ttl,
+        string? reservationTarget = null,
         CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(licenseId);
@@ -105,11 +115,18 @@ public sealed class EfSeatStore(SymbolonDbContext db) : ISeatStore
                 .ToListAsync(ct)
                 .ConfigureAwait(false);
 
-            var candidates = seats
+            var freeSeats = seats
                 .Where(s => (s.LeaseId == null || s.ExpiresAt < now) &&
                             (s.BorrowedUntil == null || s.BorrowedUntil < now))
-                .Take(quantity)
                 .ToList();
+
+            var matchingReserved = !string.IsNullOrWhiteSpace(reservationTarget)
+                ? freeSeats.Where(s => string.Equals(s.ReservedFor, reservationTarget, StringComparison.OrdinalIgnoreCase))
+                : Enumerable.Empty<SeatEntity>();
+
+            var unreserved = freeSeats.Where(s => s.ReservedFor == null);
+
+            var candidates = matchingReserved.Concat(unreserved).Take(quantity).ToList();
 
             if (candidates.Count < quantity)
             {
@@ -242,7 +259,7 @@ public sealed class EfSeatStore(SymbolonDbContext db) : ISeatStore
             seat.AcquiredAt = null;
             seat.ExpiresAt = null;
             seat.BorrowedUntil = null;
-            seat.ReservedFor = null;
+            seat.UserId = null;
             seat.LeaseSeq = 0;
         }
 
@@ -314,5 +331,76 @@ public sealed class EfSeatStore(SymbolonDbContext db) : ISeatStore
         }
 
         return null;
+    }
+
+    public async Task SyncSeatReservationsAsync(
+        string licenseId,
+        IReadOnlyList<(string Target, int Count)> reservations,
+        CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(licenseId);
+        ArgumentNullException.ThrowIfNull(reservations);
+
+        var now = DateTimeOffset.UtcNow;
+        var seats = await db.Seats
+            .Where(s => s.LicenseId == licenseId && s.GrantId == null)
+            .OrderBy(s => s.IsOverage)
+            .ThenBy(s => s.SeatNo)
+            .ToListAsync(ct)
+            .ConfigureAwait(false);
+
+        var desiredMap = reservations.ToDictionary(r => r.Target, r => r.Count, StringComparer.OrdinalIgnoreCase);
+
+        // 1. For targets that are no longer in desired reservations, clear ReservedFor on free seats (FLT-25)
+        foreach (var seat in seats)
+        {
+            if (seat.ReservedFor != null && !desiredMap.ContainsKey(seat.ReservedFor))
+            {
+                bool isFree = (seat.LeaseId == null || seat.ExpiresAt < now) && (seat.BorrowedUntil == null || seat.BorrowedUntil < now);
+                if (isFree)
+                {
+                    seat.ReservedFor = null;
+                }
+            }
+        }
+
+        // 2. Adjust counts for desired reservations (FLT-23)
+        foreach (var (target, count) in reservations)
+        {
+            int currentReservedCount = seats.Count(s => string.Equals(s.ReservedFor, target, StringComparison.OrdinalIgnoreCase));
+
+            if (currentReservedCount < count)
+            {
+                int needMore = count - currentReservedCount;
+                var unreservedFreeSeats = seats
+                    .Where(s => s.ReservedFor == null &&
+                                (s.LeaseId == null || s.ExpiresAt < now) &&
+                                (s.BorrowedUntil == null || s.BorrowedUntil < now))
+                    .Take(needMore)
+                    .ToList();
+
+                foreach (var s in unreservedFreeSeats)
+                {
+                    s.ReservedFor = target;
+                }
+            }
+            else if (currentReservedCount > count)
+            {
+                int reduceBy = currentReservedCount - count;
+                var freeToRemove = seats
+                    .Where(s => string.Equals(s.ReservedFor, target, StringComparison.OrdinalIgnoreCase) &&
+                                (s.LeaseId == null || s.ExpiresAt < now) &&
+                                (s.BorrowedUntil == null || s.BorrowedUntil < now))
+                    .Take(reduceBy)
+                    .ToList();
+
+                foreach (var s in freeToRemove)
+                {
+                    s.ReservedFor = null;
+                }
+            }
+        }
+
+        await db.SaveChangesAsync(ct).ConfigureAwait(false);
     }
 }

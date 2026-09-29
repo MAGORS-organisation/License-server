@@ -7,9 +7,11 @@ using Symbolon.ControlPlane.Models;
 using Symbolon.Data;
 using Symbolon.Data.Entities;
 using Symbolon.Domain;
+using Symbolon.Domain.PolicyRules;
 using Symbolon.Domain.Reporting;
 using Symbolon.Domain.Security;
 using Symbolon.Format;
+using Symbolon.Protocol;
 using Symbolon.Protocol.Reporting;
 using Symbolon.ControlPlane.Queuing;
 
@@ -62,6 +64,11 @@ public static class AdminEndpoints
         group.MapPost("/licenses/{id}/users", AssignLicenseUserAsync).WithName("AssignLicenseUser");
         group.MapGet("/licenses/{id}/users", GetLicenseUsersAsync).WithName("GetLicenseUsers");
         group.MapDelete("/licenses/{id}/users/{userId}", RemoveLicenseUserAsync).WithName("RemoveLicenseUser");
+
+        // Options File & Policy Rules (FLT-23, FLT-24, FLT-25, §7.5)
+        group.MapGet("/licenses/{id}/rules", GetLicenseRulesAsync).WithName("GetLicenseRules");
+        group.MapPut("/licenses/{id}/rules", UpdateLicenseRulesAsync).WithName("UpdateLicenseRules");
+        group.MapPost("/licenses/{id}/rules/simulate", SimulateLicenseRulesAsync).WithName("SimulateLicenseRules");
 
         // Quotas & Metered Units
         group.MapPost("/licenses/{id}/quotas", SetLicenseQuotaAsync).WithName("SetLicenseQuota");
@@ -1069,6 +1076,245 @@ public static class AdminEndpoints
         db.LicenseUsers.Remove(user);
         await db.SaveChangesAsync(ct).ConfigureAwait(false);
         return TypedResults.Ok(new { message = $"User {userId} removed from license {id}." });
+    }
+
+    private static async Task<IResult> GetLicenseRulesAsync(
+        string id,
+        HttpContext context,
+        SymbolonDbContext db,
+        CancellationToken ct)
+    {
+        var license = await db.Licenses.Include(l => l.Policy).FirstOrDefaultAsync(l => l.Id == id, ct).ConfigureAwait(false);
+        if (license is null) return TypedResults.NotFound();
+
+        if (!IsSuperAdmin(context) && license.TenantId != GetCallerTenantId(context))
+        {
+            return TypedResults.NotFound();
+        }
+
+        string rawYaml = license.RulesYaml ?? license.Policy?.RulesYaml ?? string.Empty;
+        var ruleSet = !string.IsNullOrWhiteSpace(rawYaml)
+            ? PolicyRuleSerializer.Parse(rawYaml)
+            : new PolicyRuleSet(1, license.Id, [], []);
+
+        var dto = new PolicyRuleSetDto
+        {
+            Version = ruleSet.Version,
+            LicenseId = license.Id,
+            RawYaml = rawYaml,
+            Groups = ruleSet.Groups.Select(g => new PolicyRuleGroupDto
+            {
+                Name = g.Name,
+                Members = g.Members,
+                Hosts = g.Hosts
+            }).ToList(),
+            Rules = ruleSet.Rules.Select(r => new PolicyRuleItemDto
+            {
+                Type = r.Type switch
+                {
+                    PolicyRuleType.Deny => "deny",
+                    PolicyRuleType.Max => "max",
+                    PolicyRuleType.Reserve => "reserve",
+                    PolicyRuleType.Priority => "priority",
+                    _ => "deny"
+                },
+                Value = r.Value,
+                Group = r.Target?.Group,
+                User = r.Target?.User,
+                Subnet = r.Target?.Subnet,
+                Host = r.Target?.Host,
+                Hosts = r.Hosts,
+                Users = r.Users,
+                Groups = r.Groups,
+                Subnets = r.Subnets,
+                Feature = r.Feature,
+                Reason = r.Reason
+            }).ToList()
+        };
+
+        return TypedResults.Ok(dto);
+    }
+
+    private static async Task<IResult> UpdateLicenseRulesAsync(
+        string id,
+        UpdatePolicyRulesRequestDto dto,
+        HttpContext context,
+        SymbolonDbContext db,
+        ISeatStore seatStore,
+        IAuditLedger audit,
+        TimeProvider time,
+        CancellationToken ct)
+    {
+        var license = await db.Licenses.Include(l => l.Policy).FirstOrDefaultAsync(l => l.Id == id, ct).ConfigureAwait(false);
+        if (license is null) return TypedResults.NotFound();
+
+        if (!IsSuperAdmin(context) && license.TenantId != GetCallerTenantId(context))
+        {
+            return TypedResults.NotFound();
+        }
+
+        string? content = dto.RulesYaml ?? dto.RulesJson;
+        PolicyRuleSet ruleSet;
+        if (string.IsNullOrWhiteSpace(content))
+        {
+            license.RulesYaml = null;
+            ruleSet = new PolicyRuleSet(1, license.Id, [], []);
+            await seatStore.SyncSeatReservationsAsync(license.Id, [], ct).ConfigureAwait(false);
+        }
+        else
+        {
+            try
+            {
+                ruleSet = PolicyRuleSerializer.Parse(content);
+            }
+            catch (Exception ex) when (ex is JsonException or FormatException or ArgumentException)
+            {
+                return TypedResults.Problem(
+                    statusCode: StatusCodes.Status400BadRequest,
+                    title: "Invalid Policy Rules Format",
+                    detail: ex.Message,
+                    type: ProblemTypes.InvalidRequest);
+            }
+
+            license.RulesYaml = PolicyRuleSerializer.ToYaml(ruleSet);
+
+            var reservations = ruleSet.Rules
+                .Where(r => r.Type == PolicyRuleType.Reserve && r.Value.HasValue)
+                .Select(r => (Target: r.Target?.Group ?? r.Target?.User ?? (r.Groups is { Count: > 0 } ? r.Groups[0] : (r.Users is { Count: > 0 } ? r.Users[0] : "default")), Count: r.Value.GetValueOrDefault()))
+                .ToList();
+
+            await seatStore.SyncSeatReservationsAsync(license.Id, reservations, ct).ConfigureAwait(false);
+        }
+
+        await db.SaveChangesAsync(ct).ConfigureAwait(false);
+
+        var now = time.GetUtcNow();
+        await audit.AppendAsync(new AuditEvent(
+            "policy.rules_updated",
+            license.Id,
+            null,
+            null,
+            now,
+            $"Updated policy rules: {ruleSet.Rules.Count} rules across {ruleSet.Groups.Count} groups"), ct).ConfigureAwait(false);
+
+        var resultDto = new PolicyRuleSetDto
+        {
+            Version = ruleSet.Version,
+            LicenseId = license.Id,
+            RawYaml = license.RulesYaml,
+            Groups = ruleSet.Groups.Select(g => new PolicyRuleGroupDto
+            {
+                Name = g.Name,
+                Members = g.Members,
+                Hosts = g.Hosts
+            }).ToList(),
+            Rules = ruleSet.Rules.Select(r => new PolicyRuleItemDto
+            {
+                Type = r.Type switch
+                {
+                    PolicyRuleType.Deny => "deny",
+                    PolicyRuleType.Max => "max",
+                    PolicyRuleType.Reserve => "reserve",
+                    PolicyRuleType.Priority => "priority",
+                    _ => "deny"
+                },
+                Value = r.Value,
+                Group = r.Target?.Group,
+                User = r.Target?.User,
+                Subnet = r.Target?.Subnet,
+                Host = r.Target?.Host,
+                Hosts = r.Hosts,
+                Users = r.Users,
+                Groups = r.Groups,
+                Subnets = r.Subnets,
+                Feature = r.Feature,
+                Reason = r.Reason
+            }).ToList()
+        };
+
+        return TypedResults.Ok(resultDto);
+    }
+
+    private static async Task<IResult> SimulateLicenseRulesAsync(
+        string id,
+        SimulateRuleEvaluationRequestDto dto,
+        HttpContext context,
+        SymbolonDbContext db,
+        CancellationToken ct)
+    {
+        var license = await db.Licenses.Include(l => l.Policy).FirstOrDefaultAsync(l => l.Id == id, ct).ConfigureAwait(false);
+        if (license is null) return TypedResults.NotFound();
+
+        if (!IsSuperAdmin(context) && license.TenantId != GetCallerTenantId(context))
+        {
+            return TypedResults.NotFound();
+        }
+
+        string rawYaml = license.RulesYaml ?? license.Policy?.RulesYaml ?? string.Empty;
+        if (string.IsNullOrWhiteSpace(rawYaml))
+        {
+            return TypedResults.Ok(new SimulateRuleEvaluationResponseDto
+            {
+                Allowed = true,
+                DenyReason = null,
+                DenyType = null,
+                ResolvedPriority = null,
+                MatchedReservation = null,
+                MaxLimit = null
+            });
+        }
+
+        var ruleSet = PolicyRuleSerializer.Parse(rawYaml);
+        var activeSeats = await db.Seats
+            .Where(s => s.LicenseId == license.Id && s.LeaseId != null)
+            .ToListAsync(ct)
+            .ConfigureAwait(false);
+
+        int GetActiveCount(string targetName)
+        {
+            if (targetName.StartsWith("group:", StringComparison.OrdinalIgnoreCase))
+            {
+                string grp = targetName["group:".Length..];
+                var groupDef = ruleSet.Groups.FirstOrDefault(g => string.Equals(g.Name, grp, StringComparison.OrdinalIgnoreCase));
+                if (groupDef != null)
+                {
+                    return activeSeats.Count(s =>
+                        (s.UserId != null && groupDef.Members.Any(m => WildcardMatcher.Matches(s.UserId, m))) ||
+                        (s.MachineId != null && groupDef.Hosts != null && groupDef.Hosts.Any(h => WildcardMatcher.Matches(s.MachineId, h))) ||
+                        (s.ReservedFor != null && string.Equals(s.ReservedFor, grp, StringComparison.OrdinalIgnoreCase)));
+                }
+                return activeSeats.Count(s => (s.ReservedFor != null && string.Equals(s.ReservedFor, grp, StringComparison.OrdinalIgnoreCase)) ||
+                                             (s.UserId != null && string.Equals(s.UserId, grp, StringComparison.OrdinalIgnoreCase)));
+            }
+            else if (targetName.StartsWith("user:", StringComparison.OrdinalIgnoreCase))
+            {
+                string u = targetName["user:".Length..];
+                return activeSeats.Count(s => s.UserId != null && WildcardMatcher.Matches(s.UserId, u));
+            }
+            return 0;
+        }
+
+        var evalContext = new RuleEvaluationContext(
+            LicenseId: license.Id,
+            UserId: dto.UserId,
+            MachineId: dto.MachineId,
+            HostName: dto.HostName ?? dto.MachineId,
+            ClientIp: dto.ClientIp,
+            Features: dto.Features,
+            CurrentlyHeldByClient: 0,
+            GetActiveCountForTarget: GetActiveCount);
+
+        var evalResult = PolicyRuleEngine.Evaluate(ruleSet, evalContext);
+
+        return TypedResults.Ok(new SimulateRuleEvaluationResponseDto
+        {
+            Allowed = evalResult.Allowed,
+            DenyReason = evalResult.DenyReason,
+            DenyType = evalResult.DenyType,
+            ResolvedPriority = evalResult.ResolvedPriority,
+            MatchedReservation = evalResult.MatchedReservationTarget,
+            MaxLimit = evalResult.MaxLimit
+        });
     }
 
     private static async Task<IResult> SetLicenseQuotaAsync(

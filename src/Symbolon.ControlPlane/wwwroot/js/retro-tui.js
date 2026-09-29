@@ -36,6 +36,7 @@
         { id: 'features', label: 'F[u]nkcie & Moduly', hotkey: 'U', view: 'view-features', hasSub: false },
         { id: 'revocations', label: 'Revokácie & CRL', hotkey: 'X', view: 'view-revocations', hasSub: false },
         { id: 'queue', label: 'Licenčný Rad (FLT-31)', hotkey: 'Q', view: 'view-queue', hasSub: false },
+        { id: 'policyrules', label: 'Pravidlá & Options', hotkey: 'Z', view: 'view-policy-rules', hasSub: false },
         { id: 'webhooky', label: 'Webhooky', hotkey: 'W', view: 'view-webhooks', hasSub: false },
         { isSeparator: true },
         { id: 'sulad', label: 'Súlad & CRA / SBOM', hotkey: 'S', view: 'view-system', hasSub: false },
@@ -49,6 +50,7 @@
         { id: 'sub-tenants', label: 'Adresár zákazníkov', hotkey: 'A', action: () => alert('Adresár zákazníkov ISV') },
         { id: 'sub-products', label: 'Katalóg produktov', hotkey: 'K', action: () => alert('Katalóg chránených aplikácií') },
         { id: 'sub-policies', label: 'Licenčné politiky', hotkey: 'P', action: () => alert('Šablóny licenčných politík') },
+        { id: 'sub-rules', label: 'Options & Pravidlá (FLT-24)', hotkey: 'O', action: () => { switchRetroView('view-policy-rules'); if (typeof window.loadPolicyRulesView === 'function') window.loadPolicyRulesView(); } },
         { id: 'sub-features', label: 'Katalóg modulov a suít', hotkey: 'F', action: () => { switchRetroView('view-features'); if (typeof loadFeaturesView === 'function') loadFeaturesView(); } },
         { id: 'sub-jwks', label: 'Verejné kľúče (JWKS)', hotkey: 'V', action: () => { if (typeof openJwksModal === 'function') openJwksModal(); } },
         { id: 'sub-kms', label: 'Cloud KMS & HSM Stav', hotkey: 'M', action: () => { switchRetroView('view-keys'); if (typeof loadKmsHierarchy === 'function') loadKmsHierarchy(); } },
@@ -88,6 +90,7 @@
                 <li class="retro-menu-item" onclick="switchRetroView('view-webhooks')" tabindex="0"><span class="hotkey">W</span>ebhooky</li>
                 <li class="retro-menu-item" onclick="switchRetroView('view-revocations')" tabindex="0">Revo<span class="hotkey">k</span>ácie</li>
                 <li class="retro-menu-item" onclick="switchRetroView('view-queue')" tabindex="0"><span class="hotkey">Q</span>ueue Rad</li>
+                <li class="retro-menu-item" onclick="switchRetroView('view-policy-rules')" tabindex="0"><span class="hotkey">Z</span>ásady (FLT-24)</li>
                 <li class="retro-menu-item" onclick="switchRetroView('view-system')" tabindex="0"><span class="hotkey">S</span>úlad CRA</li>
                 <li class="retro-menu-item" onclick="openModal('modal-auth-config')" tabindex="0">K<span class="hotkey">o</span>nfigurácia</li>
             </ul>
@@ -620,6 +623,7 @@
             'view-features': 'GRANULÁRNE MODULY, BALÍKOVÉ SUITY & MERAČE VYŤAŽENIA',
             'view-revocations': 'KRYPTOGRAFICKÝ REVOKAČNÝ ZOZNAM (.SYMRL) & ENTERPRISE CRL',
             'view-queue': 'ENTERPRISE LICENČNÝ RAD & PRIORITNÁ REZERVÁCIA (FLT-31)',
+            'view-policy-rules': 'ENTERPRISE OPTIONS PRAVIDLÁ & REZERVÁCIE SEDADIEL (FLT-24)',
             'view-tokens': 'KREDITOVÉ PEŇAŽENKY & PAY-AS-YOU-GO SPOTREBA',
             'view-migrate': 'MIGRÁCIA Z FLEXNET PUBLISHER (FLEXLM) & KEYGEN.SH',
             'view-scim': 'SCIM 2.0 IDENTITA & FIREMNÁ SYNCHRONIZÁCIA'
@@ -635,6 +639,9 @@
         }
         if (viewId === 'view-queue' && typeof window.loadQueueView === 'function') {
             window.loadQueueView();
+        }
+        if (viewId === 'view-policy-rules' && typeof window.loadPolicyRulesView === 'function') {
+            window.loadPolicyRulesView();
         }
 
         // Zatvorenie podmenu pri prepnutí
@@ -657,6 +664,9 @@
         } else if (hash === 'queue' || hash === 'rad') {
             switchRetroView('view-queue');
             if (typeof window.loadQueueView === 'function') window.loadQueueView();
+        } else if (hash === 'rules' || hash === 'policy' || hash === 'options') {
+            switchRetroView('view-policy-rules');
+            if (typeof window.loadPolicyRulesView === 'function') window.loadPolicyRulesView();
         } else if (hash === 'reports' || hash === 'trueup' || hash === 'reporty') {
             switchRetroView('view-reports');
             if (typeof window.loadReportsView === 'function') window.loadReportsView();

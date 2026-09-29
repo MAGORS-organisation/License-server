@@ -12,6 +12,7 @@ using Symbolon.Data;
 using Symbolon.Data.Entities;
 using Symbolon.Domain;
 using Symbolon.Domain.Entitlements;
+using Symbolon.Domain.PolicyRules;
 using Symbolon.Domain.Security;
 using Symbolon.Domain.Webhooks;
 using Symbolon.Format;
@@ -212,6 +213,96 @@ public static class PublicEndpoints
             }, license.TenantId, ct).ConfigureAwait(false);
         }
 
+        // ====================================================================
+        // Options File & Policy Rules Evaluation (FLT-23, FLT-24, FLT-25, §7.5)
+        // ====================================================================
+        string? rulesYaml = license.RulesYaml ?? license.Policy?.RulesYaml;
+        string? reservationTarget = null;
+        int? ruleDerivedPriority = null;
+
+        if (!string.IsNullOrWhiteSpace(rulesYaml))
+        {
+            var ruleSet = PolicyRuleSerializer.Parse(rulesYaml);
+
+            var activeSeats = await db.Seats
+                .Where(s => s.LicenseId == license.Id && s.LeaseId != null && s.ExpiresAt > now)
+                .ToListAsync(ct)
+                .ConfigureAwait(false);
+
+            int GetActiveCount(string targetName)
+            {
+                if (targetName.StartsWith("group:", StringComparison.OrdinalIgnoreCase))
+                {
+                    string grp = targetName["group:".Length..];
+                    var groupDef = ruleSet.Groups.FirstOrDefault(g => string.Equals(g.Name, grp, StringComparison.OrdinalIgnoreCase));
+                    if (groupDef != null)
+                    {
+                        return activeSeats.Count(s =>
+                            (s.UserId != null && groupDef.Members.Any(m => WildcardMatcher.Matches(s.UserId, m))) ||
+                            (s.MachineId != null && groupDef.Hosts != null && groupDef.Hosts.Any(h => WildcardMatcher.Matches(s.MachineId, h))) ||
+                            (s.ReservedFor != null && string.Equals(s.ReservedFor, grp, StringComparison.OrdinalIgnoreCase)));
+                    }
+                    return activeSeats.Count(s => (s.ReservedFor != null && string.Equals(s.ReservedFor, grp, StringComparison.OrdinalIgnoreCase)) ||
+                                                 (s.UserId != null && string.Equals(s.UserId, grp, StringComparison.OrdinalIgnoreCase)));
+                }
+                else if (targetName.StartsWith("user:", StringComparison.OrdinalIgnoreCase))
+                {
+                    string u = targetName["user:".Length..];
+                    return activeSeats.Count(s => s.UserId != null && WildcardMatcher.Matches(s.UserId, u));
+                }
+                return 0;
+            }
+
+            var evalContext = new RuleEvaluationContext(
+                LicenseId: license.Id,
+                UserId: dto.UserId,
+                MachineId: dto.MachineId,
+                HostName: dto.MachineId,
+                ClientIp: clientIp,
+                Features: dto.Features,
+                CurrentlyHeldByClient: 0,
+                GetActiveCountForTarget: GetActiveCount);
+
+            var evalResult = PolicyRuleEngine.Evaluate(ruleSet, evalContext);
+
+            if (!evalResult.Allowed)
+            {
+                metrics.RecordCheckoutDenied(license.Id);
+                await alertService.RecordDenialSpikeAsync(license.Id, license.TenantId, evalResult.DenyType ?? "rule-denied", ct).ConfigureAwait(false);
+
+                await webhooks.PublishEventAsync(WebhookEventTypes.LeaseDenied, new
+                {
+                    licenseId = license.Id,
+                    tenantId = license.TenantId,
+                    customerRef = license.CustomerRef,
+                    fingerprint,
+                    reason = evalResult.DenyReason ?? "Access denied by policy rule",
+                    denyType = evalResult.DenyType ?? "rule-denied",
+                    requestedQuantity = dto.Quantity ?? 1,
+                    userId = dto.UserId,
+                    machineId = dto.MachineId
+                }, license.TenantId, ct).ConfigureAwait(false);
+
+                if (evalResult.DenyType == "group-quota-exceeded")
+                {
+                    return TypedResults.Problem(
+                        statusCode: StatusCodes.Status409Conflict,
+                        title: "Group Quota Exceeded",
+                        detail: evalResult.DenyReason,
+                        type: ProblemTypes.GroupQuotaExceeded);
+                }
+
+                return TypedResults.Problem(
+                    statusCode: StatusCodes.Status403Forbidden,
+                    title: "Access Denied by Policy Rule",
+                    detail: evalResult.DenyReason,
+                    type: ProblemTypes.RuleDenied);
+            }
+
+            reservationTarget = evalResult.MatchedReservationTarget;
+            ruleDerivedPriority = evalResult.ResolvedPriority;
+        }
+
         int quantity = dto.Quantity ?? 1;
         var ttl = TimeSpan.FromSeconds(license.Policy?.LeaseTtlSeconds ?? 600);
 
@@ -227,7 +318,8 @@ public static class PublicEndpoints
             expandedFeatures,
             idempotencyKey,
             dto.AllowQueue ?? false,
-            ttl);
+            ttl,
+            reservationTarget);
 
         var result = await engine.CheckoutAsync(cmd, ct).ConfigureAwait(false);
 
@@ -248,7 +340,7 @@ public static class PublicEndpoints
                     .ConfigureAwait(false);
                 foreach (var s in allocatedSeats)
                 {
-                    s.ReservedFor = dto.UserId;
+                    s.UserId = dto.UserId;
                 }
                 await db.SaveChangesAsync(ct).ConfigureAwait(false);
             }
@@ -290,7 +382,7 @@ public static class PublicEndpoints
                 quantity,
                 dto.Features,
                 ttl: TimeSpan.FromMinutes(10),
-                priority: dto.Priority ?? 0,
+                priority: dto.Priority ?? ruleDerivedPriority ?? 0,
                 ct).ConfigureAwait(false);
 
             var qStatus = await queueManager.GetStatusAsync(ticket.Ticket, ct).ConfigureAwait(false);

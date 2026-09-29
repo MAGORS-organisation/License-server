@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Routing;
 using Symbolon.Domain;
+using Symbolon.Domain.PolicyRules;
 using Symbolon.Format;
 using Symbolon.Protocol;
 
@@ -57,6 +58,7 @@ internal static class LeaseEndpoints
         HttpContext httpContext,
         LeaseEngine engine,
         RelayQueueManager queueManager,
+        RelayOptionsManager optionsManager,
         CancellationToken ct)
     {
         ArgumentNullException.ThrowIfNull(dto);
@@ -74,6 +76,47 @@ internal static class LeaseEndpoints
         string fingerprintHash = dto.ToFingerprintHash();
         string licenseId = key.Canonical;
 
+        // Policy rules check (FLT-24)
+        var rules = optionsManager.GetRules(licenseId);
+        string? reservationTarget = null;
+        int? ruleDerivedPriority = null;
+
+        if (rules is not null)
+        {
+            string? clientIp = httpContext.Connection.RemoteIpAddress?.ToString();
+            var evalContext = new RuleEvaluationContext(
+                LicenseId: licenseId,
+                UserId: dto.UserId,
+                MachineId: dto.MachineId,
+                HostName: dto.MachineId,
+                ClientIp: clientIp,
+                Features: dto.Features,
+                CurrentlyHeldByClient: 0,
+                GetActiveCountForTarget: _ => 0);
+
+            var evalResult = PolicyRuleEngine.Evaluate(rules, evalContext);
+            if (!evalResult.Allowed)
+            {
+                if (evalResult.DenyType == "group-quota-exceeded")
+                {
+                    return Results.Problem(
+                        statusCode: StatusCodes.Status409Conflict,
+                        type: ProblemTypes.GroupQuotaExceeded,
+                        title: "Group Quota Exceeded",
+                        detail: evalResult.DenyReason);
+                }
+
+                return Results.Problem(
+                    statusCode: StatusCodes.Status403Forbidden,
+                    type: ProblemTypes.RuleDenied,
+                    title: "Access Denied by Policy Rule",
+                    detail: evalResult.DenyReason);
+            }
+
+            reservationTarget = evalResult.MatchedReservationTarget;
+            ruleDerivedPriority = evalResult.ResolvedPriority;
+        }
+
         var command = new CheckoutCommand(
             LicenseId: licenseId,
             Fingerprint: fingerprintHash,
@@ -82,7 +125,8 @@ internal static class LeaseEndpoints
             Features: dto.Features,
             IdempotencyKey: idempotencyKey,
             AllowQueue: dto.AllowQueue ?? false,
-            Ttl: TimeSpan.FromMinutes(10));
+            Ttl: TimeSpan.FromMinutes(10),
+            ReservationTarget: reservationTarget);
 
         var result = await engine.CheckoutAsync(command, ct).ConfigureAwait(false);
 
@@ -108,7 +152,7 @@ internal static class LeaseEndpoints
                 dto.MachineId,
                 dto.Quantity ?? 1,
                 dto.Features,
-                dto.Priority ?? 0,
+                dto.Priority ?? ruleDerivedPriority ?? 0,
                 TimeSpan.FromMinutes(10));
 
             int position = queueManager.GetPosition(ticket);

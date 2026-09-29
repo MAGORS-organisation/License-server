@@ -71,6 +71,14 @@ namespace Symbolon.Protocol;
 [JsonSerializable(typeof(List<Symbolon.Protocol.Reporting.DenialRecordDto>))]
 [JsonSerializable(typeof(Symbolon.Protocol.Reporting.DenialsAnalyticsResponseDto))]
 [JsonSerializable(typeof(Symbolon.Protocol.Reporting.AuditVerificationProofDto))]
+[JsonSerializable(typeof(PolicyRuleGroupDto))]
+[JsonSerializable(typeof(List<PolicyRuleGroupDto>))]
+[JsonSerializable(typeof(PolicyRuleItemDto))]
+[JsonSerializable(typeof(List<PolicyRuleItemDto>))]
+[JsonSerializable(typeof(PolicyRuleSetDto))]
+[JsonSerializable(typeof(UpdatePolicyRulesRequestDto))]
+[JsonSerializable(typeof(SimulateRuleEvaluationRequestDto))]
+[JsonSerializable(typeof(SimulateRuleEvaluationResponseDto))]
 public sealed partial class SymbolonProtocolJsonContext : JsonSerializerContext
 {
 }

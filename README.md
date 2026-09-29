@@ -2,7 +2,7 @@
 
 [![Platform](https://img.shields.io/badge/.NET-10.0%20LTS-512BD4?logo=dotnet)](https://dotnet.microsoft.com/)
 [![Language](https://img.shields.io/badge/C%23-14.0-239120?logo=csharp)](https://learn.microsoft.com/dotnet/csharp/)
-[![Tests](https://img.shields.io/badge/tests-334%20passed%20(+15%20Python%2C%20+12%20Wasm)-brightgreen)](#výsledky-testovania)
+[![Tests](https://img.shields.io/badge/tests-372%20passed%20(+17%20Python%2C%20+12%20Wasm)-brightgreen)](#výsledky-testovania)
 [![License: AGPL-3.0](https://img.shields.io/badge/license-AGPL--3.0-blue.svg)](LICENSE)
 [![License: Apache-2.0](https://img.shields.io/badge/client%20SDK-Apache--2.0-blue.svg)](LICENSES/Apache-2.0.txt)
 [![CRA Compliant](https://img.shields.io/badge/CRA%20Compliance-EU%202024%2F2847-success)](SECURITY.md)
@@ -150,6 +150,12 @@ Rieši to, čo dnešné cloud-first platformy ponúkajú iba ako obmedzený dopl
     - **Enterprise Premenné Prostredia (`SYMBOLON_LICENSE_SERVER`, `SYMBOLON_SERVERS`)**: Podpora FlexNet notácie `port@host`, `@host`, štandardných URL adries a zoznamov oddelených čiarkami či bodkočiarkami.
     - **Parita vo Viacjazyčných SDK**: Automatická detekcia a konfigurácia v C#, Python, Rust a C/C++ SDK.
     - **CLI Nástroje**: Príkazy `symbolon discover` a `symbolon servers resolve` pre vizualizáciu nájdených uzlov a diagnostiku parsovania.
+32. **Enterprise Options File Engine & Deklaratívne Pravidlá Politík (FLT-23, FLT-24, FLT-25, §7.5)**
+    - **FLT-24 Deterministické Vyhodnocovanie**: Striktné poradie `deny` ➜ `max` ➜ `reserve` ➜ `priority`. Prvé vyhovujúce `deny` pravidlo okamžite zastaví vyhodnocovanie s chybou 403 Forbidden (`RuleDenied`).
+    - **FLT-23 Rezervácie a Izolácia Kapacity Sedadiel**: Deklaratívne pravidlá `reserve` materializujú vyhradené sedadlá s atribútom `ReservedFor` priamo v PostgreSQL / SQLite. Bežné checkouts bez kvalifikácie nemôžu čerpať z vyhradenej kapacity.
+    - **FLT-25 Aktualizácia za Behu s Auditom**: Zmena pravidiel cez `PUT /admin/v1/licenses/{id}/rules` vyvoláva auditnú udalosť `policy.rules_updated`, dynamicky synchronizuje rezervácie a zachováva aktívne leasingy až do vypršania TTL.
+    - **Wildcard & CIDR Matching**: Presné priraďovanie skupín používateľov (`eng-*`), hostiteľov (`srv-*`) a IP podsietí (IPv4/IPv6 CIDR notácia `10.0.0.0/8`, `192.168.1.0/24`).
+    - **Multi-Interface Parita**: REST API endpointy, lokálny engine v on-premise Relay serveri, CLI príkazy `symbolon policy rules get|set|test`, obojsmerný YAML editor a interaktívny simulátor vo Web Dashboarde aj v Retro FoxPro TUI.
 
 ---
 
@@ -200,69 +206,106 @@ Symbolon.slnx
 
 ## Požiadavky na Systém (Hardvér a Softvér)
 
-Server Symbolon je optimalizovaný pre maximálnu priepustnosť a nízku latenciu vďaka natívnemu AOT kódu a deterministickému O(1) prideľovaniu sedadiel. Nasledujúce požiadavky definujú minimálne a odporúčané parametre pre jednotlivé prostredia.
-
-### 1. Hardvérové Požiadavky
-
-| Komponent / Režim Nasadenia | Minimálne Parametre (Min) | Odporúčané Parametre (Rec) | Poznámka |
-|---|---|---|---|
-| **On-Premise Edge Relay** | 1 vCPU, 512 MB RAM, 1 GB disk | 2 vCPU, 1–2 GB RAM, 5 GB NVMe | Zvláda tisíce lokálnych heartbeatov/s pri spotrebe pamäte < 80 MB. |
-| **Control Plane (do 10 000 sedadiel)** | 2 vCPU, 2 GB RAM, 10 GB SSD | 4 vCPU, 4–8 GB RAM, 25 GB NVMe | Vhodné pre stredné ISV inštalácie a podnikové privátne cloudy. |
-| **Control Plane Enterprise (> 50 000 sedadiel)** | 4 vCPU, 8 GB RAM, 50 GB NVMe | 8+ vCPU, 16–32 GB RAM, 100+ GB NVMe | Pre masívne súbehy, multi-region klastre a vysokofrekvenčný auditný ledger. |
-| **Klientske Stanice (ISV aplikácie)** | Architektúra x64 / ARM64 | 1 vCPU, < 10 MB voľnej RAM | Klientske SDK má zanedbateľný footprint (< 5 MB RAM, < 0.1% CPU). |
-
-- **Sieťová infraštruktúra**: 
-  - Control Plane: 1 Gbps Ethernet (pre enterprise klastre odporúčané 10 Gbps a nízka latencia k databáze < 5 ms).
-  - Relay a klienti: Štandardné lokálne alebo internetové pripojenie (prenos jedného heartbeatu vyžaduje len cca 350 bajtov).
+Server Symbolon je optimalizovaný pre maximálnu priepustnosť, extrémnu odolnosť a nízku latenciu vďaka natívnemu AOT kódu a deterministickému O(1) prideľovaniu sedadiel. Nasledujúce požiadavky definujú minimálne a odporúčané parametre pre jednotlivé profily nasadenia.
 
 ---
 
-### 2. Softvérové Požiadavky
+### 1. Hardvérové Požiadavky (Hardware Specifications)
 
-#### Podporované Operačné Systémy
-- **Linux (odporúčané pre produkciu)**:
-  - Ubuntu 22.04 LTS / 24.04 LTS
-  - Debian 12 (Bookworm) a novší
+| Profil Nasadenia / Komponent | Minimálne Parametre (Min) | Odporúčané Parametre (Production Rec) | Poznámka k Výkonu a Kapacite |
+|---|---|---|---|
+| **On-Premise Edge Relay** | 1 vCPU, 512 MB RAM, 1 GB disk | 2 vCPU, 1–2 GB RAM, 5 GB NVMe | Zvláda tisíce lokálnych heartbeatov/s pri spotrebe pamäte < 80 MB. Autonómny SQLite WAL engine. |
+| **Air-Gapped Standalone Relay** | 1 vCPU, 512 MB RAM, 2 GB disk | 2 vCPU, 1 GB RAM, 5 GB SSD | Pre striktne izolované priemyselné zóny a bezsieťové klastre. Vyžaduje USB port pre transfer `.symreq`/`.symgrant`. |
+| **Control Plane — Standard Tier**<br>*(do 10 000 súbežných sedadiel)* | 2 vCPU, 2 GB RAM, 10 GB SSD | 4 vCPU, 4–8 GB RAM, 25 GB NVMe | Vhodné pre stredné ISV inštalácie, podnikové privátne cloudy a lokálne klastre. |
+| **Control Plane — Enterprise Tier**<br>*(> 50 000 súbežných sedadiel)* | 4 vCPU, 8 GB RAM, 50 GB NVMe | 8+ vCPU, 16–32 GB RAM, 100+ GB NVMe (RAID-10) | Pre masívne súbehy, multi-region aktívno-aktívne klastre, vysokofrekvenčný auditný ledger a True-Up reporting. |
+| **Dedikovaný PostgreSQL Server**<br>*(pre Enterprise Control Plane)* | 2 vCPU, 4 GB RAM, 20 GB SSD | 8 vCPU, 16–32 GB RAM, 100+ GB NVMe (> 5 000 IOPS) | Zabezpečuje sub-milisekundové zamykanie `FOR UPDATE SKIP LOCKED` a materializované sedadlá. |
+| **Klientske Stanice & ISV Aplikácie** | 64-bit architektúra (x64 / ARM64) | 1 vCPU, < 10 MB voľnej RAM | Klientske SDK (.NET, Python, Rust, C/C++) má zanedbateľný footprint (< 5 MB RAM, < 0.1% CPU). |
+
+#### Sieťová Infraštruktúra, Latencia a Priepustnosť
+- **Dátový tok heartbeatu**: Prenos jedného lease renewal paketu predstavuje iba cca **350 bajtov**. Napríklad 10 000 aktívnych klientov pri 60-sekundovom obnovovacom intervale generuje sieťový tok iba cca **58 kB/s**.
+- **Latencia k databáze**: Pre Control Plane sa odporúča pripojenie k PostgreSQL s odozvou **< 5 ms** (lokálna sieť alebo dedikovaný cloud VPC peering).
+- **Priepustnosť rozhrania**: Pre bežný Control Plane a Relay postačuje **1 Gbps Ethernet**; pre Enterprise klastre s tisíckami požiadaviek za sekundu sa odporúča **10 Gbps Ethernet**.
+- **Lokálny Broadcast / Multicast**: Podpora protokolu UDP pre port `7584` (`0x1D90`) na lokálnom segmente siete pre fungovanie Zero-Config Discovery mechanizmu.
+
+---
+
+### 2. Softvérové Požiadavky (Software Specifications)
+
+#### Podporované Operačné Systémy (OS Matrix)
+- **Linux (odporúčané pre produkčné nasadenie)**:
+  - Ubuntu 22.04 LTS / 24.04 LTS (x64, ARM64)
+  - Debian 12 (Bookworm) a novší (x64, ARM64)
   - Red Hat Enterprise Linux (RHEL) 9+ / Rocky Linux 9+ / AlmaLinux 9+
-  - Alpine Linux 3.19+ (glibc aj musl libc)
+  - Alpine Linux 3.19+ (podpora pre `musl libc` aj `glibc` kontajnerové obrazy)
 - **Windows**:
-  - Windows Server 2019 / 2022 / 2025
+  - Windows Server 2019 / 2022 / 2025 (64-bit)
   - Windows 10 / 11 (64-bit x64 a ARM64)
 - **macOS**:
   - macOS 13+ (Ventura, Sonoma, Sequoia — architektúry Apple Silicon M1/M2/M3/M4 aj Intel x64)
-- **Kontajnery & Orchestrácia**:
+- **Kontajnerizácia & Orchestrácia**:
   - Docker Engine 24+ / Podman 4+
   - Docker Compose v2.20+
   - Kubernetes 1.28+ (podporovaný natívny Helm Chart a Symbolon Kubernetes Operator)
 
-#### Runtime & Databázové Úložiská
+#### Behové Prostredie (Runtime) & Knižnice
 - **.NET Runtime**:
   - **.NET 10.0 LTS** Runtime / ASP.NET Core Runtime (pre beh zo zdrojových kódov alebo framework-dependent nasadenie).
-  - *Poznámka*: Pre nasadenie cez oficiálne Docker kontajnery alebo self-contained single-file binárky **nie je potrebná žiadna predchádzajúca inštalácia .NET**, behové prostredie je pribalené priamo v obraze/binárke.
-- **Databázy**:
-  - **PostgreSQL 16 alebo 17** (odporúčané **PostgreSQL 17** pre produkčný Control Plane s transakčným zamykaním `FOR UPDATE SKIP LOCKED`).
-  - **SQLite 3.42+** (vstavané automaticky s WAL žurnálom; primárne pre on-premise Relay, edge nasadenia a offline vývoj).
+  - *Self-Contained & Docker*: Oficiálne Docker kontajnery a samostatné single-file binárky (`symbolon`, `symbolon-relay`) obsahujú pribalený AOT runtime – **nevyžadujú predinštalovaný .NET v hostiteľskom systéme**.
+- **C-Runtime & Systémové Knižnice**:
+  - Linux: `glibc 2.31+` alebo `musl libc 1.2.4+`, `libssl 3.0+`.
+  - Windows: Universal C Runtime (CRT) – štandardná súčasť moderných Windows systémov.
+
+#### Databázové Úložiská
+- **PostgreSQL 16 alebo 17** (odporúčané **PostgreSQL 17**):
+  - Vyžadované pre produkčný Symbolon Control Plane.
+  - Využíva natívnu schému s materializovanými sedadlami, indexované stĺpce `ReservedFor` a `UserId`, a transakčný O(1) mechanizmus `FOR UPDATE SKIP LOCKED`.
+- **SQLite 3.42+**:
+  - Vstavané automaticky priamo v binárke Relay servera.
+  - Využíva režim Write-Ahead Logging (`PRAGMA journal_mode=WAL;`), indexy na `reserved_for` a garantuje bezpečný súbeh procesov pri výpadkoch siete a reštartoch.
 
 #### Sieťové Porty a Firewall Pravidlá
-- `8080/TCP`: Symbolon Control Plane (REST API, Web TUI, CRA compliance, Prometheus metriky).
-- `8081/TCP`: Symbolon On-Premise Relay (lokálne API a edge správa sedadiel).
-- `7584/UDP` (`0x1D90`): Zero-config discovery (lokálny broadcast a multicast pre automatické vyhľadávanie serverov).
-- `5432/TCP`: PostgreSQL databázový server (interná komunikácia medzi Control Plane a DB).
-- `9090/TCP` & `3000/TCP`: Prometheus zber metrík a Grafana dashboard (voliteľné pre observabilitu).
+| Port / Protokol | Smer Komunikácie | Služba | Popis a Účel |
+|---|---|---|---|
+| `8080/TCP` | Inbound | Control Plane | REST API, Web TUI, SCIM 2.0, CRA/SBOM compliance, Prometheus metriky. |
+| `8081/TCP` | Inbound | On-Premise Relay | Lokálne klientske API, heartbeat, edge správa sedadiel a fronty. |
+| `7584/UDP` (`0x1D90`) | Inbound / Outbound | Discovery Responder | Zero-config automatické vyhľadávanie licenčných serverov na lokálnej sieti. |
+| `5432/TCP` | Outbound (CP ➜ DB) | PostgreSQL | Databázové spojenie pre Control Plane (chránené TLS). |
+| `9090/TCP` & `3000/TCP` | Inbound | Observabilita | Prometheus zber metrík a Grafana dashboard (voliteľné pre monitoring). |
 
-#### Požiadavky pre Vývoj a Kompiláciu (Build & Dev)
-Ak plánujete kompilovať riešenie zo zdrojových kódov alebo vyvíjať vlastné integrácie:
-- **.NET SDK 10.0** (jazyk C# 14.0)
-- **Git 2.30+**
-- **Python 3.10+** (pre prácu s Python SDK a beh integračných testov)
-- **Node.js 18+** (pre offline WebAssembly a WebCrypto validátor)
-- **Rust 1.75+** (edícia 2021 s Cargo, pre zostavenie Rust SDK)
-- **C/C++ kompilátor** (GCC 9+, Clang 10+ alebo MSVC 2019+ pre C/C++ SDK s podporou C99 / C++17)
+---
 
-#### Voliteľné Podnikové Rozšírenia
-- **Hardware Enclave Attestation**: Fyzický čip **TPM 2.0** a systémový balíček `tpm2-tools` (Linux) alebo ekvivalentné ovládače (Intel SGX, AMD SEV-SNP).
-- **eBPF Socket Enforcement**: Linuxové jadro verzie **5.15 alebo novšej** s povoleným BTF (`CONFIG_DEBUG_INFO_BTF=y`) a knižnicou `libbpf`.
-- **Cloud KMS & Hardware HSM**: Prístup k API Azure Key Vault, AWS KMS alebo sieťovému HSM zariadeniu s rozhraním **PKCS#11** pre bezpečnú úschovu Tier-1 master kľúčov.
+### 3. Požiadavky Špecifických Modulov a Fázy 20
+
+- **Enterprise Options File Engine & Policy Rules (Fáza 20 - FLT-23, FLT-24, FLT-25, §7.5)**:
+  - *Dátová vrstva*: Podpora pre stĺpce `ReservedFor` (vyhradená kapacita) a `UserId` (aktívny nájomca) v `SeatEntity` (PostgreSQL) a `sqlite_seat_store` (SQLite).
+  - *Pamäťový procesor*: In-memory cache pravidiel pre okamžité vyhodnocovanie CIDR podsietí a wildcard masiek používateľov/hostiteľov s odozvou pod 1 milisekundu.
+  - *Konfigurácia*: Prístup k čítaniu/zápisu konfiguračných súborov politík (`options.yaml` na Relay, auditný ledger na Control Plane).
+- **Air-Gapped & Offline Izolované Prostredia**:
+  - *Nulová závislosť na internete*: Server ani klientske SDK nevyžadujú DNS preklad, verejné NTP servery ani kontakt s externými licencormi.
+  - *Výmena Offline Tokenov*: Fyzické vymeniteľné médium (USB flash disk), optické médium alebo lokálny zabezpečený SFTP kanál pre prenos požiadaviek `.symreq` a grantov `.symgrant`.
+  - *In-Browser Validátor*: Prehliadač s podporou W3C WebCrypto API (Chrome 37+, Firefox 34+, Safari 11+, Edge 79+) – funguje 100% offline z lokálneho disku.
+- **Hardware Enclave Attestation (R6)**:
+  - Fyzický čip **TPM 2.0** (Trusted Platform Module) alebo vTPM vo virtualizovaných prostrediach.
+  - Na Linuxe vyžadovaný balíček `tpm2-tools` a prístup k zariadeniu `/dev/tpmrm0`.
+  - Podpora pre dôveryhodné exekučné prostredia Intel SGX / AMD SEV-SNP.
+- **eBPF Kernel Socket Enforcement**:
+  - Linuxové jadro verzie **5.15 alebo novšej** (odporúčané 6.5+).
+  - Kompilácia jadra s podporou BPF CO-RE: `CONFIG_DEBUG_INFO_BTF=y`, `CONFIG_BPF=y`, `CONFIG_BPF_SYSCALL=y`, `CONFIG_NET_CLS_ACT=y`.
+  - Používateľské oprávnenie `CAP_BPF` / `CAP_NET_ADMIN` alebo `root` pre pripojenie socket filtrov.
+- **Cloud KMS & Hardware HSM**:
+  - Sieťová konektivita k endpointom Azure Key Vault, AWS KMS alebo podpora štandardného rozhrania **PKCS#11** (knižnice vendor HSM ako Thales Luna, Utimaco, YubiHSM).
+
+---
+
+### 4. Požiadavky pre Vývoj a Kompiláciu (Build & Dev)
+
+Ak plánujete kompilovať riešenie zo zdrojových kódov, prispievať do repozitára alebo vyvíjať vlastné integrácie:
+- **.NET SDK 10.0** (podpora jazyka C# 14.0, AOT source generátorov).
+- **Git 2.30+** (správa verzií, Git LFS voliteľné).
+- **Python 3.10+** (pre vývoj a beh testov v `sdk/python/symbolon`).
+- **Node.js 18+** (pre offline WebAssembly a WebCrypto testy v `sdk/wasm`).
+- **Rust 1.75+** (edícia 2021 s Cargo, pre zostavenie Rust SDK v `sdk/rust`).
+- **C/C++ kompilátor**: GCC 9+, Clang 10+ alebo MSVC 2019+ s podporou štandardov C99 a C++17 (pre klientske C/C++ SDK v `sdk/c_cpp`).
 
 ---
 
@@ -432,6 +475,9 @@ dotnet run --project src/Symbolon.Cli -- doctor --file license.symlic --key ./my
 - `POST /admin/v1/keys/{kid}/revoke` — okamžitá revokácia kompromitovaného kľúča a jeho vyradenie z JWKS.
 - `GET /admin/v1/reports/concurrency` — analytika vyťaženia floating licencií a počtu odmietnutí.
 - `GET /admin/v1/audit` — prehľadávanie kryptograficky reťazeného auditného ledgeru.
+- `GET /admin/v1/licenses/{id}/rules` — získanie deklaratívnych politických pravidiel licencie (FLT-24).
+- `PUT /admin/v1/licenses/{id}/rules` — aktualizácia pravidiel, synchronizácia rezervácií sedadiel (`reserve`) a audit `policy.rules_updated` (FLT-23, FLT-25).
+- `POST /admin/v1/licenses/{id}/rules/simulate` — interaktívna simulácia vyhodnotenia pravidiel bez zmeny stavu licencie.
 
 ### Synchronizačné API pre Relay (`/relay/v1`)
 - `POST /relay/v1/register` — registrácia on-premise relay uzla a vystavenie bezpečného API kľúča.
@@ -455,22 +501,22 @@ dotnet run --project src/Symbolon.Cli -- doctor --file license.symlic --key ./my
 Všetkých 10 testovacích projektov má 100% úspešnosť testov bez zlyhania:
 
 ```text
-Passed!  - Failed: 0, Passed: 28, Skipped: 0, Total: 28 - Symbolon.Crypto.Tests.dll
-Passed!  - Failed: 0, Passed: 44, Skipped: 0, Total: 44 - Symbolon.Format.Tests.dll
-Passed!  - Failed: 0, Passed: 16, Skipped: 0, Total: 16 - Symbolon.Protocol.Tests.dll
-Passed!  - Failed: 0, Passed: 68, Skipped: 0, Total: 68 - Symbolon.Domain.Tests.dll
-Passed!  - Failed: 0, Passed:  9, Skipped: 0, Total:  9 - Symbolon.Relay.Tests.dll
-Passed!  - Failed: 0, Passed: 27, Skipped: 0, Total: 27 - Symbolon.Client.Tests.dll
-Passed!  - Failed: 0, Passed: 30, Skipped: 0, Total: 30 - Symbolon.Cli.Tests.dll
-Passed!  - Failed: 0, Passed: 17, Skipped: 0, Total: 17 - Symbolon.Data.Tests.dll
-Passed!  - Failed: 0, Passed:  8, Skipped: 0, Total:  8 - Symbolon.Operator.Tests.dll
-Passed!  - Failed: 0, Passed: 87, Skipped: 0, Total: 87 - Symbolon.ControlPlane.Tests.dll
+Passed!  - Failed: 0, Passed:  28, Skipped: 0, Total:  28 - Symbolon.Crypto.Tests.dll
+Passed!  - Failed: 0, Passed:  44, Skipped: 0, Total:  44 - Symbolon.Format.Tests.dll
+Passed!  - Failed: 0, Passed:  16, Skipped: 0, Total:  16 - Symbolon.Protocol.Tests.dll
+Passed!  - Failed: 0, Passed:  89, Skipped: 0, Total:  89 - Symbolon.Domain.Tests.dll
+Passed!  - Failed: 0, Passed:  10, Skipped: 0, Total:  10 - Symbolon.Relay.Tests.dll
+Passed!  - Failed: 0, Passed:  30, Skipped: 0, Total:  30 - Symbolon.Client.Tests.dll
+Passed!  - Failed: 0, Passed:  30, Skipped: 0, Total:  30 - Symbolon.Cli.Tests.dll
+Passed!  - Failed: 0, Passed:  17, Skipped: 0, Total:  17 - Symbolon.Data.Tests.dll
+Passed!  - Failed: 0, Passed:   8, Skipped: 0, Total:   8 - Symbolon.Operator.Tests.dll
+Passed!  - Failed: 0, Passed: 100, Skipped: 0, Total: 100 - Symbolon.ControlPlane.Tests.dll
 
 Viacjazyčné SDK & WebAssembly testovacie sady:
-Passed!  - Failed: 0, Passed: 15, Skipped: 0, Total: 15 - Python SDK (unittest)
+Passed!  - Failed: 0, Passed: 17, Skipped: 0, Total: 17 - Python SDK (unittest)
 Passed!  - Failed: 0, Passed: 12, Skipped: 0, Total: 12 - WebAssembly / WebCrypto SDK (node:test)
 
-Celkovo: 361 úspešných automatizovaných testov (334 .NET + 15 Python + 12 Node/Wasm), 0 zlyhaní, 0 chýb.
+Celkovo: 401 úspešných automatizovaných testov (372 .NET + 17 Python + 12 Node/Wasm), 0 zlyhaní, 0 chýb.
 ```
 
 ---

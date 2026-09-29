@@ -803,14 +803,17 @@ public static partial class ScimEndpoints
         int revokedSeatsCount = 0;
         foreach (var seat in candidateSeats)
         {
-            if (seat.ReservedFor != null && identifiers.Contains(seat.ReservedFor))
+            bool isUserMatch = (seat.UserId != null && identifiers.Contains(seat.UserId)) ||
+                               (seat.ReservedFor != null && identifiers.Contains(seat.ReservedFor));
+
+            if (isUserMatch)
             {
                 if (!string.IsNullOrWhiteSpace(seat.LeaseId))
                 {
                     await leaseEngine.ReleaseAsync(seat.LeaseId, ct).ConfigureAwait(false);
                     revokedSeatsCount++;
                 }
-                seat.ReservedFor = null;
+                seat.UserId = null;
             }
         }
 

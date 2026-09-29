@@ -68,6 +68,7 @@ public sealed class Policy
     public int OfflineFileTtlDays { get; set; } = 30;
     public string CryptoProfile { get; set; } = "hybrid-v1";
     public string EntitlementsJson { get; set; } = "[]";
+    public string? RulesYaml { get; set; }
 
     public Tenant? Tenant { get; set; }
     public Product? Product { get; set; }
@@ -88,6 +89,7 @@ public sealed class LicenseEntity
     public DateTimeOffset IssuedAt { get; set; }
     public DateTimeOffset? ExpiresAt { get; set; }
     public DateTimeOffset CreatedAt { get; set; }
+    public string? RulesYaml { get; set; }
 
     public Tenant? Tenant { get; set; }
     public Policy? Policy { get; set; }
@@ -117,6 +119,7 @@ public sealed class SeatEntity
     public DateTimeOffset? BorrowedUntil { get; set; }
     public long LeaseSeq { get; set; }
     public string? ReservedFor { get; set; }
+    public string? UserId { get; set; }
 
     public LicenseEntity? License { get; set; }
     public SeatGrantEntity? SeatGrant { get; set; }

@@ -313,4 +313,67 @@ public static class FlexNetOptionsTranspiler
         "INTERNET" => "Subnet",
         _ => "Group"
     };
+
+    public static PolicyRules.PolicyRuleSet ToPolicyRuleSet(this OptionsTranspilationReport report, string? licenseId = null)
+    {
+        ArgumentNullException.ThrowIfNull(report);
+
+        var groups = new List<PolicyRules.PolicyRuleGroup>();
+        foreach (var ug in report.Policy.UserGroups)
+        {
+            groups.Add(new PolicyRules.PolicyRuleGroup(ug.Name, ug.Members));
+        }
+        foreach (var hg in report.Policy.HostGroups)
+        {
+            groups.Add(new PolicyRules.PolicyRuleGroup(hg.Name, [], hg.Members));
+        }
+
+        var rules = new List<PolicyRules.PolicyRule>();
+        foreach (var alloc in report.Policy.SeatAllocations)
+        {
+            var ruleType = string.Equals(alloc.AllocationType, "Reservation", StringComparison.OrdinalIgnoreCase)
+                ? PolicyRules.PolicyRuleType.Reserve
+                : PolicyRules.PolicyRuleType.Max;
+
+            var target = alloc.TargetType switch
+            {
+                "Group" or "HostGroup" => new PolicyRules.RuleTarget(Group: alloc.TargetName),
+                "User" => new PolicyRules.RuleTarget(User: alloc.TargetName),
+                "Host" => new PolicyRules.RuleTarget(Host: alloc.TargetName),
+                "Subnet" => new PolicyRules.RuleTarget(Subnet: alloc.TargetName),
+                _ => new PolicyRules.RuleTarget(Group: alloc.TargetName)
+            };
+
+            rules.Add(new PolicyRules.PolicyRule(
+                Type: ruleType,
+                Value: alloc.Seats,
+                Target: target,
+                Feature: alloc.FeatureCode));
+        }
+
+        foreach (var ent in report.Policy.Entitlements)
+        {
+            if (string.Equals(ent.Effect, "Exclude", StringComparison.OrdinalIgnoreCase))
+            {
+                var target = ent.TargetType switch
+                {
+                    "Group" or "HostGroup" => new PolicyRules.RuleTarget(Group: ent.TargetName),
+                    "User" => new PolicyRules.RuleTarget(User: ent.TargetName),
+                    "Host" => new PolicyRules.RuleTarget(Host: ent.TargetName),
+                    "Subnet" => new PolicyRules.RuleTarget(Subnet: ent.TargetName),
+                    _ => new PolicyRules.RuleTarget(Group: ent.TargetName)
+                };
+
+                rules.Add(new PolicyRules.PolicyRule(
+                    Type: PolicyRules.PolicyRuleType.Deny,
+                    Value: null,
+                    Target: target,
+                    Feature: ent.FeatureCode,
+                    Reason: $"FlexNet EXCLUDE restriction for {ent.TargetType}:{ent.TargetName}"));
+            }
+        }
+
+        return new PolicyRules.PolicyRuleSet(1, licenseId, groups, rules);
+    }
 }
+

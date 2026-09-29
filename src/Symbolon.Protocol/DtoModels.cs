@@ -440,5 +440,7 @@ public static class ProblemTypes
     public const string Forbidden = "https://symbolon.dev/errors/forbidden";
     public const string NotFound = "https://symbolon.dev/errors/not-found";
     public const string QueueNotFound = "https://symbolon.dev/errors/queue-not-found";
+    public const string RuleDenied = "https://symbolon.dev/problems/rule-denied";
+    public const string GroupQuotaExceeded = "https://symbolon.dev/problems/group-quota-exceeded";
 }
 

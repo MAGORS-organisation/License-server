@@ -29,7 +29,7 @@ public sealed class LeaseEngineTests
             }
         }
 
-        public Task<SeatAllocation?> TryAcquireOneAsync(string licenseId, string fingerprint, string? machineId, DateTimeOffset now, TimeSpan ttl, CancellationToken ct = default)
+        public Task<SeatAllocation?> TryAcquireOneAsync(string licenseId, string fingerprint, string? machineId, DateTimeOffset now, TimeSpan ttl, string? reservationTarget = null, CancellationToken ct = default)
         {
             var seat = _seats.FirstOrDefault(s => s.LeaseId is null || s.ExpiresAt < now);
             if (seat is null) return Task.FromResult<SeatAllocation?>(null);
@@ -49,7 +49,7 @@ public sealed class LeaseEngineTests
             return Task.FromResult<SeatAllocation?>(allocated);
         }
 
-        public Task<SeatAllocation[]?> TryAcquireManyAsync(string licenseId, string fingerprint, string? machineId, int quantity, DateTimeOffset now, TimeSpan ttl, CancellationToken ct = default)
+        public Task<SeatAllocation[]?> TryAcquireManyAsync(string licenseId, string fingerprint, string? machineId, int quantity, DateTimeOffset now, TimeSpan ttl, string? reservationTarget = null, CancellationToken ct = default)
         {
             var available = _seats.Where(s => s.LeaseId is null || s.ExpiresAt < now).Take(quantity).ToList();
             if (available.Count < quantity) return Task.FromResult<SeatAllocation[]?>(null);
@@ -72,6 +72,11 @@ public sealed class LeaseEngineTests
                 result.Add(allocated);
             }
             return Task.FromResult<SeatAllocation[]?>(result.ToArray());
+        }
+
+        public Task SyncSeatReservationsAsync(string licenseId, IReadOnlyList<(string Target, int Count)> reservations, CancellationToken ct = default)
+        {
+            return Task.CompletedTask;
         }
 
         public Task<RenewOutcome> TryRenewAsync(string leaseId, string fingerprint, long clientSeq, DateTimeOffset now, TimeSpan ttl, TimeSpan resurrectionWindow, CancellationToken ct = default)

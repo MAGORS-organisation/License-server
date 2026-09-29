@@ -67,6 +67,9 @@ function initNavigation() {
                 if (targetView === "view-queue") {
                     loadQueueView();
                 }
+                if (targetView === "view-policy-rules") {
+                    loadPolicyRulesView();
+                }
             }
         });
     });
@@ -278,6 +281,9 @@ async function loadLicenses() {
                             ${!isRevoked ? `
                                 <button class="btn btn-secondary btn-sm" onclick="openLicenseDetailsModal('${escapeHtml(l.id)}', '${escapeHtml(l.customer || l.id)}')">
                                     👤 Používatelia
+                                </button>
+                                <button class="btn btn-secondary btn-sm" onclick="openLicenseRulesView('${escapeHtml(l.id)}')">
+                                    📜 Pravidlá
                                 </button>
                                 <button class="btn btn-secondary btn-sm" onclick="downloadLicenseFile('${escapeHtml(l.licenseKey)}')">
                                     ⬇ .symlic
@@ -3485,6 +3491,290 @@ async function cancelQueueTicket(ticket) {
 window.loadQueueView = loadQueueView;
 window.promoteQueueTicket = promoteQueueTicket;
 window.cancelQueueTicket = cancelQueueTicket;
+
+// ==========================================
+// Enterprise Options Rules & Reservations (FLT-23, FLT-24, FLT-25)
+// ==========================================
+
+let _cachedLicensesForRuleSelection = [];
+
+async function loadPolicyRulesView() {
+    try {
+        const res = await fetch("/admin/v1/licenses", { headers: getAuthHeaders() });
+        if (!res.ok) return;
+        const licenses = await res.json();
+        _cachedLicensesForRuleSelection = licenses;
+
+        const select = document.getElementById("rules-license-select");
+        if (select) {
+            const currentVal = select.value;
+            select.innerHTML = '<option value="">-- Vyberte licenciu pre správu pravidiel --</option>' +
+                licenses.map(l => `<option value="${escapeHtml(l.id)}">${escapeHtml(l.customer || l.id)} (${escapeHtml(l.productId || "default")}) - ${l.seatsCount} sedadiel</option>`).join("");
+
+            if (currentVal && licenses.some(l => l.id === currentVal)) {
+                select.value = currentVal;
+            } else if (licenses.length > 0) {
+                select.value = licenses[0].id;
+                await loadPolicyRulesForLicense(licenses[0].id);
+            }
+        }
+    } catch (e) {
+        console.error("Error loading policy rules view", e);
+    }
+}
+
+async function onPolicyRuleLicenseChanged() {
+    const select = document.getElementById("rules-license-select");
+    if (!select || !select.value) {
+        const editor = document.getElementById("rules-yaml-editor");
+        if (editor) editor.value = "";
+        const resEl = document.getElementById("rules-reserved-status");
+        if (resEl) resEl.textContent = "Materializovaných: 0 sedadiel";
+        return;
+    }
+    await loadPolicyRulesForLicense(select.value);
+}
+
+async function loadPolicyRulesForLicense(licenseId) {
+    const statusEl = document.getElementById("rules-save-status");
+    const reservedStatusEl = document.getElementById("rules-reserved-status");
+    const editorEl = document.getElementById("rules-yaml-editor");
+    if (statusEl) statusEl.textContent = "Načítavam pravidlá zo servera...";
+
+    try {
+        const res = await fetch(`/admin/v1/licenses/${encodeURIComponent(licenseId)}/rules`, { headers: getAuthHeaders() });
+        if (res.ok) {
+            const data = await res.json();
+            if (editorEl) {
+                editorEl.value = data.rulesYaml || getDefaultRulesYamlTemplate(licenseId);
+            }
+            if (reservedStatusEl) {
+                reservedStatusEl.textContent = `Materializovaných: ${data.reservedSeatsCount || 0} sedadiel (FLT-23)`;
+            }
+            if (statusEl) statusEl.textContent = "Pravidlá načítané.";
+        } else {
+            if (statusEl) statusEl.textContent = "Chyba načítania: " + res.statusText;
+        }
+    } catch (e) {
+        if (statusEl) statusEl.textContent = "Chyba komunikácie: " + e.message;
+    }
+}
+
+async function saveCurrentPolicyRules() {
+    const select = document.getElementById("rules-license-select");
+    const licenseId = select ? select.value : null;
+    if (!licenseId) {
+        showToast("Najprv vyberte licenciu!", "error");
+        return;
+    }
+
+    const editorEl = document.getElementById("rules-yaml-editor");
+    const statusEl = document.getElementById("rules-save-status");
+    const yamlContent = editorEl ? editorEl.value : "";
+
+    if (statusEl) statusEl.textContent = "Ukladám a materializujem rezervácie...";
+
+    try {
+        const res = await fetch(`/admin/v1/licenses/${encodeURIComponent(licenseId)}/rules`, {
+            method: "PUT",
+            headers: {
+                ...getAuthHeaders(),
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+                rulesYaml: yamlContent
+            })
+        });
+
+        if (res.ok) {
+            const data = await res.json();
+            showToast("Pravidlá úspešne uložené (FLT-24, FLT-25).", "success");
+            const reservedStatusEl = document.getElementById("rules-reserved-status");
+            if (reservedStatusEl) {
+                reservedStatusEl.textContent = `Materializovaných: ${data.reservedSeatsAllocated || 0} sedadiel (FLT-23)`;
+            }
+            if (statusEl) statusEl.textContent = `Uložené v ${new Date().toLocaleTimeString()} (rezervovaných: ${data.reservedSeatsAllocated || 0})`;
+        } else {
+            const err = await res.json().catch(() => ({}));
+            showToast(`Uloženie zlyhalo: ${err.detail || res.statusText}`, "error");
+            if (statusEl) statusEl.textContent = `Chyba pri ukladaní: ${err.detail || res.statusText}`;
+        }
+    } catch (e) {
+        showToast("Chyba komunikácie: " + e.message, "error");
+        if (statusEl) statusEl.textContent = "Chyba: " + e.message;
+    }
+}
+
+function getDefaultRulesYamlTemplate(licenseId) {
+    return `# Enterprise Declarative Policy Rules (FLT-23, FLT-24, FLT-25)
+# Evaluated strictly in order: DENY -> MAX -> RESERVE -> PRIORITY
+version: "1.0"
+licenseId: "${licenseId || "LIC-1000"}"
+
+groups:
+  - name: "CAD_ENGINEERS"
+    type: "USER_GROUP"
+    members:
+      - "alice"
+      - "bob"
+      - "ing.*"
+
+  - name: "OFFICE_SUBNET"
+    type: "INTERNET"
+    members:
+      - "192.168.100.0/24"
+      - "10.0.1.*"
+
+rules:
+  # 1. DENY rules: First match halts checkout immediately with 403 Forbidden
+  - type: "deny"
+    target: "USER_GROUP"
+    targetName: "CONTRACTORS"
+    feature: "PRO_MODULE"
+    description: "Externí dodávatelia nesmú používať PRO modul"
+
+  # 2. MAX rules: Concurrent floating limits per group
+  - type: "max"
+    target: "USER_GROUP"
+    targetName: "CAD_ENGINEERS"
+    quantity: 10
+    description: "Inžinieri majú strop najviac 10 súbežných licencií"
+
+  # 3. RESERVE rules (FLT-23): Materialized in DB schema
+  - type: "reserve"
+    target: "GROUP"
+    targetName: "VIP_RESEARCH"
+    quantity: 2
+    description: "Garantované 2 sedadlá pre VIP tím"
+
+  # 4. PRIORITY rules (FLT-31): Ordering in waiting queue
+  - type: "priority"
+    target: "USER_GROUP"
+    targetName: "CAD_ENGINEERS"
+    priority: 80
+`;
+}
+
+function insertDefaultRulesTemplate() {
+    const select = document.getElementById("rules-license-select");
+    const licenseId = select ? select.value : "LIC-DEMO";
+    const editor = document.getElementById("rules-yaml-editor");
+    if (editor) {
+        editor.value = getDefaultRulesYamlTemplate(licenseId);
+        showToast("Vložená predvolená šablóna pravidiel.", "info");
+    }
+}
+
+function formatRulesYaml() {
+    const editor = document.getElementById("rules-yaml-editor");
+    if (!editor) return;
+    const lines = editor.value.split("\n").map(l => l.trimEnd());
+    editor.value = lines.join("\n").trim() + "\n";
+    showToast("Pravidlá preformátované.", "info");
+}
+
+async function runRulesSimulation() {
+    const select = document.getElementById("rules-license-select");
+    const licenseId = select ? select.value : null;
+    if (!licenseId) {
+        showToast("Najprv vyberte licenciu!", "error");
+        return;
+    }
+
+    const username = document.getElementById("sim-user").value.trim();
+    const hostname = document.getElementById("sim-host").value.trim();
+    const ipAddress = document.getElementById("sim-ip").value.trim();
+    const feature = document.getElementById("sim-feature").value.trim() || null;
+    const quantity = parseInt(document.getElementById("sim-quantity").value, 10) || 1;
+
+    try {
+        const res = await fetch(`/admin/v1/licenses/${encodeURIComponent(licenseId)}/rules/simulate`, {
+            method: "POST",
+            headers: {
+                ...getAuthHeaders(),
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+                username: username || null,
+                hostname: hostname || null,
+                ipAddress: ipAddress || null,
+                feature: feature,
+                quantity: quantity
+            })
+        });
+
+        if (res.ok) {
+            const data = await res.json();
+            const resultBox = document.getElementById("sim-result-box");
+            const verdictBadge = document.getElementById("sim-verdict-badge");
+            const reasonBox = document.getElementById("sim-reason-box");
+            const matchGroup = document.getElementById("sim-match-group");
+            const quota = document.getElementById("sim-quota");
+            const reserved = document.getElementById("sim-reserved");
+            const priority = document.getElementById("sim-priority");
+
+            if (resultBox) resultBox.style.display = "block";
+
+            if (data.allowed) {
+                verdictBadge.textContent = "POVOLENÝ (ALLOW)";
+                verdictBadge.className = "badge badge-active";
+                verdictBadge.style.background = "var(--accent-emerald)";
+                if (reasonBox) reasonBox.style.display = "none";
+            } else {
+                verdictBadge.textContent = "ZAMIETNUTÝ (DENIED)";
+                verdictBadge.className = "badge badge-revoked";
+                verdictBadge.style.background = "var(--accent-rose)";
+                if (reasonBox) {
+                    reasonBox.style.display = "block";
+                    reasonBox.style.background = "rgba(239, 68, 68, 0.15)";
+                    reasonBox.style.color = "#fca5a5";
+                    reasonBox.style.border = "1px solid rgba(239, 68, 68, 0.3)";
+                    reasonBox.innerHTML = `<strong>Dôvod:</strong> ${escapeHtml(data.denialReason || "Zamietnuté na základe policy pravidiel.")}`;
+                }
+            }
+
+            if (matchGroup) matchGroup.textContent = data.matchingGroup || "(žiadna skupina / priamy user)";
+            if (quota) quota.textContent = data.groupQuotaMax != null ? `${data.currentGroupUsage || 0} / ${data.groupQuotaMax}` : "Bez limitu";
+            if (reserved) reserved.textContent = data.isReservedSeatQualified ? `Áno (Cieľ: ${escapeHtml(data.reservationTarget || "N/A")})` : "Nie (Všeobecný floating pool)";
+            if (priority) priority.textContent = data.calculatedPriority != null ? `${data.calculatedPriority} bodov` : "0 (predvolená)";
+        } else {
+            const err = await res.json().catch(() => ({}));
+            showToast(`Simulácia zlyhala: ${err.detail || res.statusText}`, "error");
+        }
+    } catch (e) {
+        showToast("Chyba komunikácie pri simulácii: " + e.message, "error");
+    }
+}
+
+function openLicenseRulesView(licenseId) {
+    document.querySelectorAll(".nav-link").forEach(l => l.classList.remove("active"));
+    const targetLink = document.querySelector(`.nav-link[data-view="view-policy-rules"]`);
+    if (targetLink) targetLink.classList.add("active");
+
+    document.querySelectorAll(".view-section").forEach(sec => sec.classList.remove("active"));
+    const activeSec = document.getElementById("view-policy-rules");
+    if (activeSec) {
+        activeSec.classList.add("active");
+        document.getElementById("page-title").textContent = "Pravidlá & Options (FLT-24)";
+    }
+
+    loadPolicyRulesView().then(() => {
+        const select = document.getElementById("rules-license-select");
+        if (select && licenseId) {
+            select.value = licenseId;
+            loadPolicyRulesForLicense(licenseId);
+        }
+    });
+}
+
+window.loadPolicyRulesView = loadPolicyRulesView;
+window.onPolicyRuleLicenseChanged = onPolicyRuleLicenseChanged;
+window.saveCurrentPolicyRules = saveCurrentPolicyRules;
+window.insertDefaultRulesTemplate = insertDefaultRulesTemplate;
+window.formatRulesYaml = formatRulesYaml;
+window.runRulesSimulation = runRulesSimulation;
+window.openLicenseRulesView = openLicenseRulesView;
+
 
 
 

@@ -10,6 +10,34 @@ a projekt striktne dodržiava [Sémantické Verziovanie (Semantic Versioning 2.0
 ## [Unreleased]
 
 ### Pridané (Added)
+- **Enterprise Options File Engine, Declarative Policy Rules & Seat Reservations (FLT-23, FLT-24, FLT-25, §7.5 Options File)**:
+  - **Doménová vrstva (`Symbolon.Domain.PolicyRules`)**:
+    - `PolicyRuleEngine`: Deterministické vyhodnocovanie pravidiel v striktnom normatívnom poradí **FLT-24** (`deny` ➜ `max` ➜ `reserve` ➜ `priority`). Prvé vyhovujúce `deny` pravidlo okamžite zastaví vyhodnocovanie s chybovým kódom 403 Forbidden (`RuleDenied`).
+    - `WildcardMatcher` a `SubnetMatcher`: Case-insensitive globbing (`eng-*`, `dev?`) a IPv4/IPv6 CIDR matching (`10.0.0.0/8`, `192.168.1.0/24`, `::1/128`).
+    - `PolicyRuleSerializer`: Flexibilný obojsmerný YAML & JSON parser a serializátor podporujúci kľúčový formát (`- reserve: 2\n  for:\n    group: CAD`) aj typovaný atribútový formát (`type: reserve`, `group: CAD`, `value: 2`).
+    - `FlexNetOptionsTranspiler.ToPolicyRuleSet`: Deterministické prepojenie transpilovaných FlexNet `options.opt` direktív priamo do Symbolon `PolicyRuleSet`.
+    - `ISeatStore` & `LeaseEngine`: Rozšírenie o podporu atribútu `reservationTarget` a synchronizačnú metódu `SyncSeatReservationsAsync`.
+  - **Dátová vrstva (`Symbolon.Data`)**:
+    - `SeatEntity`: Pridané indexované polia `public string? UserId { get; set; }` a `public string? ReservedFor { get; set; }` pre materializáciu sedadiel a bezpečné oddelenie rezervovanej kapacity od bežných checkoutov (**FLT-23**).
+    - `EfSeatStore`: Podpora `ReservedFor` izolácie pri `TryAcquireOneAsync` a `TryAcquireManyAsync`; materializácia a prealokácia sedadiel v `SyncSeatReservationsAsync`; zachovanie `ReservedFor` pri uvoľnení sedadla s vyčistením `UserId = null`.
+  - **Protokolová vrstva (`Symbolon.Protocol`)**:
+    - DTO kontrakty: `PolicyRuleGroupDto`, `PolicyRuleItemDto`, `PolicyRuleSetDto`, `UpdatePolicyRulesRequestDto`, `SimulateRuleEvaluationRequestDto`, `SimulateRuleEvaluationResponseDto`.
+    - Problémové typy `RuleDenied` a `GroupQuotaExceeded` v `ProblemTypes` a registrácia v `SymbolonProtocolJsonContext` pre AOT kompiláciu.
+  - **Serverové riadenie (`Symbolon.ControlPlane`)**:
+    - `PublicEndpoints`: Vyhodnocovanie pravidiel pred checkoutom v `CheckoutAsync`, vrátenie 403 Forbidden pri `deny`, 409 Conflict pri prekročení skupinového maxima (`max`), evidencia `UserId` a dynamické overovanie aktívnych leasingov podľa členov skupín a hostiteľov.
+    - `AdminEndpoints`: `GET /admin/v1/licenses/{id}/rules`, `PUT /admin/v1/licenses/{id}/rules` (s generovaním auditného záznamu `policy.rules_updated` a okamžitou synchronizáciou rezervácií podľa **FLT-25** bez rušenia bežiacich leasingov do vypršania TTL), a `POST /admin/v1/licenses/{id}/rules/simulate` pre live testovanie pravidiel.
+    - `ScimEndpoints`: Aktualizované automatické deprovisioning uvoľňovanie sedadiel (`RevokeUserSeatsAsync`) rešpektujúce `seat.UserId`.
+  - **Edge Relay Server Local Enforcement (`Symbolon.Relay`)**:
+    - `RelayOptionsManager`: Lokálny YAML loader a správca pravidiel pre on-premise relay servery.
+    - `SqliteSeatStore`: Automatická migrácia stĺpcov `reserved_for` a `user_id` v SQLite WAL tabuľkách a implementácia `SyncSeatReservationsAsync`.
+  - **CLI Nástroje (`Symbolon.Cli`)**:
+    - Príkazy `symbolon policy rules get <licenseId>`, `symbolon policy rules set <licenseId> --file <rules.yaml>`, `symbolon policy rules test <licenseId> --user <user> --group <group> --host <host> --ip <ip>` s prehľadným zobrazením pravidiel a simulačných výstupov.
+  - **Web Dashboard & Retro FoxPro TUI**:
+    - Nové zobrazenie `view-policy-rules` s dvojstĺpcovým YAML editorom a live interaktívnym FLT-24 simulátorom v riadiacom paneli, tlačidlo „📜 Pravidlá“ pri každej licencii.
+    - Retro FoxPro TUI integrácia s klávesovou skratkou `Z`, navigáciou `#rules` a dedikovaným dialógovým oknom.
+  - **Testovacie Pokrytie**:
+    - 372 .NET unit/integration testov naprieč všetkými 11 projektmi (100% pass rate, 0 varovaní, 0 chýb s `TreatWarningsAsErrors=true`), 17 Python SDK testov, 12 Wasm testov (celkovo 401 testov).
+
 - **Enterprise License Priority Queueing, Reaper Service & Client Auto-Wait (FLT-31, §7.1, §7.2, §7.5)**:
   - **Dátová a protokolová vrstva (`Symbolon.Protocol`, `Symbolon.Data`)**:
     - DTO kontrakty `QueuedResponseDto`, `QueueStatusResponseDto`, `CheckoutRequestDto`, `QueueTicketItemDto` s podporou priority (`Priority`), `Status`, `RetryAfterSeconds` a registrácia v `SymbolonProtocolJsonContext` pre AOT kompiláciu.

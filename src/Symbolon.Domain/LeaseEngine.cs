@@ -10,7 +10,8 @@ public sealed record CheckoutCommand(
     IReadOnlyList<string>? Features,
     string? IdempotencyKey,
     bool AllowQueue,
-    TimeSpan Ttl);
+    TimeSpan Ttl,
+    string? ReservationTarget = null);
 
 public sealed record CheckoutResult(
     bool IsSuccess,
@@ -97,9 +98,9 @@ public sealed partial class LeaseEngine
 
         // 2. Atomic seat acquisition
         SeatAllocation[]? allocated = req.Quantity == 1
-            ? await _seats.TryAcquireOneAsync(req.LicenseId, req.Fingerprint, req.MachineId, now, req.Ttl, ct).ConfigureAwait(false)
+            ? await _seats.TryAcquireOneAsync(req.LicenseId, req.Fingerprint, req.MachineId, now, req.Ttl, req.ReservationTarget, ct).ConfigureAwait(false)
                 is { } one ? [one] : null
-            : await _seats.TryAcquireManyAsync(req.LicenseId, req.Fingerprint, req.MachineId, req.Quantity, now, req.Ttl, ct).ConfigureAwait(false);
+            : await _seats.TryAcquireManyAsync(req.LicenseId, req.Fingerprint, req.MachineId, req.Quantity, now, req.Ttl, req.ReservationTarget, ct).ConfigureAwait(false);
 
         // 3. Pool exhausted
         if (allocated is null)

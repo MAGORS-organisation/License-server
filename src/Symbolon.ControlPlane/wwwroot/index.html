@@ -123,6 +123,12 @@
                 </a>
             </li>
             <li class="nav-item">
+                <a class="nav-link" data-view="view-policy-rules">
+                    <span class="nav-icon">📜</span>
+                    <span>Pravidlá &amp; Options (FLT-24)</span>
+                </a>
+            </li>
+            <li class="nav-item">
                 <a class="nav-link" data-view="view-system">
                     <span class="nav-icon">⚡</span>
                     <span>API &amp; Diagnostika</span>
@@ -1928,6 +1934,137 @@
                                 <div style="color: var(--text-muted); font-size: 11px;">POSLEDNÝ OVERENÝ HASH</div>
                                 <div id="chain-verif-latest" style="font-family: monospace; font-size: 11px; word-break: break-all; margin-top: 4px; color: var(--accent-emerald);">-</div>
                             </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- VIEW: Enterprise Options Pravidlá & Rezervácie Sedadiel (FLT-23, FLT-24, FLT-25, §7.5) -->
+            <section id="view-policy-rules" class="view-section">
+                <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 24px;">
+                    <div>
+                        <h2 style="font-size: 20px; font-weight: 700; color: var(--text-primary); margin-bottom: 4px;">
+                            📜 Enterprise Options Pravidlá &amp; Rezervácie Sedadiel (FLT-23, FLT-24, FLT-25)
+                        </h2>
+                        <p style="color: var(--text-secondary); font-size: 13px;">
+                            Deklaratívny systém pravidiel s vyhodnocovacím reťazcom <code>Deny ➜ Max ➜ Reserve ➜ Priority</code>. Zaručené sedadlá (FLT-23), nulové prerušenie aktívnych lízingov pri aktualizácii (FLT-25).
+                        </p>
+                    </div>
+                    <div style="display: flex; gap: 8px;">
+                        <button type="button" class="btn btn-secondary btn-sm" onclick="loadPolicyRulesView()">🔄 Obnoviť</button>
+                        <button type="button" class="btn btn-primary btn-sm" onclick="saveCurrentPolicyRules()">💾 Uložiť Pravidlá (PUT)</button>
+                    </div>
+                </div>
+
+                <!-- License Selector & Quick Summary -->
+                <div class="table-card" style="margin-bottom: 20px; padding: 14px 20px;">
+                    <div style="display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-end;">
+                        <div style="flex: 2; min-width: 250px;">
+                            <label class="form-label" for="rules-license-select" style="font-size: 12px; margin-bottom: 4px;">Vyberte Licenciu pre Správu Pravidiel:</label>
+                            <select class="form-control" id="rules-license-select" onchange="onPolicyRuleLicenseChanged()" style="font-size: 13px;">
+                                <option value="">-- Vyberte licenciu --</option>
+                            </select>
+                        </div>
+                        <div style="flex: 1; min-width: 200px;">
+                            <label class="form-label" style="font-size: 12px; margin-bottom: 4px;">Stav Rezervácií (FLT-23):</label>
+                            <div id="rules-reserved-status" style="font-size: 13px; font-weight: 600; padding: 6px 12px; background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.3); border-radius: 6px; color: var(--accent-emerald);">
+                                Materializovaných: 0 sedadiel
+                            </div>
+                        </div>
+                        <div style="display: flex; gap: 8px;">
+                            <button type="button" class="btn btn-secondary btn-sm" onclick="insertDefaultRulesTemplate()">📋 Vložiť Šablónu</button>
+                            <button type="button" class="btn btn-secondary btn-sm" onclick="formatRulesYaml()">📐 Preformátovať</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Two-Column Layout: YAML/JSON Rules Editor & Interactive Simulator -->
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; align-items: start;">
+                    <!-- Column 1: Rules Editor -->
+                    <div class="table-card" style="padding: 16px 20px;">
+                        <div class="table-title" style="margin-bottom: 6px;">📝 Deklaratívny Konfiguračný Súbor (YAML / JSON)</div>
+                        <p style="color: var(--text-secondary); font-size: 12px; margin-bottom: 12px;">
+                            Definujte skupiny (<code>GROUP</code>, <code>HOST_GROUP</code>, <code>INTERNET</code>), kvóty (<code>max</code>), rezervácie (<code>reserve</code>), pravidlá odmietnutia (<code>deny</code>) a priority.
+                        </p>
+                        <textarea id="rules-yaml-editor" class="form-control" rows="22" spellcheck="false" style="font-family: 'Fira Code', 'Cascadia Code', Consolas, monospace; font-size: 12px; line-height: 1.45; background: #0f172a; color: #f8fafc; border-color: #334155; resize: vertical;" placeholder="# Zadajte YAML pravidlá alebo zvoľte licenciu..."></textarea>
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 10px;">
+                            <span id="rules-save-status" style="font-size: 12px; color: var(--text-muted);">Pripravené na úpravy</span>
+                            <button type="button" class="btn btn-primary btn-sm" onclick="saveCurrentPolicyRules()">💾 Aplikovať &amp; Materializovať Sedadlá</button>
+                        </div>
+                    </div>
+
+                    <!-- Column 2: Live Simulator -->
+                    <div class="table-card" style="padding: 16px 20px;">
+                        <div class="table-title" style="margin-bottom: 6px;">⚡ Interaktívna Simulácia Požiadavky (FLT-24)</div>
+                        <p style="color: var(--text-secondary); font-size: 12px; margin-bottom: 12px;">
+                            Otestujte vyhodnotenie reťazca pravidiel v reálnom čase bez vytvorenia skutočného lízingu v databáze.
+                        </p>
+                        <form id="form-rules-simulator" onsubmit="event.preventDefault(); runRulesSimulation();">
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px;">
+                                <div>
+                                    <label class="form-label" for="sim-user" style="font-size: 11px; margin-bottom: 2px;">Používateľ (Username):</label>
+                                    <input type="text" class="form-control" id="sim-user" placeholder="napr. ing.novak" style="font-size: 12px; padding: 6px 10px;">
+                                </div>
+                                <div>
+                                    <label class="form-label" for="sim-host" style="font-size: 11px; margin-bottom: 2px;">Počítač (Hostname):</label>
+                                    <input type="text" class="form-control" id="sim-host" placeholder="napr. cad-ws-01" style="font-size: 12px; padding: 6px 10px;">
+                                </div>
+                            </div>
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px;">
+                                <div>
+                                    <label class="form-label" for="sim-ip" style="font-size: 11px; margin-bottom: 2px;">IP Adresa / Subnet:</label>
+                                    <input type="text" class="form-control" id="sim-ip" placeholder="napr. 192.168.100.25" style="font-size: 12px; padding: 6px 10px;">
+                                </div>
+                                <div>
+                                    <label class="form-label" for="sim-feature" style="font-size: 11px; margin-bottom: 2px;">Modul / Feature:</label>
+                                    <input type="text" class="form-control" id="sim-feature" placeholder="napr. CAD_PRO" style="font-size: 12px; padding: 6px 10px;">
+                                </div>
+                            </div>
+                            <div style="display: flex; gap: 10px; align-items: flex-end; margin-bottom: 14px;">
+                                <div style="flex: 1;">
+                                    <label class="form-label" for="sim-quantity" style="font-size: 11px; margin-bottom: 2px;">Počet sedadiel:</label>
+                                    <input type="number" class="form-control" id="sim-quantity" value="1" min="1" max="100" style="font-size: 12px; padding: 6px 10px;">
+                                </div>
+                                <button type="submit" class="btn btn-primary btn-sm" style="height: 33px; white-space: nowrap;">🔍 Spustiť Simuláciu (FLT-24)</button>
+                            </div>
+                        </form>
+
+                        <!-- Simulation Results Box -->
+                        <div id="sim-result-box" style="display: none; background: #0b132b; border: 1px solid var(--border-color); border-radius: 8px; padding: 14px; margin-top: 10px;">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                                <span style="font-size: 12px; font-weight: 700; color: var(--text-muted);">VÝSLEDOK SIMULÁCIE:</span>
+                                <span id="sim-verdict-badge" class="badge">--</span>
+                            </div>
+                            <div id="sim-reason-box" style="font-size: 12px; padding: 8px 10px; border-radius: 6px; margin-bottom: 10px; display: none;"></div>
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 11px;">
+                                <div><strong style="color: var(--text-secondary);">Zodpovedajúca skupina:</strong> <span id="sim-match-group" style="color: var(--text-primary); font-family: monospace;">-</span></div>
+                                <div><strong style="color: var(--text-secondary);">Kvóta skupiny (Max):</strong> <span id="sim-quota" style="color: var(--text-primary); font-family: monospace;">-</span></div>
+                                <div><strong style="color: var(--text-secondary);">Rezervácia sedadla (FLT-23):</strong> <span id="sim-reserved" style="color: var(--text-primary); font-family: monospace;">-</span></div>
+                                <div><strong style="color: var(--text-secondary);">Priorita v rade (FLT-31):</strong> <span id="sim-priority" style="color: var(--text-primary); font-family: monospace;">-</span></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Rules Reference Guide Card -->
+                <div class="table-card" style="margin-top: 20px; padding: 16px 20px;">
+                    <div class="table-title" style="margin-bottom: 8px;">ℹ️ Špecifikácia &amp; Pravidlá Vyhodnocovania (§7.5, FLT-23, FLT-24, FLT-25)</div>
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; font-size: 12px; color: var(--text-secondary);">
+                        <div style="background: rgba(239, 68, 68, 0.08); border-left: 3px solid var(--accent-rose); padding: 8px 12px; border-radius: 0 6px 6px 0;">
+                            <strong style="color: var(--text-primary);">1. DENY (FLT-24)</strong><br>
+                            Okamžite preruší vyhodnocovanie s chybou <code>403 Forbidden</code> a dôvodom zamietnutia.
+                        </div>
+                        <div style="background: rgba(245, 158, 11, 0.08); border-left: 3px solid var(--accent-amber); padding: 8px 12px; border-radius: 0 6px 6px 0;">
+                            <strong style="color: var(--text-primary);">2. MAX (Kvóta)</strong><br>
+                            Obmedzí maximálny súbeh sedadiel pre danú skupinu/IP/používateľa. Pri prekročení vracia <code>409 Conflict</code>.
+                        </div>
+                        <div style="background: rgba(16, 185, 129, 0.08); border-left: 3px solid var(--accent-emerald); padding: 8px 12px; border-radius: 0 6px 6px 0;">
+                            <strong style="color: var(--text-primary);">3. RESERVE (FLT-23)</strong><br>
+                            Garantované sedadlá sú materializované v DB s <code>ReservedFor</code>. Všeobecný checkout ich nesmie vyčerpať.
+                        </div>
+                        <div style="background: rgba(59, 130, 246, 0.08); border-left: 3px solid var(--accent-primary); padding: 8px 12px; border-radius: 0 6px 6px 0;">
+                            <strong style="color: var(--text-primary);">4. PRIORITY (FLT-31)</strong><br>
+                            Určuje prednosť v licenčnom rade pri vyčerpaných floating sedadlách. Vyššie číslo = skoršie vybavenie.
                         </div>
                     </div>
                 </div>

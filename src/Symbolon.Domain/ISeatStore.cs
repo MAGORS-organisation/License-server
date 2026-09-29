@@ -31,6 +31,7 @@ public interface ISeatStore
         string? machineId,
         DateTimeOffset now,
         TimeSpan ttl,
+        string? reservationTarget = null,
         CancellationToken ct = default);
 
     Task<SeatAllocation[]?> TryAcquireManyAsync(
@@ -40,6 +41,12 @@ public interface ISeatStore
         int quantity,
         DateTimeOffset now,
         TimeSpan ttl,
+        string? reservationTarget = null,
+        CancellationToken ct = default);
+
+    Task SyncSeatReservationsAsync(
+        string licenseId,
+        IReadOnlyList<(string Target, int Count)> reservations,
         CancellationToken ct = default);
 
     Task<RenewOutcome> TryRenewAsync(

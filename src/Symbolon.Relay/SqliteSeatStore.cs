@@ -36,7 +36,8 @@ internal sealed class SqliteSeatStore : ISeatStore, IDisposable
                 acquired_at TEXT,
                 expires_at TEXT,
                 lease_seq INTEGER NOT NULL DEFAULT 0,
-                is_overage INTEGER NOT NULL DEFAULT 0
+                is_overage INTEGER NOT NULL DEFAULT 0,
+                reserved_for TEXT
             );
 
             CREATE INDEX IF NOT EXISTS ix_seats_lookup 
@@ -52,6 +53,17 @@ internal sealed class SqliteSeatStore : ISeatStore, IDisposable
             );
         """;
         cmd.ExecuteNonQuery();
+
+        try
+        {
+            using var alterCmd = _connection.CreateCommand();
+            alterCmd.CommandText = "ALTER TABLE seats ADD COLUMN reserved_for TEXT;";
+            alterCmd.ExecuteNonQuery();
+        }
+        catch (SqliteException)
+        {
+            // Column already exists
+        }
     }
 
     /// <summary>
@@ -94,9 +106,10 @@ internal sealed class SqliteSeatStore : ISeatStore, IDisposable
         string? machineId,
         DateTimeOffset now,
         TimeSpan ttl,
+        string? reservationTarget = null,
         CancellationToken ct = default)
     {
-        var many = await TryAcquireManyAsync(licenseId, fingerprint, machineId, 1, now, ttl, ct).ConfigureAwait(false);
+        var many = await TryAcquireManyAsync(licenseId, fingerprint, machineId, 1, now, ttl, reservationTarget, ct).ConfigureAwait(false);
         return many is { Length: > 0 } ? many[0] : null;
     }
 
@@ -107,6 +120,7 @@ internal sealed class SqliteSeatStore : ISeatStore, IDisposable
         int quantity,
         DateTimeOffset now,
         TimeSpan ttl,
+        string? reservationTarget = null,
         CancellationToken ct = default)
     {
         await _lock.WaitAsync(ct).ConfigureAwait(false);
@@ -117,19 +131,36 @@ internal sealed class SqliteSeatStore : ISeatStore, IDisposable
             {
                 string nowIso = now.ToString("O", CultureInfo.InvariantCulture);
 
-                // Select N free or expired seats
+                // Select N free or expired seats, respecting reservationTarget
                 var availableSeatIds = new List<(string Id, int SeatNo)>();
                 using (var selectCmd = _connection.CreateCommand())
                 {
                     selectCmd.Transaction = (SqliteTransaction)tx;
-                    selectCmd.CommandText = """
-                        SELECT id, seat_no FROM seats
-                        WHERE license_id = @licenseId
-                          AND (lease_id IS NULL OR expires_at < @now)
-                          AND is_overage = 0
-                        ORDER BY seat_no
-                        LIMIT @qty;
-                    """;
+                    if (!string.IsNullOrWhiteSpace(reservationTarget))
+                    {
+                        selectCmd.CommandText = """
+                            SELECT id, seat_no FROM seats
+                            WHERE license_id = @licenseId
+                              AND (lease_id IS NULL OR expires_at < @now)
+                              AND is_overage = 0
+                              AND (reserved_for = @resTarget OR reserved_for IS NULL)
+                            ORDER BY (CASE WHEN reserved_for = @resTarget THEN 0 ELSE 1 END), seat_no
+                            LIMIT @qty;
+                        """;
+                        selectCmd.Parameters.AddWithValue("@resTarget", reservationTarget);
+                    }
+                    else
+                    {
+                        selectCmd.CommandText = """
+                            SELECT id, seat_no FROM seats
+                            WHERE license_id = @licenseId
+                              AND (lease_id IS NULL OR expires_at < @now)
+                              AND is_overage = 0
+                              AND reserved_for IS NULL
+                            ORDER BY seat_no
+                            LIMIT @qty;
+                        """;
+                    }
                     selectCmd.Parameters.AddWithValue("@licenseId", licenseId);
                     selectCmd.Parameters.AddWithValue("@now", nowIso);
                     selectCmd.Parameters.AddWithValue("@qty", quantity);
@@ -468,6 +499,71 @@ internal sealed class SqliteSeatStore : ISeatStore, IDisposable
                 return diff > TimeSpan.Zero ? diff : TimeSpan.Zero;
             }
             return null;
+        }
+        finally
+        {
+            _lock.Release();
+        }
+    }
+
+    public async Task SyncSeatReservationsAsync(
+        string licenseId,
+        IReadOnlyList<(string Target, int Count)> reservations,
+        CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(licenseId);
+        ArgumentNullException.ThrowIfNull(reservations);
+
+        await _lock.WaitAsync(ct).ConfigureAwait(false);
+        try
+        {
+            var tx = await _connection.BeginTransactionAsync(ct).ConfigureAwait(false);
+            await using (tx.ConfigureAwait(false))
+            {
+                string nowIso = DateTimeOffset.UtcNow.ToString("O", CultureInfo.InvariantCulture);
+
+                // Clear reserved_for on free seats (FLT-25)
+                using (var clearCmd = _connection.CreateCommand())
+                {
+                    clearCmd.Transaction = (SqliteTransaction)tx;
+                    clearCmd.CommandText = """
+                        UPDATE seats
+                        SET reserved_for = NULL
+                        WHERE license_id = @licenseId
+                          AND (lease_id IS NULL OR expires_at < @now)
+                          AND reserved_for IS NOT NULL;
+                    """;
+                    clearCmd.Parameters.AddWithValue("@licenseId", licenseId);
+                    clearCmd.Parameters.AddWithValue("@now", nowIso);
+                    await clearCmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
+                }
+
+                // Apply reservations to free seats (FLT-23)
+                foreach (var (target, count) in reservations)
+                {
+                    using var applyCmd = _connection.CreateCommand();
+                    applyCmd.Transaction = (SqliteTransaction)tx;
+                    applyCmd.CommandText = """
+                        UPDATE seats
+                        SET reserved_for = @target
+                        WHERE id IN (
+                            SELECT id FROM seats
+                            WHERE license_id = @licenseId
+                              AND (lease_id IS NULL OR expires_at < @now)
+                              AND (reserved_for IS NULL)
+                            ORDER BY seat_no
+                            LIMIT @count
+                        );
+                    """;
+                    applyCmd.Parameters.AddWithValue("@target", target);
+                    applyCmd.Parameters.AddWithValue("@licenseId", licenseId);
+                    applyCmd.Parameters.AddWithValue("@now", nowIso);
+                    applyCmd.Parameters.AddWithValue("@count", count);
+                    await applyCmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
+                }
+
+                await tx.CommitAsync(ct).ConfigureAwait(false);
+            }
         }
         finally
         {
