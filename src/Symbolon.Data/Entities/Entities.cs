@@ -64,6 +64,7 @@ public sealed class Policy
     public int ResurrectionWindowSeconds { get; set; } = 300;
     public bool BorrowEnabled { get; set; }
     public int BorrowMaxDurationDays { get; set; } = 7;
+    public int BorrowMaxConcurrent { get; set; } = 5;
     public bool OfflineAllowed { get; set; } = true;
     public int OfflineFileTtlDays { get; set; } = 30;
     public string CryptoProfile { get; set; } = "hybrid-v1";
@@ -120,6 +121,7 @@ public sealed class SeatEntity
     public long LeaseSeq { get; set; }
     public string? ReservedFor { get; set; }
     public string? UserId { get; set; }
+    public string? PossessionKey { get; set; }
 
     public LicenseEntity? License { get; set; }
     public SeatGrantEntity? SeatGrant { get; set; }

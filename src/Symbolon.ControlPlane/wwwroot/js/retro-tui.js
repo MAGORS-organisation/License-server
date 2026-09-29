@@ -56,6 +56,7 @@
         { id: 'sub-kms', label: 'Cloud KMS & HSM Stav', hotkey: 'M', action: () => { switchRetroView('view-keys'); if (typeof loadKmsHierarchy === 'function') loadKmsHierarchy(); } },
         { id: 'sub-hierarchy', label: '3-Úrovňová Hierarchia (§9.3)', hotkey: '3', action: () => { switchRetroView('view-keys'); if (typeof verifyKeyHierarchy === 'function') verifyKeyHierarchy(); } },
         { id: 'sub-rates', label: 'Sadzby & Kredity (Tokeny)', hotkey: 'S', action: () => { switchRetroView('view-tokens'); if (typeof loadTokenRates === 'function') loadTokenRates(); } },
+        { id: 'sub-borrow', label: 'Offline Roaming (.symlease)', hotkey: 'B', action: () => { switchRetroView('view-overview'); if (typeof openBorrowModal === 'function') openBorrowModal(); } },
         { id: 'sub-nodes', label: 'Hardvérové odtlačky', hotkey: 'H', action: () => alert('Zoznam autorizovaných HW fingerprintov') }
     ];
 

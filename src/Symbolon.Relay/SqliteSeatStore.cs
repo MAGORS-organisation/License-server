@@ -64,6 +64,28 @@ internal sealed class SqliteSeatStore : ISeatStore, IDisposable
         {
             // Column already exists
         }
+
+        try
+        {
+            using var alterCmd = _connection.CreateCommand();
+            alterCmd.CommandText = "ALTER TABLE seats ADD COLUMN borrowed_until TEXT;";
+            alterCmd.ExecuteNonQuery();
+        }
+        catch (SqliteException)
+        {
+            // Column already exists
+        }
+
+        try
+        {
+            using var alterCmd = _connection.CreateCommand();
+            alterCmd.CommandText = "ALTER TABLE seats ADD COLUMN possession_key TEXT;";
+            alterCmd.ExecuteNonQuery();
+        }
+        catch (SqliteException)
+        {
+            // Column already exists
+        }
     }
 
     /// <summary>
@@ -356,6 +378,68 @@ internal sealed class SqliteSeatStore : ISeatStore, IDisposable
                     holder_fp = NULL,
                     machine_id = NULL,
                     expires_at = @now
+                WHERE lease_id = @leaseId
+                  AND (borrowed_until IS NULL OR borrowed_until < @now);
+            """;
+            cmd.Parameters.AddWithValue("@now", now.ToString("O", CultureInfo.InvariantCulture));
+            cmd.Parameters.AddWithValue("@leaseId", leaseId);
+
+            int rows = await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
+            return rows > 0;
+        }
+        finally
+        {
+            _lock.Release();
+        }
+    }
+
+    public async Task<bool> TryBorrowSeatAsync(
+        string leaseId,
+        DateTimeOffset borrowedUntil,
+        string possessionKeyJwk,
+        CancellationToken ct = default)
+    {
+        await _lock.WaitAsync(ct).ConfigureAwait(false);
+        try
+        {
+            using var cmd = _connection.CreateCommand();
+            cmd.CommandText = """
+                UPDATE seats
+                SET borrowed_until = @borrowedUntil,
+                    expires_at = @borrowedUntil,
+                    possession_key = @possessionKey
+                WHERE lease_id = @leaseId;
+            """;
+            cmd.Parameters.AddWithValue("@borrowedUntil", borrowedUntil.ToString("O", CultureInfo.InvariantCulture));
+            cmd.Parameters.AddWithValue("@possessionKey", possessionKeyJwk);
+            cmd.Parameters.AddWithValue("@leaseId", leaseId);
+
+            int rows = await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
+            return rows > 0;
+        }
+        finally
+        {
+            _lock.Release();
+        }
+    }
+
+    public async Task<bool> TryReturnBorrowedSeatAsync(
+        string leaseId,
+        DateTimeOffset now,
+        CancellationToken ct = default)
+    {
+        await _lock.WaitAsync(ct).ConfigureAwait(false);
+        try
+        {
+            using var cmd = _connection.CreateCommand();
+            cmd.CommandText = """
+                UPDATE seats
+                SET lease_id = NULL,
+                    holder_fp = NULL,
+                    machine_id = NULL,
+                    expires_at = @now,
+                    borrowed_until = NULL,
+                    possession_key = NULL
                 WHERE lease_id = @leaseId;
             """;
             cmd.Parameters.AddWithValue("@now", now.ToString("O", CultureInfo.InvariantCulture));
@@ -363,6 +447,34 @@ internal sealed class SqliteSeatStore : ISeatStore, IDisposable
 
             int rows = await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
             return rows > 0;
+        }
+        finally
+        {
+            _lock.Release();
+        }
+    }
+
+    public async Task<int> GetActiveBorrowedCountAsync(
+        string licenseId,
+        DateTimeOffset now,
+        CancellationToken ct = default)
+    {
+        await _lock.WaitAsync(ct).ConfigureAwait(false);
+        try
+        {
+            using var cmd = _connection.CreateCommand();
+            cmd.CommandText = """
+                SELECT COUNT(*)
+                FROM seats
+                WHERE license_id = @licenseId
+                  AND borrowed_until IS NOT NULL
+                  AND borrowed_until > @now;
+            """;
+            cmd.Parameters.AddWithValue("@licenseId", licenseId);
+            cmd.Parameters.AddWithValue("@now", now.ToString("O", CultureInfo.InvariantCulture));
+
+            var result = await cmd.ExecuteScalarAsync(ct).ConfigureAwait(false);
+            return Convert.ToInt32(result, CultureInfo.InvariantCulture);
         }
         finally
         {

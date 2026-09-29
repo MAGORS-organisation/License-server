@@ -56,6 +56,8 @@ class SeatLease:
         self.seq = seq
         self._is_released = False
         self._is_borrowed = False
+        self.symlease: Optional[str] = None
+        self.possession_key: Optional[Union[str, dict]] = None
         self._active_features: Dict[str, FeatureLease] = {}
 
     @property
@@ -118,6 +120,25 @@ class SeatLease:
         """Borrows this seat for offline use for the specified number of days."""
         res = self._client.borrow_seat(self, days)
         self._is_borrowed = True
+        self.symlease = res.get("symlease")
+        self.possession_key = res.get("possessionKey")
+        return res
+
+    def return_borrowed(
+        self,
+        symlease: Optional[str] = None,
+        possession_key: Optional[Union[str, dict]] = None,
+    ) -> dict:
+        """Explicitly returns this borrowed seat early back to the floating pool using proof-of-possession."""
+        effective_symlease = symlease or self.symlease
+        effective_key = possession_key or self.possession_key
+        res = self._client.return_borrowed_seat(
+            self.lease_id,
+            symlease=effective_symlease,
+            possession_key=effective_key,
+        )
+        self._is_released = True
+        self._is_borrowed = False
         return res
 
     def release(self) -> None:
@@ -134,6 +155,36 @@ class SeatLease:
     def __exit__(self, exc_type, exc_val, exc_tb) -> None:
         if not self._is_borrowed:
             self.release()
+
+
+def sign_possession_challenge(nonce: str, private_key_jwk: Union[str, dict]) -> str:
+    """Signs a challenge nonce using an ephemeral P-256 ECDSA possession private key."""
+    import base64
+    import json
+    if isinstance(private_key_jwk, str):
+        key_data = json.loads(private_key_jwk)
+    else:
+        key_data = private_key_jwk
+
+    def b64url_decode(s: str) -> bytes:
+        s += "=" * ((4 - len(s) % 4) % 4)
+        return base64.urlsafe_b64decode(s)
+
+    try:
+        from cryptography.hazmat.primitives.asymmetric import ec
+        from cryptography.hazmat.primitives import hashes
+        from cryptography.hazmat.primitives.asymmetric.utils import decode_dss_signature
+
+        d_bytes = b64url_decode(key_data["d"])
+        d_int = int.from_bytes(d_bytes, byteorder="big")
+        priv_key = ec.derive_private_key(d_int, ec.SECP256R1())
+
+        der_sig = priv_key.sign(nonce.encode("utf-8"), ec.ECDSA(hashes.SHA256()))
+        r, s = decode_dss_signature(der_sig)
+        raw_sig = r.to_bytes(32, byteorder="big") + s.to_bytes(32, byteorder="big")
+        return base64.urlsafe_b64encode(raw_sig).decode("ascii").rstrip("=")
+    except ImportError:
+        raise RuntimeError("The 'cryptography' library is required to sign return challenges.")
 
 
 class SymbolonClient:
@@ -309,6 +360,8 @@ class SymbolonClient:
 
         if isinstance(lease, SeatLease):
             lease._is_borrowed = True
+            lease.symlease = res_data.get("symlease")
+            lease.possession_key = res_data.get("possessionKey")
             if "token" in res_data:
                 borrowed_exp = (
                     datetime.fromisoformat(res_data["borrowedUntil"].replace("Z", "+00:00"))
@@ -325,9 +378,39 @@ class SymbolonClient:
 
         return res_data
 
-    def return_borrowed_seat(self, lease_id: str) -> None:
-        """Returns a borrowed offline seat early back to the floating pool."""
+    def get_return_challenge(self, lease_id: str) -> dict:
+        """Obtains single-use challenge nonce for early return of an offline roaming seat (FLT-21)."""
+        url = f"{self.server_url}/v1/leases/{lease_id}/return-challenge"
+        return self._post_json(url, {})
+
+    def return_borrowed_seat(
+        self,
+        lease_id: str,
+        symlease: Optional[str] = None,
+        possession_key: Optional[Union[str, dict]] = None,
+        nonce: Optional[str] = None,
+        signature: Optional[str] = None,
+    ) -> dict:
+        """
+        Returns a borrowed offline seat early back to the floating pool (FLT-21, FLT-22).
+        If symlease and possession_key (or nonce and signature) are provided, performs cryptographic early return.
+        Otherwise falls back to DELETE release_seat.
+        """
+        if symlease and (possession_key or (nonce and signature)):
+            if not (nonce and signature):
+                challenge = self.get_return_challenge(lease_id)
+                nonce = challenge["nonce"]
+                signature = sign_possession_challenge(nonce, possession_key)
+            url = f"{self.server_url}/v1/leases/{lease_id}/return"
+            payload = {
+                "symlease": symlease,
+                "nonce": nonce,
+                "signature": signature,
+            }
+            return self._post_json(url, payload)
+
         self.release_seat(lease_id)
+        return {"success": True, "leaseId": lease_id}
 
     def _start_heartbeat(self, lease: SeatLease, components: Dict[str, str]) -> None:
         stop_event = threading.Event()

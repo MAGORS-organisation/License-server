@@ -1896,6 +1896,128 @@ async function returnBorrowedSeat(leaseId) {
     }
 }
 
+function openBorrowModal(leaseId) {
+    const input = document.getElementById("borrow-lease-id");
+    if (input && leaseId) input.value = leaseId;
+    const resBox = document.getElementById("borrow-result-box");
+    if (resBox) resBox.style.display = "none";
+    const btn = document.getElementById("btn-submit-borrow");
+    if (btn) btn.style.display = "inline-block";
+    openModal("modal-borrow-seat");
+}
+
+function openReturnEarlyModal(leaseId) {
+    const input = document.getElementById("return-lease-id");
+    if (input && leaseId) input.value = leaseId;
+    openModal("modal-return-early");
+}
+
+async function borrowSeatSubmit(event) {
+    event.preventDefault();
+    const leaseId = document.getElementById("borrow-lease-id").value.trim();
+    const days = parseInt(document.getElementById("borrow-days").value, 10);
+
+    try {
+        const res = await fetch(`/v1/leases/${encodeURIComponent(leaseId)}/borrow`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ days: days })
+        });
+
+        if (!res.ok) {
+            const err = await res.json().catch(() => ({}));
+            showToast("Zlyhanie zapožičania: " + (err.detail || `HTTP ${res.status}`), "error");
+            return;
+        }
+
+        const data = await res.json();
+        showToast("Sedadlo úspešne zapožičané na " + days + " dní!", "success");
+
+        document.getElementById("borrow-symlease-out").value = data.symlease || "";
+        document.getElementById("borrow-key-out").value = data.possessionKey || "";
+        document.getElementById("borrow-result-box").style.display = "block";
+        document.getElementById("btn-submit-borrow").style.display = "none";
+
+        await loadBorrowedSeats();
+        await loadDashboardKPIs();
+    } catch (err) {
+        showToast("Chyba komunikácie: " + err.message, "error");
+    }
+}
+
+async function returnEarlySubmit(event) {
+    event.preventDefault();
+    const leaseId = document.getElementById("return-lease-id").value.trim();
+    const symlease = document.getElementById("return-symlease").value.trim();
+    const keyStr = document.getElementById("return-key").value.trim();
+
+    try {
+        const chRes = await fetch(`/v1/leases/${encodeURIComponent(leaseId)}/return-challenge`, {
+            method: "POST"
+        });
+        if (!chRes.ok) {
+            const err = await chRes.json().catch(() => ({}));
+            showToast("Zlyhanie výzvy na vrátenie: " + (err.detail || `HTTP ${chRes.status}`), "error");
+            return;
+        }
+        const challenge = await chRes.json();
+
+        let keyObj;
+        try {
+            keyObj = JSON.parse(keyStr);
+        } catch {
+            showToast("Neplatný JSON formát privátneho kľúča.", "error");
+            return;
+        }
+
+        const cryptoKey = await window.crypto.subtle.importKey(
+            "jwk",
+            keyObj,
+            { name: "ECDSA", namedCurve: "P-256" },
+            false,
+            ["sign"]
+        );
+
+        const enc = new TextEncoder();
+        const nonceBytes = enc.encode(challenge.nonce);
+        const sigBuffer = await window.crypto.subtle.sign(
+            { name: "ECDSA", hash: { name: "SHA-256" } },
+            cryptoKey,
+            nonceBytes
+        );
+
+        const sigBytes = new Uint8Array(sigBuffer);
+        let binary = "";
+        for (let i = 0; i < sigBytes.byteLength; i++) {
+            binary += String.fromCharCode(sigBytes[i]);
+        }
+        const base64UrlSig = btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+
+        const retRes = await fetch(`/v1/leases/${encodeURIComponent(leaseId)}/return`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                symlease: symlease,
+                nonce: challenge.nonce,
+                signature: base64UrlSig
+            })
+        });
+
+        if (!retRes.ok) {
+            const err = await retRes.json().catch(() => ({}));
+            showToast("Zlyhanie predčasného vrátenia: " + (err.detail || `HTTP ${retRes.status}`), "error");
+            return;
+        }
+
+        showToast("Sedadlo úspešne predčasne vrátené s kryptografickým dôkazom!", "success");
+        closeModal("modal-return-early");
+        await loadBorrowedSeats();
+        await loadDashboardKPIs();
+    } catch (err) {
+        showToast("Chyba spracovania: " + err.message, "error");
+    }
+}
+
 // 7. OpenTelemetry Distributed Traces Waterfall
 async function loadDistributedTraces() {
     const tbody = document.getElementById("distributed-traces-table-body");

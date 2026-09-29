@@ -1,6 +1,9 @@
 using System.Net;
 using System.Net.Http.Json;
+using FluentAssertions;
 using Symbolon.ControlPlane.Models;
+using Symbolon.Crypto;
+using Symbolon.Format;
 using Symbolon.Protocol;
 using Xunit;
 
@@ -144,7 +147,9 @@ public sealed class FraudAndBorrowingApiTests : IClassFixture<ControlPlaneFactor
             Code = "floating-borrow-5",
             Name = "Floating 5 seats",
             MaxSeats = 5,
-            LicenseModel = "floating"
+            LicenseModel = "floating",
+            BorrowEnabled = true,
+            BorrowMaxDurationDays = 14
         });
         Assert.Equal(HttpStatusCode.Created, polRes.StatusCode);
         var policy = await polRes.Content.ReadFromJsonAsync<PolicyDto>();
@@ -195,5 +200,196 @@ public sealed class FraudAndBorrowingApiTests : IClassFixture<ControlPlaneFactor
         var borrowedList2 = await listRes2.Content.ReadFromJsonAsync<List<BorrowedSeatAdminDto>>();
         Assert.NotNull(borrowedList2);
         Assert.DoesNotContain(borrowedList2, s => s.LeaseId == checkoutDto.LeaseId);
+    }
+
+    private async Task<(string LicenseKey, string LeaseId)> SetupAndAcquireSeatAsync(
+        bool borrowEnabled = true,
+        int borrowMaxDays = 14,
+        int maxConcurrent = 5,
+        int maxSeats = 5)
+    {
+        string slug = $"tenant-b-{Guid.NewGuid():N}";
+        var tenantRes = await _client.PostAsJsonAsync("/admin/v1/tenants", new CreateTenantDto(slug, "Borrow Test Corp"));
+        var tenant = await tenantRes.Content.ReadFromJsonAsync<TenantDto>();
+
+        var prodReq = new HttpRequestMessage(HttpMethod.Post, "/admin/v1/products")
+        {
+            Content = JsonContent.Create(new CreateProductDto($"app-b-{Guid.NewGuid():N}"[..12], "Borrow Test App", ["windows"]))
+        };
+        prodReq.Headers.Add("X-Tenant-Id", tenant!.Id);
+        var prodRes = await _client.SendAsync(prodReq);
+        var product = await prodRes.Content.ReadFromJsonAsync<ProductDto>();
+
+        var polRes = await _client.PostAsJsonAsync("/admin/v1/policies", new CreatePolicyDto
+        {
+            ProductId = product!.Id,
+            Code = $"policy-b-{Guid.NewGuid():N}"[..16],
+            Name = "Floating borrow policy",
+            MaxSeats = maxSeats,
+            LicenseModel = "floating",
+            BorrowEnabled = borrowEnabled,
+            BorrowMaxDurationDays = borrowMaxDays,
+            BorrowMaxConcurrent = maxConcurrent
+        });
+        var policy = await polRes.Content.ReadFromJsonAsync<PolicyDto>();
+
+        var licRes = await _client.PostAsJsonAsync("/admin/v1/licenses", new CreateLicenseDto
+        {
+            PolicyId = policy!.Id,
+            CustomerRef = "CUST-BORROW-TEST",
+            MaxSeats = maxSeats
+        });
+        var license = await licRes.Content.ReadFromJsonAsync<LicenseResponseDto>();
+
+        var checkoutRes = await _client.PostAsJsonAsync("/v1/leases", new CheckoutRequestDto
+        {
+            LicenseKey = license!.LicenseKey!,
+            FingerprintComponents = new Dictionary<string, string> { ["host"] = "test-machine" },
+            Quantity = 1
+        });
+        var checkoutDto = await checkoutRes.Content.ReadFromJsonAsync<CheckoutResponseDto>();
+
+        return (license.LicenseKey!, checkoutDto!.LeaseId);
+    }
+
+    [Fact]
+    public async Task BorrowSeat_IssuesSymleaseAndPossessionKey_FLT19()
+    {
+        var (_, leaseId) = await SetupAndAcquireSeatAsync();
+
+        var borrowRes = await _client.PostAsJsonAsync($"/v1/leases/{leaseId}/borrow", new BorrowRequestDto(7));
+        Assert.Equal(HttpStatusCode.OK, borrowRes.StatusCode);
+
+        var borrowDto = await borrowRes.Content.ReadFromJsonAsync<BorrowResponseDto>();
+        Assert.NotNull(borrowDto);
+        Assert.Equal(leaseId, borrowDto.LeaseId);
+        Assert.True(borrowDto.BorrowedUntil > DateTimeOffset.UtcNow.AddDays(6));
+        Assert.NotNull(borrowDto.Token);
+
+        // FLT-19: Must return PEM-armored .symlease artifact and ephemeral possession key
+        borrowDto.Symlease.Should().NotBeNull();
+        borrowDto.Symlease.Should().StartWith("-----BEGIN SYMBOLON LEASE-----");
+        borrowDto.Symlease.Trim().Should().EndWith("-----END SYMBOLON LEASE-----");
+
+        borrowDto.PossessionKey.Should().NotBeNull();
+        borrowDto.PossessionKey.Should().Contain("\"crv\":\"P-256\"");
+        borrowDto.PossessionKey.Should().Contain("\"d\":"); // Private key returned to client
+    }
+
+    [Fact]
+    public async Task BorrowSeat_PlainDelete_Returns403ProofOfPossessionRequired_FLT22()
+    {
+        var (_, leaseId) = await SetupAndAcquireSeatAsync();
+
+        var borrowRes = await _client.PostAsJsonAsync($"/v1/leases/{leaseId}/borrow", new BorrowRequestDto(7));
+        borrowRes.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        // FLT-22: Standard DELETE on active borrowed seat must return 403 Forbidden with ProofOfPossessionRequired
+        var deleteRes = await _client.DeleteAsync($"/v1/leases/{leaseId}");
+        deleteRes.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+
+        string body = await deleteRes.Content.ReadAsStringAsync();
+        body.Should().Contain(ProblemTypes.ProofOfPossessionRequired);
+    }
+
+    [Fact]
+    public async Task BorrowSeat_EarlyReturn_WithValidProofOfPossession_Succeeds_FLT21()
+    {
+        var (_, leaseId) = await SetupAndAcquireSeatAsync();
+
+        var borrowRes = await _client.PostAsJsonAsync($"/v1/leases/{leaseId}/borrow", new BorrowRequestDto(7));
+        borrowRes.StatusCode.Should().Be(HttpStatusCode.OK);
+        var borrowDto = await borrowRes.Content.ReadFromJsonAsync<BorrowResponseDto>();
+        borrowDto.Should().NotBeNull();
+
+        // 1. Request challenge nonce
+        var challengeRes = await _client.PostAsync($"/v1/leases/{leaseId}/return-challenge", null);
+        challengeRes.StatusCode.Should().Be(HttpStatusCode.OK);
+        var challengeDto = await challengeRes.Content.ReadFromJsonAsync<ReturnChallengeResponseDto>();
+        challengeDto.Should().NotBeNull();
+        challengeDto!.Nonce.Should().NotBeNullOrWhiteSpace();
+
+        // 2. Sign challenge nonce with possession private key
+        string signature = ProofOfPossessionEngine.SignChallenge(challengeDto.Nonce, borrowDto!.PossessionKey!);
+
+        // 3. Submit early return with proof-of-possession
+        var earlyReturnReq = new EarlyReturnRequestDto
+        {
+            Symlease = borrowDto.Symlease!,
+            Nonce = challengeDto.Nonce,
+            Signature = signature
+        };
+
+        var returnRes = await _client.PostAsJsonAsync($"/v1/leases/{leaseId}/return", earlyReturnReq);
+        returnRes.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        var returnDto = await returnRes.Content.ReadFromJsonAsync<EarlyReturnResponseDto>();
+        returnDto.Should().NotBeNull();
+        returnDto!.Success.Should().BeTrue();
+        returnDto.LeaseId.Should().Be(leaseId);
+
+        // 4. Verify lease is released (DELETE on released lease returns Success = false)
+        var checkAgainRes = await _client.DeleteAsync($"/v1/leases/{leaseId}");
+        var checkAgainDto = await checkAgainRes.Content.ReadFromJsonAsync<ReleaseResponseDto>();
+        checkAgainDto!.Success.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task BorrowSeat_EarlyReturn_WithInvalidSignature_Fails403()
+    {
+        var (_, leaseId) = await SetupAndAcquireSeatAsync();
+
+        var borrowRes = await _client.PostAsJsonAsync($"/v1/leases/{leaseId}/borrow", new BorrowRequestDto(7));
+        var borrowDto = await borrowRes.Content.ReadFromJsonAsync<BorrowResponseDto>();
+        borrowDto.Should().NotBeNull();
+
+        // Request challenge
+        var challengeRes = await _client.PostAsync($"/v1/leases/{leaseId}/return-challenge", null);
+        var challengeDto = await challengeRes.Content.ReadFromJsonAsync<ReturnChallengeResponseDto>();
+        challengeDto.Should().NotBeNull();
+
+        // Sign with a completely different key pair
+        var foreignKeyPair = ProofOfPossessionEngine.GenerateKeyPair();
+        string foreignSignature = ProofOfPossessionEngine.SignChallenge(challengeDto!.Nonce, foreignKeyPair.PrivateKeyJwk);
+
+        var earlyReturnReq = new EarlyReturnRequestDto
+        {
+            Symlease = borrowDto!.Symlease!,
+            Nonce = challengeDto.Nonce,
+            Signature = foreignSignature
+        };
+
+        var returnRes = await _client.PostAsJsonAsync($"/v1/leases/{leaseId}/return", earlyReturnReq);
+        returnRes.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+
+        string body = await returnRes.Content.ReadAsStringAsync();
+        body.Should().Contain(ProblemTypes.InvalidProofOfPossession);
+    }
+
+    [Fact]
+    public async Task BorrowSeat_PolicyViolation_DurationExceeded_Fails400_FLT18()
+    {
+        // Policy limits borrow to max 5 days
+        var (_, leaseId) = await SetupAndAcquireSeatAsync(borrowMaxDays: 5);
+
+        // Request 10 days
+        var borrowRes = await _client.PostAsJsonAsync($"/v1/leases/{leaseId}/borrow", new BorrowRequestDto(10));
+        borrowRes.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+
+        string body = await borrowRes.Content.ReadAsStringAsync();
+        body.Should().Contain(ProblemTypes.BorrowDurationExceeded);
+    }
+
+    [Fact]
+    public async Task BorrowSeat_PolicyViolation_Disabled_Fails403_FLT18()
+    {
+        // Policy with borrow disabled
+        var (_, leaseId) = await SetupAndAcquireSeatAsync(borrowEnabled: false);
+
+        var borrowRes = await _client.PostAsJsonAsync($"/v1/leases/{leaseId}/borrow", new BorrowRequestDto(3));
+        borrowRes.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+
+        string body = await borrowRes.Content.ReadAsStringAsync();
+        body.Should().Contain(ProblemTypes.BorrowDisabled);
     }
 }

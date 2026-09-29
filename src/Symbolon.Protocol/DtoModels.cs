@@ -118,11 +118,16 @@ public sealed record BorrowRequestDto
     [JsonPropertyName("days")]
     public int Days { get; init; }
 
+    [JsonPropertyName("possessionPublicKeyJwk")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? PossessionPublicKeyJwk { get; init; }
+
     public BorrowRequestDto() { }
 
-    public BorrowRequestDto(int days)
+    public BorrowRequestDto(int days, string? possessionPublicKeyJwk = null)
     {
         Days = days;
+        PossessionPublicKeyJwk = possessionPublicKeyJwk;
     }
 }
 
@@ -137,14 +142,63 @@ public sealed record BorrowResponseDto
     [JsonPropertyName("token")]
     public string Token { get; init; } = string.Empty;
 
+    [JsonPropertyName("symlease")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Symlease { get; init; }
+
+    [JsonPropertyName("possessionKey")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? PossessionKey { get; init; }
+
     public BorrowResponseDto() { }
 
-    public BorrowResponseDto(string leaseId, DateTimeOffset borrowedUntil, string token)
+    public BorrowResponseDto(string leaseId, DateTimeOffset borrowedUntil, string token, string? symlease = null, string? possessionKey = null)
     {
         LeaseId = leaseId;
         BorrowedUntil = borrowedUntil;
         Token = token;
+        Symlease = symlease;
+        PossessionKey = possessionKey;
     }
+}
+
+public sealed record ReturnChallengeResponseDto
+{
+    [JsonPropertyName("leaseId")]
+    public required string LeaseId { get; init; }
+
+    [JsonPropertyName("nonce")]
+    public required string Nonce { get; init; }
+
+    [JsonPropertyName("expiresAt")]
+    public required DateTimeOffset ExpiresAt { get; init; }
+}
+
+public sealed record EarlyReturnRequestDto
+{
+    [Required]
+    [JsonPropertyName("symlease")]
+    public required string Symlease { get; init; }
+
+    [Required]
+    [JsonPropertyName("nonce")]
+    public required string Nonce { get; init; }
+
+    [Required]
+    [JsonPropertyName("signature")]
+    public required string Signature { get; init; }
+}
+
+public sealed record EarlyReturnResponseDto
+{
+    [JsonPropertyName("success")]
+    public required bool Success { get; init; }
+
+    [JsonPropertyName("returnedAt")]
+    public required DateTimeOffset ReturnedAt { get; init; }
+
+    [JsonPropertyName("leaseId")]
+    public required string LeaseId { get; init; }
 }
 
 public sealed record QueuedResponseDto
@@ -442,5 +496,11 @@ public static class ProblemTypes
     public const string QueueNotFound = "https://symbolon.dev/errors/queue-not-found";
     public const string RuleDenied = "https://symbolon.dev/problems/rule-denied";
     public const string GroupQuotaExceeded = "https://symbolon.dev/problems/group-quota-exceeded";
+    public const string BorrowDisabled = "https://symbolon.dev/problems/borrow-disabled";
+    public const string BorrowDurationExceeded = "https://symbolon.dev/problems/borrow-duration-exceeded";
+    public const string BorrowLimitExceeded = "https://symbolon.dev/problems/borrow-limit-exceeded";
+    public const string ProofOfPossessionRequired = "https://symbolon.dev/problems/proof-of-possession-required";
+    public const string InvalidProofOfPossession = "https://symbolon.dev/problems/invalid-proof-of-possession";
+    public const string ChallengeExpired = "https://symbolon.dev/problems/challenge-expired";
 }
 

@@ -29,6 +29,8 @@ namespace Symbolon.Format;
 [JsonSerializable(typeof(RevocationItem))]
 [JsonSerializable(typeof(List<RevocationItem>))]
 [JsonSerializable(typeof(IReadOnlyList<RevocationItem>))]
+[JsonSerializable(typeof(SymleaseClaims))]
+[JsonSerializable(typeof(SymleaseBorrowPayload))]
 public sealed partial class SymbolonJsonContext : JsonSerializerContext
 {
 }

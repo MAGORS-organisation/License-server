@@ -15,4 +15,6 @@ public sealed record SeatAllocation
     public required DateTimeOffset ExpiresAt { get; init; }
     public long LeaseSeq { get; init; }
     public bool IsOverage { get; init; }
+    public DateTimeOffset? BorrowedUntil { get; init; }
+    public string? PossessionKey { get; init; }
 }

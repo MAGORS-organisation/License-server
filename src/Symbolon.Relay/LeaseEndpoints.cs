@@ -3,7 +3,9 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Routing;
 using Symbolon.Domain;
+using Symbolon.Domain.Borrow;
 using Symbolon.Domain.PolicyRules;
+using Symbolon.Crypto;
 using Symbolon.Format;
 using Symbolon.Protocol;
 
@@ -35,7 +37,30 @@ internal static class LeaseEndpoints
              .WithName("ReleaseLease")
              .WithSummary("Explicitne uvoľní sedadlo späť do poolu.")
              .Produces<ReleaseResponseDto>(StatusCodes.Status200OK)
-             .Produces(StatusCodes.Status404NotFound);
+             .Produces(StatusCodes.Status404NotFound)
+             .ProducesProblem(StatusCodes.Status403Forbidden);
+
+        group.MapPost("/leases/{id}/borrow", BorrowAsync)
+             .WithName("BorrowLease")
+             .WithSummary("Vypožičia sedadlo pre offline roaming (FLT-17..FLT-20).")
+             .Produces<BorrowResponseDto>(StatusCodes.Status200OK)
+             .ProducesProblem(StatusCodes.Status400BadRequest)
+             .ProducesProblem(StatusCodes.Status403Forbidden)
+             .ProducesProblem(StatusCodes.Status404NotFound)
+             .ProducesProblem(StatusCodes.Status409Conflict);
+
+        group.MapPost("/leases/{id}/return-challenge", ReturnChallengeAsync)
+             .WithName("ReturnChallenge")
+             .WithSummary("Vygeneruje jednorazovú výzvu (nonce) pre predčasné vrátenie výpožičky (FLT-21, FLT-22).")
+             .Produces<ReturnChallengeResponseDto>(StatusCodes.Status200OK)
+             .ProducesProblem(StatusCodes.Status404NotFound);
+
+        group.MapPost("/leases/{id}/return", ReturnEarlyAsync)
+             .WithName("ReturnEarly")
+             .WithSummary("Predčasne vráti vypožičané sedadlo s proof-of-possession (FLT-21, FLT-22).")
+             .Produces<EarlyReturnResponseDto>(StatusCodes.Status200OK)
+             .ProducesProblem(StatusCodes.Status403Forbidden)
+             .ProducesProblem(StatusCodes.Status404NotFound);
 
         group.MapGet("/queue/{ticket}", GetQueueStatusAsync)
              .WithName("GetQueueStatus")
@@ -259,6 +284,157 @@ internal static class LeaseEndpoints
         return released
             ? Results.Ok(new ReleaseResponseDto { Success = true })
             : Results.NotFound(new ReleaseResponseDto { Success = false });
+    }
+
+    private static async Task<IResult> BorrowAsync(
+        string id,
+        [FromBody] BorrowRequestDto dto,
+        SqliteSeatStore store,
+        ILeaseTokenIssuer tokenIssuer,
+        ISignatureProvider signatureProvider,
+        TimeProvider time,
+        CancellationToken ct)
+    {
+        var now = time.GetUtcNow();
+        var borrowedUntil = now.AddDays(dto.Days);
+
+        string possessionPublicJwk;
+        string? possessionPrivateJwk = null;
+
+        if (!string.IsNullOrWhiteSpace(dto.PossessionPublicKeyJwk))
+        {
+            possessionPublicJwk = dto.PossessionPublicKeyJwk;
+        }
+        else
+        {
+            var keyPair = ProofOfPossessionEngine.GenerateKeyPair();
+            possessionPublicJwk = keyPair.PublicKeyJwk;
+            possessionPrivateJwk = keyPair.PrivateKeyJwk;
+        }
+
+        bool success = await store.TryBorrowSeatAsync(id, borrowedUntil, possessionPublicJwk, ct).ConfigureAwait(false);
+        if (!success)
+        {
+            return Results.Problem(
+                statusCode: StatusCodes.Status404NotFound,
+                type: ProblemTypes.LeaseUnknown,
+                title: "Lease Not Found",
+                detail: $"Lease '{id}' was not found.");
+        }
+
+        var symleaseClaims = new SymleaseClaims(
+            Iss: "relay:relay-main",
+            Sub: "relay-license",
+            Jti: id,
+            Iat: now.ToUnixTimeSeconds(),
+            Nbf: now.AddMinutes(-5).ToUnixTimeSeconds(),
+            Exp: borrowedUntil.ToUnixTimeSeconds(),
+            Seat: 0,
+            Fp: "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            Ent: ["core"],
+            Borrow: new SymleaseBorrowPayload(
+                Days: dto.Days,
+                BorrowedAt: now.ToUnixTimeSeconds(),
+                BorrowedUntil: borrowedUntil.ToUnixTimeSeconds(),
+                PossessionKeyJwk: possessionPublicJwk
+            )
+        );
+
+        var signer = new SymleaseSigner([signatureProvider]);
+        string symleasePem = signer.Sign(symleaseClaims);
+
+        var alloc = new SeatAllocation
+        {
+            SeatId = id,
+            SeatNo = 0,
+            LicenseId = "relay-license",
+            LeaseId = id,
+            ExpiresAt = borrowedUntil,
+            BorrowedUntil = borrowedUntil,
+            PossessionKey = possessionPublicJwk
+        };
+
+        string token = tokenIssuer.Issue(alloc);
+        return Results.Ok(new BorrowResponseDto(id, borrowedUntil, token, symleasePem, possessionPrivateJwk));
+    }
+
+    private static async Task<IResult> ReturnChallengeAsync(
+        string id,
+        IReturnChallengeStore challengeStore,
+        CancellationToken ct)
+    {
+        var (nonce, expiresAt) = await challengeStore.CreateChallengeAsync(id, TimeSpan.FromMinutes(5), ct).ConfigureAwait(false);
+        return Results.Ok(new ReturnChallengeResponseDto
+        {
+            LeaseId = id,
+            Nonce = nonce,
+            ExpiresAt = expiresAt
+        });
+    }
+
+    private static async Task<IResult> ReturnEarlyAsync(
+        string id,
+        [FromBody] EarlyReturnRequestDto dto,
+        SqliteSeatStore store,
+        IKeyRing keyRing,
+        IReturnChallengeStore challengeStore,
+        TimeProvider time,
+        CancellationToken ct)
+    {
+        var now = time.GetUtcNow();
+
+        // 1. Consume challenge
+        bool validNonce = await challengeStore.TryConsumeChallengeAsync(id, dto.Nonce, now, ct).ConfigureAwait(false);
+        if (!validNonce)
+        {
+            return Results.Problem(
+                statusCode: StatusCodes.Status403Forbidden,
+                type: ProblemTypes.ChallengeExpired,
+                title: "Challenge Expired or Invalid",
+                detail: "The provided challenge nonce is invalid, expired, or already consumed.");
+        }
+
+        // 2. Verify .symlease artifact
+        var verifier = new SymleaseVerifier(keyRing, time);
+        var symleaseResult = verifier.Verify(dto.Symlease);
+        if (!symleaseResult.IsValid || symleaseResult.Claims?.Jti != id)
+        {
+            return Results.Problem(
+                statusCode: StatusCodes.Status403Forbidden,
+                type: ProblemTypes.InvalidProofOfPossession,
+                title: "Invalid Symlease Artifact",
+                detail: symleaseResult.FailureReason ?? "The provided .symlease artifact does not match the active lease.");
+        }
+
+        // 3. Verify proof of possession
+        string possessionKeyJwk = symleaseResult.Claims.Borrow.PossessionKeyJwk;
+        bool validProof = ProofOfPossessionEngine.VerifyProof(dto.Nonce, dto.Signature, possessionKeyJwk);
+        if (!validProof)
+        {
+            return Results.Problem(
+                statusCode: StatusCodes.Status403Forbidden,
+                type: ProblemTypes.InvalidProofOfPossession,
+                title: "Invalid Proof of Possession",
+                detail: "Cryptographic signature over the challenge nonce is invalid.");
+        }
+
+        // 4. Release seat in SQLite
+        bool released = await store.TryReturnBorrowedSeatAsync(id, now, ct).ConfigureAwait(false);
+        if (!released)
+        {
+            return Results.Problem(
+                statusCode: StatusCodes.Status404NotFound,
+                type: ProblemTypes.LeaseUnknown,
+                title: "Lease Not Found",
+                detail: $"Lease '{id}' could not be returned.");
+        }
+
+        return Results.Ok(new EarlyReturnResponseDto
+        {
+            Success = true,
+            ReturnedAt = now,
+            LeaseId = id
+        });
     }
 
     private static async Task<IResult> GetQueueStatusAsync(

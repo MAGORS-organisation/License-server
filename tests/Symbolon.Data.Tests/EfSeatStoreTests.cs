@@ -162,8 +162,12 @@ public sealed class EfSeatStoreTests : IDisposable
         seat.BorrowedUntil = now.AddDays(7);
         await db.SaveChangesAsync();
 
-        // Client returns borrowed seat early
-        bool released = await store.TryReleaseAsync(alloc.LeaseId!, now.AddDays(1));
+        // Standard release fails because seat is borrowed and within borrow period (FLT-20, FLT-22)
+        bool standardRelease = await store.TryReleaseAsync(alloc.LeaseId!, now.AddDays(1));
+        Assert.False(standardRelease);
+
+        // Client returns borrowed seat early via authenticated return (FLT-21)
+        bool released = await store.TryReturnBorrowedSeatAsync(alloc.LeaseId!, now.AddDays(1));
         Assert.True(released);
 
         // Verify BorrowedUntil is cleared

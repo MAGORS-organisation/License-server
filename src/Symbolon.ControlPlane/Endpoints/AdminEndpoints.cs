@@ -276,6 +276,7 @@ public static class AdminEndpoints
             ResurrectionWindowSeconds = dto.ResurrectionWindowSeconds,
             BorrowEnabled = dto.BorrowEnabled,
             BorrowMaxDurationDays = dto.BorrowMaxDurationDays,
+            BorrowMaxConcurrent = dto.BorrowMaxConcurrent,
             OfflineAllowed = dto.OfflineAllowed,
             CryptoProfile = dto.CryptoProfile,
             EntitlementsJson = JsonSerializer.Serialize(dto.Entitlements ?? ["core"])
@@ -1464,13 +1465,19 @@ public static class AdminEndpoints
             return TypedResults.NotFound();
         }
 
-        bool released = await engine.ReleaseAsync(id, ct).ConfigureAwait(false);
-        if (released)
-        {
-            metrics.RecordSeatReleased(1);
-        }
+        seat.LeaseId = null;
+        seat.HolderFp = null;
+        seat.MachineId = null;
+        seat.AcquiredAt = null;
+        seat.ExpiresAt = null;
+        seat.BorrowedUntil = null;
+        seat.PossessionKey = null;
+        seat.UserId = null;
+        seat.LeaseSeq = 0;
+        await db.SaveChangesAsync(ct).ConfigureAwait(false);
+        metrics.RecordSeatReleased(1);
 
-        return TypedResults.Ok(new { success = released, leaseId = id });
+        return TypedResults.Ok(new { success = true, leaseId = id });
     }
 
     private static IResult GetRecentTraces(

@@ -3,6 +3,7 @@ using System.Net.Http.Json;
 using Microsoft.Extensions.Logging;
 using Symbolon.Client.Discovery;
 using Symbolon.Client.Revocation;
+using Symbolon.Crypto;
 using Symbolon.Format;
 using Symbolon.Protocol;
 using Symbolon.Protocol.Tracing;
@@ -374,7 +375,11 @@ public sealed class SymbolonClient : IDisposable
     /// <summary>
     /// Borrows an active floating seat for offline roaming for up to 30 days.
     /// </summary>
-    public async Task<BorrowResponseDto?> BorrowSeatAsync(string leaseId, int days, CancellationToken ct = default)
+    public async Task<BorrowResponseDto?> BorrowSeatAsync(
+        string leaseId,
+        int days,
+        string? possessionPublicKeyJwk = null,
+        CancellationToken ct = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(leaseId);
         if (days < 1 || days > 30)
@@ -386,7 +391,7 @@ public sealed class SymbolonClient : IDisposable
         activity?.SetTag(SymbolonTracing.TagLeaseId, leaseId);
         activity?.SetTag(SymbolonTracing.TagBorrowDays, days);
 
-        var dto = new BorrowRequestDto(days);
+        var dto = new BorrowRequestDto(days, possessionPublicKeyJwk);
 
         try
         {
@@ -426,8 +431,110 @@ public sealed class SymbolonClient : IDisposable
     }
 
     /// <summary>
-    /// Returns a previously borrowed seat back to the floating pool early.
+    /// Obtains a single-use return challenge nonce for early return of an offline roaming borrowed seat (FLT-21).
     /// </summary>
+    public async Task<ReturnChallengeResponseDto?> GetReturnChallengeAsync(string leaseId, CancellationToken ct = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(leaseId);
+
+        try
+        {
+            return await _failoverPool.ExecuteWithFailoverAsync(async (serverUri, http, token) =>
+            {
+                var targetUri = new Uri(serverUri, $"v1/leases/{leaseId}/return-challenge");
+                var response = await http.PostAsync(targetUri, null, token).ConfigureAwait(false);
+
+                if ((int)response.StatusCode is 502 or 503 or 504)
+                {
+                    throw new HttpRequestException($"Server node {serverUri} returned {(int)response.StatusCode}");
+                }
+
+                if (!response.IsSuccessStatusCode)
+                {
+                    return null;
+                }
+
+                return await response.Content.ReadFromJsonAsync(
+                    SymbolonProtocolJsonContext.Default.ReturnChallengeResponseDto,
+                    token).ConfigureAwait(false);
+            }, ct).ConfigureAwait(false);
+        }
+        catch (SymbolonFailoverExhaustedException)
+        {
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Returns a previously borrowed seat back to the floating pool early using cryptographic proof-of-possession (FLT-21, FLT-22).
+    /// </summary>
+    public async Task<bool> ReturnBorrowedSeatAsync(
+        string leaseId,
+        string symleasePem,
+        string possessionPrivateKeyJwk,
+        CancellationToken ct = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(leaseId);
+        ArgumentException.ThrowIfNullOrWhiteSpace(symleasePem);
+        ArgumentException.ThrowIfNullOrWhiteSpace(possessionPrivateKeyJwk);
+
+        using var activity = SymbolonTracing.ActivitySource.StartActivity(SymbolonTracing.OpReturnBorrowed);
+        activity?.SetTag(SymbolonTracing.TagLeaseId, leaseId);
+
+        var challenge = await GetReturnChallengeAsync(leaseId, ct).ConfigureAwait(false);
+        if (challenge is null)
+        {
+            activity?.SetStatus(ActivityStatusCode.Error, "Failed to obtain return challenge");
+            return false;
+        }
+
+        string signature = ProofOfPossessionEngine.SignChallenge(challenge.Nonce, possessionPrivateKeyJwk);
+
+        var requestDto = new EarlyReturnRequestDto
+        {
+            Symlease = symleasePem,
+            Nonce = challenge.Nonce,
+            Signature = signature
+        };
+
+        try
+        {
+            return await _failoverPool.ExecuteWithFailoverAsync(async (serverUri, http, token) =>
+            {
+                var targetUri = new Uri(serverUri, $"v1/leases/{leaseId}/return");
+                var response = await http.PostAsJsonAsync(
+                    targetUri,
+                    requestDto,
+                    SymbolonProtocolJsonContext.Default.EarlyReturnRequestDto,
+                    token).ConfigureAwait(false);
+
+                if ((int)response.StatusCode is 502 or 503 or 504)
+                {
+                    throw new HttpRequestException($"Server node {serverUri} returned {(int)response.StatusCode}");
+                }
+
+                if (response.IsSuccessStatusCode)
+                {
+                    activity?.SetStatus(ActivityStatusCode.Ok);
+                    return true;
+                }
+
+                activity?.SetStatus(ActivityStatusCode.Error, $"HTTP {(int)response.StatusCode}");
+                return false;
+            }, ct).ConfigureAwait(false);
+        }
+        catch (SymbolonFailoverExhaustedException ex)
+        {
+            activity?.SetStatus(ActivityStatusCode.Error, ex.Message);
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Attempts to return a borrowed seat without cryptographic proof-of-possession (FLT-22).
+    /// Returns false if rejected by the server with 403 Forbidden.
+    /// </summary>
+    [Obsolete("Use ReturnBorrowedSeatAsync with symlease and possessionKey to provide cryptographic proof-of-possession (FLT-21).")]
     public async Task<bool> ReturnBorrowedSeatAsync(string leaseId, CancellationToken ct = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(leaseId);

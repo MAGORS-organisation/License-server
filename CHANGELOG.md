@@ -10,6 +10,40 @@ a projekt striktne dodržiava [Sémantické Verziovanie (Semantic Versioning 2.0
 ## [Unreleased]
 
 ### Pridané (Added)
+- **Enterprise Offline Roaming, Self-Verifiable `.symlease` Artifact & Cryptographic Proof-of-Possession Early Return (FLT-17 – FLT-22, §7.4)**:
+  - **Formátová vrstva (`Symbolon.Format`)**:
+    - `SymleaseClaims` & `SymleaseBorrowPayload`: JWT/JWS claims štruktúra pre offline roaming v súlade s RFC 7519, RFC 7515 a Symbolon §7.4.
+    - `SymleaseSigner`: PEM-armored JWS General JSON multi-signature generátor (`-----BEGIN SYMBOLON LEASE-----`) s hybridným podpisom (ES256 + ML-DSA-65) a `exp = borrowedUntil`.
+    - `SymleaseVerifier`: Samostatný offline verifikátor kontrolujúci hybridné podpisy voči `SymbolonKeyRing`, časovú platnosť, zhodu licencie a hardvérového odtlačku stroja.
+    - Zdrojové generovanie JSON serializácie v `SymbolonJsonContext` pre Native AOT.
+  - **Kryptografická vrstva (`Symbolon.Crypto`)**:
+    - `ProofOfPossessionEngine`: Generovanie efemérnych kľúčových párov NIST P-256 (`EphemeralPossessionKeyPair`), bezpečné podpisovanie jednorazovej výzvy (nonce) vo formáte IEEE P1363 / RFC 7515 a kryptografické overovanie podpisu voči verejnému JWK kľúču.
+  - **Protokolová vrstva (`Symbolon.Protocol`)**:
+    - DTO kontrakty: `BorrowRequestDto`, `BorrowResponseDto`, `ReturnChallengeResponseDto`, `EarlyReturnRequestDto`, `EarlyReturnResponseDto`.
+    - Problémové typy: `BorrowDisabled`, `BorrowDurationExceeded`, `BorrowLimitExceeded`, `ProofOfPossessionRequired`, `InvalidProofOfPossession`, `ChallengeExpired` registrované v `SymbolonProtocolJsonContext`.
+  - **Doménová a dátová vrstva (`Symbolon.Domain`, `Symbolon.Data`)**:
+    - `BorrowPolicyEvaluator`: Striktné presadzovanie politiky **FLT-18** (`BorrowEnabled`, `BorrowMaxDurationDays`, `BorrowMaxConcurrent`).
+    - `IReturnChallengeStore` & `InMemoryReturnChallengeStore`: Jednorazové kryptografické výzvy (32-bajtové kryptografické nonces) s 5-minútovou TTL a ochranou proti replay útokom.
+    - Rozšírenie `Policy` o `BorrowMaxConcurrent` a `SeatEntity` o `PossessionKey` a index `BorrowedUntil`.
+    - `EfSeatStore`: Implementácia `TryBorrowSeatAsync`, `TryReturnBorrowedSeatAsync`, `GetActiveBorrowedCountAsync`, a ochrana `TryReleaseAsync` zabraňujúca neautorizovanému uvoľneniu zapožičaných sedadiel pred vypršaním lehoty.
+  - **Serverové riadenie (`Symbolon.ControlPlane`, `Symbolon.Relay`)**:
+    - `POST /v1/leases/{id}/borrow`: Validácia FLT-18 politiky, generovanie efemérneho páru kľúčov, hybridné podpísanie `.symlease` artefaktu a audit `seat.borrowed`.
+    - `POST /v1/leases/{id}/return-challenge`: Vydanie jednorazovej výzvy nonce.
+    - `POST /v1/leases/{id}/return`: Overenie nonce, ECDSA P-256 podpisu a `.symlease` artefaktu, predčasné vrátenie sedadla s auditom `seat.borrow_returned_early` (**FLT-21**).
+    - `DELETE /v1/leases/{id}`: Rešpektovanie **FLT-22** — odmietnutie bežného uvoľnenia aktívneho zapožičaného sedadla s kódom 403 Forbidden (`ProofOfPossessionRequired`).
+    - Úplná parita na ControlPlane aj lokálnom SQLite Relay serveri.
+  - **Klientske SDK (`Symbolon.Client`, Python SDK)**:
+    - C# SDK: `BorrowSeatAsync`, `GetReturnChallengeAsync`, `ReturnBorrowedSeatAsync`, a `SeatLease.BorrowAsync` / `SeatLease.ReturnBorrowedAsync` s automatickým challenge-response podpisovaním.
+    - Python SDK: `borrow_seat`, `get_return_challenge`, `return_borrowed_seat`, `sign_possession_challenge`, `SeatLease.borrow` a `SeatLease.return_borrowed`.
+  - **CLI Nástroje (`Symbolon.Cli`)**:
+    - `symbolon license borrow <leaseId> --days <N> [--out <file.symlease>] [--out-key <file.key>]`
+    - `symbolon license return <leaseId> --symlease <file.symlease> --key <file.key>`
+    - `symbolon license inspect-borrow <file.symlease>`
+  - **Web Dashboard & Retro FoxPro TUI**:
+    - Modály pre zapožičanie sedadla a predčasné vrátenie s kryptografickým podpisovaním výzvy priamo v prehliadači cez SubtleCrypto API.
+    - Kaskádové podmenu a klávesová skratka v retro FoxPro TUI.
+  - **Testovacie Pokrytie**:
+    - 397 .NET unit/integration testov naprieč všetkými 11 projektmi (100% pass rate, 0 varovaní, 0 chýb s `TreatWarningsAsErrors=true`), 19 Python SDK testov.
 - **Enterprise Options File Engine, Declarative Policy Rules & Seat Reservations (FLT-23, FLT-24, FLT-25, §7.5 Options File)**:
   - **Doménová vrstva (`Symbolon.Domain.PolicyRules`)**:
     - `PolicyRuleEngine`: Deterministické vyhodnocovanie pravidiel v striktnom normatívnom poradí **FLT-24** (`deny` ➜ `max` ➜ `reserve` ➜ `priority`). Prvé vyhovujúce `deny` pravidlo okamžite zastaví vyhodnocovanie s chybovým kódom 403 Forbidden (`RuleDenied`).

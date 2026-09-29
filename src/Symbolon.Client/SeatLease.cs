@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.Net.Http.Json;
 using System.Security.Cryptography;
 using Microsoft.Extensions.Logging;
+using Symbolon.Crypto;
 using Symbolon.Protocol;
 using Symbolon.Protocol.Tracing;
 
@@ -31,6 +32,8 @@ public sealed partial class SeatLease : IAsyncDisposable, IDisposable
     public string? Reason { get; }
     public string? LeaseId { get; }
     public string? Token { get; private set; }
+    public string? Symlease { get; private set; }
+    public string? PossessionKey { get; private set; }
     public int SeatNo { get; }
     public IReadOnlyList<string> Entitlements { get; }
 
@@ -235,6 +238,8 @@ public sealed partial class SeatLease : IAsyncDisposable, IDisposable
             if (body is not null)
             {
                 Token = body.Token;
+                Symlease = body.Symlease;
+                PossessionKey = body.PossessionKey;
                 _expiresAt = body.BorrowedUntil;
                 State = SeatState.Borrowed;
                 return true;
@@ -245,18 +250,69 @@ public sealed partial class SeatLease : IAsyncDisposable, IDisposable
     }
 
     /// <summary>
-    /// Explicitly returns a borrowed seat early back to the floating pool.
+    /// Explicitly returns a borrowed seat early back to the floating pool using cryptographic proof-of-possession (FLT-21, FLT-22).
     /// </summary>
-    public async Task<bool> ReturnBorrowedAsync(CancellationToken ct = default)
+    public async Task<bool> ReturnBorrowedAsync(string? symlease = null, string? possessionKey = null, CancellationToken ct = default)
     {
         if (LeaseId is null || _http is null) return false;
 
-        State = SeatState.Released;
+        string? effectiveSymlease = symlease ?? Symlease;
+        string? effectiveKey = possessionKey ?? PossessionKey;
+
+        if (!string.IsNullOrWhiteSpace(effectiveSymlease) && !string.IsNullOrWhiteSpace(effectiveKey))
+        {
+            var challengeResponse = await _http.PostAsync(
+                new Uri($"v1/leases/{LeaseId}/return-challenge", UriKind.Relative),
+                null,
+                ct).ConfigureAwait(false);
+
+            if (!challengeResponse.IsSuccessStatusCode)
+            {
+                return false;
+            }
+
+            var challenge = await challengeResponse.Content.ReadFromJsonAsync(
+                SymbolonProtocolJsonContext.Default.ReturnChallengeResponseDto,
+                ct).ConfigureAwait(false);
+
+            if (challenge is null) return false;
+
+            string signature = ProofOfPossessionEngine.SignChallenge(challenge.Nonce, effectiveKey);
+
+            var earlyReturnDto = new EarlyReturnRequestDto
+            {
+                Symlease = effectiveSymlease,
+                Nonce = challenge.Nonce,
+                Signature = signature
+            };
+
+            var returnResponse = await _http.PostAsJsonAsync(
+                new Uri($"v1/leases/{LeaseId}/return", UriKind.Relative),
+                earlyReturnDto,
+                SymbolonProtocolJsonContext.Default.EarlyReturnRequestDto,
+                ct).ConfigureAwait(false);
+
+            if (returnResponse.IsSuccessStatusCode)
+            {
+                State = SeatState.Released;
+                return true;
+            }
+
+            return false;
+        }
+
+        // Fallback: without proof-of-possession, server rejects active borrowed seats with 403 (FLT-22)
         var response = await _http.DeleteAsync(
             new Uri($"v1/leases/{LeaseId}", UriKind.Relative),
             ct).ConfigureAwait(false);
 
-        return response.IsSuccessStatusCode;
+        if (response.IsSuccessStatusCode)
+        {
+            State = SeatState.Released;
+            return true;
+        }
+
+        return false;
     }
 
     private bool _isDisposed;

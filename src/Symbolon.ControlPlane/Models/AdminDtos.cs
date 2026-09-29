@@ -43,6 +43,7 @@ public sealed record CreatePolicyDto
     public int ResurrectionWindowSeconds { get; init; } = 300;
     public bool BorrowEnabled { get; init; }
     public int BorrowMaxDurationDays { get; init; } = 7;
+    public int BorrowMaxConcurrent { get; init; } = 5;
     public bool OfflineAllowed { get; init; } = true;
     public string CryptoProfile { get; init; } = "hybrid-v1";
     public IReadOnlyList<string>? Entitlements { get; init; }

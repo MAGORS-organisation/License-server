@@ -113,6 +113,46 @@ public sealed class LeaseEngineTests
             return Task.FromResult(true);
         }
 
+        public Task<bool> TryBorrowSeatAsync(string leaseId, DateTimeOffset borrowedUntil, string possessionKeyJwk, CancellationToken ct = default)
+        {
+            var seat = _seats.FirstOrDefault(s => s.LeaseId == leaseId);
+            if (seat is null) return Task.FromResult(false);
+
+            var updated = seat with
+            {
+                BorrowedUntil = borrowedUntil,
+                PossessionKey = possessionKeyJwk,
+                ExpiresAt = borrowedUntil
+            };
+            int index = _seats.FindIndex(s => s.SeatId == seat.SeatId);
+            _seats[index] = updated;
+            return Task.FromResult(true);
+        }
+
+        public Task<bool> TryReturnBorrowedSeatAsync(string leaseId, DateTimeOffset now, CancellationToken ct = default)
+        {
+            var seat = _seats.FirstOrDefault(s => s.LeaseId == leaseId);
+            if (seat is null) return Task.FromResult(false);
+
+            var updated = seat with
+            {
+                LeaseId = null,
+                HolderFingerprint = null,
+                BorrowedUntil = null,
+                PossessionKey = null,
+                ExpiresAt = now
+            };
+            int index = _seats.FindIndex(s => s.SeatId == seat.SeatId);
+            _seats[index] = updated;
+            return Task.FromResult(true);
+        }
+
+        public Task<int> GetActiveBorrowedCountAsync(string licenseId, DateTimeOffset now, CancellationToken ct = default)
+        {
+            int count = _seats.Count(s => s.LicenseId == licenseId && s.BorrowedUntil != null && s.BorrowedUntil > now);
+            return Task.FromResult(count);
+        }
+
         public Task<SeatAllocation[]?> TryGetIdempotentAsync(string licenseId, string idempotencyKey, DateTimeOffset now, CancellationToken ct = default)
         {
             if (_idempotent.TryGetValue(idempotencyKey, out var allocs))

@@ -60,6 +60,22 @@ public interface ISeatStore
 
     Task<bool> TryReleaseAsync(string leaseId, DateTimeOffset now, CancellationToken ct = default);
 
+    Task<bool> TryBorrowSeatAsync(
+        string leaseId,
+        DateTimeOffset borrowedUntil,
+        string possessionKeyJwk,
+        CancellationToken ct = default);
+
+    Task<bool> TryReturnBorrowedSeatAsync(
+        string leaseId,
+        DateTimeOffset now,
+        CancellationToken ct = default);
+
+    Task<int> GetActiveBorrowedCountAsync(
+        string licenseId,
+        DateTimeOffset now,
+        CancellationToken ct = default);
+
     Task<SeatAllocation[]?> TryGetIdempotentAsync(
         string licenseId,
         string idempotencyKey,

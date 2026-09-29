@@ -18,6 +18,7 @@ using Symbolon.Domain.Webhooks;
 using Symbolon.Format;
 using Symbolon.Protocol;
 using Symbolon.Protocol.Tracing;
+using Symbolon.Domain.Borrow;
 
 namespace Symbolon.ControlPlane.Endpoints;
 
@@ -54,6 +55,14 @@ public static class PublicEndpoints
         group.MapPost("/leases/{id}/borrow", BorrowAsync)
             .WithName("BorrowLease")
             .WithSummary("Vypožičia sedadlo pre offline roaming.");
+
+        group.MapPost("/leases/{id}/return-challenge", ReturnChallengeAsync)
+            .WithName("ReturnChallenge")
+            .WithSummary("Vygeneruje jednorazovú kryptografickú výzvu (nonce) pre predčasné vrátenie výpožičky.");
+
+        group.MapPost("/leases/{id}/return", ReturnEarlyAsync)
+            .WithName("ReturnEarly")
+            .WithSummary("Predčasne vráti vypožičané sedadlo s proof-of-possession.");
 
         group.MapPost("/activations", ActivateAsync)
             .WithName("ActivateMachine")
@@ -521,6 +530,16 @@ public static class PublicEndpoints
         var seat = await db.Seats.FirstOrDefaultAsync(s => s.LeaseId == id, ct).ConfigureAwait(false);
         string? licenseId = seat?.LicenseId;
 
+        if (seat is not null && seat.BorrowedUntil.HasValue && seat.BorrowedUntil.Value > DateTimeOffset.UtcNow)
+        {
+            activity?.SetStatus(ActivityStatusCode.Error, "Proof of Possession Required");
+            return TypedResults.Problem(
+                statusCode: StatusCodes.Status403Forbidden,
+                title: "Proof of Possession Required",
+                detail: "Borrowed seats cannot be released early via standard DELETE (FLT-22). Use POST /v1/leases/{id}/return with a valid proof-of-possession challenge signature.",
+                type: ProblemTypes.ProofOfPossessionRequired);
+        }
+
         bool released = await engine.ReleaseAsync(id, ct).ConfigureAwait(false);
         if (released)
         {
@@ -665,6 +684,8 @@ public static class PublicEndpoints
         BorrowRequestDto dto,
         SymbolonDbContext db,
         ILeaseTokenIssuer tokenIssuer,
+        ISignatureProvider signatureProvider,
+        IAuditLedger audit,
         TimeProvider time,
         CancellationToken ct)
     {
@@ -674,6 +695,7 @@ public static class PublicEndpoints
 
         var seat = await db.Seats
             .Include(s => s.License)
+                .ThenInclude(l => l!.Policy)
             .FirstOrDefaultAsync(s => s.LeaseId == id, ct)
             .ConfigureAwait(false);
 
@@ -683,12 +705,89 @@ public static class PublicEndpoints
             return TypedResults.Problem(statusCode: 404, title: "Lease Not Found", type: ProblemTypes.LeaseUnknown);
         }
 
+        var policy = seat.License?.Policy;
         var now = time.GetUtcNow();
-        var borrowedUntil = now.AddDays(dto.Days);
 
+        // Count current active borrows for this license
+        int activeBorrows = await db.Seats.CountAsync(s => s.LicenseId == seat.LicenseId && s.BorrowedUntil != null && s.BorrowedUntil > now, ct).ConfigureAwait(false);
+
+        // FLT-18: Validate borrow policy constraints
+        var eval = BorrowPolicyEvaluator.Evaluate(
+            borrowEnabled: policy?.BorrowEnabled ?? false,
+            maxDurationDays: policy?.BorrowMaxDurationDays ?? 7,
+            maxConcurrent: policy?.BorrowMaxConcurrent ?? 5,
+            requestedDays: dto.Days,
+            currentActiveBorrowsCount: activeBorrows);
+
+        if (!eval.IsAllowed)
+        {
+            int status = eval.ProblemType switch
+            {
+                ProblemTypes.BorrowDisabled => StatusCodes.Status403Forbidden,
+                ProblemTypes.BorrowLimitExceeded => StatusCodes.Status409Conflict,
+                _ => StatusCodes.Status400BadRequest
+            };
+            activity?.SetStatus(ActivityStatusCode.Error, eval.FailureReason);
+            return TypedResults.Problem(statusCode: status, title: "Borrow Denied", detail: eval.FailureReason, type: eval.ProblemType);
+        }
+
+        // Ephemeral possession key pair
+        string possessionPublicJwk;
+        string? possessionPrivateJwk = null;
+
+        if (!string.IsNullOrWhiteSpace(dto.PossessionPublicKeyJwk))
+        {
+            possessionPublicJwk = dto.PossessionPublicKeyJwk;
+        }
+        else
+        {
+            var keyPair = ProofOfPossessionEngine.GenerateKeyPair();
+            possessionPublicJwk = keyPair.PublicKeyJwk;
+            possessionPrivateJwk = keyPair.PrivateKeyJwk;
+        }
+
+        var borrowedUntil = now.AddDays(dto.Days);
         seat.BorrowedUntil = borrowedUntil;
         seat.ExpiresAt = borrowedUntil;
+        seat.PossessionKey = possessionPublicJwk;
         await db.SaveChangesAsync(ct).ConfigureAwait(false);
+
+        // Issue FLT-19 .symlease artifact
+        var entitlements = new List<string> { "core" };
+        if (!string.IsNullOrWhiteSpace(policy?.EntitlementsJson))
+        {
+            try
+            {
+                var parsed = JsonSerializer.Deserialize<List<string>>(policy.EntitlementsJson);
+                if (parsed is { Count: > 0 }) entitlements = parsed;
+            }
+            catch (JsonException) { }
+        }
+
+        string holderFpHash = seat.HolderFp is not null
+            ? $"sha256:{Convert.ToHexString(SHA256.HashData(seat.HolderFp)).ToLowerInvariant()}"
+            : "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855";
+
+        var symleaseClaims = new SymleaseClaims(
+            Iss: "symbolon:control-plane",
+            Sub: seat.LicenseId,
+            Jti: seat.LeaseId!,
+            Iat: now.ToUnixTimeSeconds(),
+            Nbf: now.AddMinutes(-5).ToUnixTimeSeconds(),
+            Exp: borrowedUntil.ToUnixTimeSeconds(),
+            Seat: seat.SeatNo,
+            Fp: holderFpHash,
+            Ent: entitlements,
+            Borrow: new SymleaseBorrowPayload(
+                Days: dto.Days,
+                BorrowedAt: now.ToUnixTimeSeconds(),
+                BorrowedUntil: borrowedUntil.ToUnixTimeSeconds(),
+                PossessionKeyJwk: possessionPublicJwk
+            )
+        );
+
+        var signer = new SymleaseSigner([signatureProvider]);
+        string symleasePem = signer.Sign(symleaseClaims);
 
         var alloc = new SeatAllocation
         {
@@ -699,12 +798,154 @@ public static class PublicEndpoints
             HolderFingerprint = seat.HolderFp is not null ? Encoding.UTF8.GetString(seat.HolderFp) : string.Empty,
             ExpiresAt = borrowedUntil,
             IsOverage = seat.IsOverage,
-            LeaseSeq = seat.LeaseSeq
+            LeaseSeq = seat.LeaseSeq,
+            BorrowedUntil = borrowedUntil,
+            PossessionKey = possessionPublicJwk
         };
 
         string token = tokenIssuer.Issue(alloc);
+        await audit.AppendAsync(new AuditEvent("seat.borrowed", seat.LicenseId, seat.LeaseId, null, now, $"days={dto.Days}"), ct).ConfigureAwait(false);
+
         activity?.SetStatus(ActivityStatusCode.Ok);
-        return TypedResults.Ok(new BorrowResponseDto(seat.LeaseId!, borrowedUntil, token));
+        return TypedResults.Ok(new BorrowResponseDto(seat.LeaseId!, borrowedUntil, token, symleasePem, possessionPrivateJwk));
+    }
+
+    private static async Task<IResult> ReturnChallengeAsync(
+        string id,
+        SymbolonDbContext db,
+        Symbolon.Domain.Borrow.IReturnChallengeStore challengeStore,
+        TimeProvider time,
+        CancellationToken ct)
+    {
+        var seat = await db.Seats
+            .FirstOrDefaultAsync(s => s.LeaseId == id, ct)
+            .ConfigureAwait(false);
+
+        if (seat is null || !seat.BorrowedUntil.HasValue || seat.BorrowedUntil.Value <= time.GetUtcNow())
+        {
+            return TypedResults.Problem(
+                statusCode: StatusCodes.Status404NotFound,
+                title: "Active Borrow Not Found",
+                detail: $"No active offline roaming borrow was found for lease {id}.",
+                type: ProblemTypes.NotFound);
+        }
+
+        var (nonce, expiresAt) = await challengeStore.CreateChallengeAsync(id, TimeSpan.FromMinutes(5), ct).ConfigureAwait(false);
+        return TypedResults.Ok(new ReturnChallengeResponseDto
+        {
+            LeaseId = id,
+            Nonce = nonce,
+            ExpiresAt = expiresAt
+        });
+    }
+
+    private static async Task<IResult> ReturnEarlyAsync(
+        string id,
+        EarlyReturnRequestDto dto,
+        SymbolonDbContext db,
+        SymbolonKeyRing keyRing,
+        Symbolon.Domain.Borrow.IReturnChallengeStore challengeStore,
+        FeatureEntitlementEngine featureEngine,
+        Queuing.IQueueManager queueManager,
+        Observability.SymbolonMetrics metrics,
+        IAuditLedger audit,
+        TimeProvider time,
+        CancellationToken ct)
+    {
+        using var activity = SymbolonTracing.ActivitySource.StartActivity(SymbolonTracing.OpReturnBorrowed);
+        activity?.SetTag(SymbolonTracing.TagLeaseId, id);
+
+        var seat = await db.Seats
+            .FirstOrDefaultAsync(s => s.LeaseId == id, ct)
+            .ConfigureAwait(false);
+
+        var now = time.GetUtcNow();
+        if (seat is null || !seat.BorrowedUntil.HasValue || seat.BorrowedUntil.Value <= now)
+        {
+            activity?.SetStatus(ActivityStatusCode.Error, "Active Borrow Not Found");
+            return TypedResults.Problem(
+                statusCode: StatusCodes.Status404NotFound,
+                title: "Active Borrow Not Found",
+                detail: $"No active offline roaming borrow was found for lease {id}.",
+                type: ProblemTypes.NotFound);
+        }
+
+        // 1. Consume challenge nonce (single-use, anti-replay)
+        bool validNonce = await challengeStore.TryConsumeChallengeAsync(id, dto.Nonce, now, ct).ConfigureAwait(false);
+        if (!validNonce)
+        {
+            activity?.SetStatus(ActivityStatusCode.Error, "Challenge Expired or Invalid");
+            return TypedResults.Problem(
+                statusCode: StatusCodes.Status403Forbidden,
+                title: "Challenge Expired or Invalid",
+                detail: "The provided challenge nonce is invalid, expired, or already consumed.",
+                type: ProblemTypes.ChallengeExpired);
+        }
+
+        // 2. Verify proof-of-possession signature
+        if (string.IsNullOrWhiteSpace(seat.PossessionKey))
+        {
+            activity?.SetStatus(ActivityStatusCode.Error, "Missing Possession Key");
+            return TypedResults.Problem(
+                statusCode: StatusCodes.Status500InternalServerError,
+                title: "Missing Possession Key",
+                detail: "Seat has no possession key associated with the active borrow.",
+                type: ProblemTypes.InvalidRequest);
+        }
+
+        bool validProof = ProofOfPossessionEngine.VerifyProof(dto.Nonce, dto.Signature, seat.PossessionKey);
+        if (!validProof)
+        {
+            activity?.SetStatus(ActivityStatusCode.Error, "Invalid Proof of Possession");
+            return TypedResults.Problem(
+                statusCode: StatusCodes.Status403Forbidden,
+                title: "Invalid Proof of Possession",
+                detail: "Cryptographic signature over the challenge nonce is invalid.",
+                type: ProblemTypes.InvalidProofOfPossession);
+        }
+
+        // 3. Verify .symlease artifact
+        var verifier = new SymleaseVerifier(keyRing, time, new SymleaseVerifierOptions
+        {
+            ExpectedLicenseId = seat.LicenseId
+        });
+        var symleaseResult = verifier.Verify(dto.Symlease);
+        if (!symleaseResult.IsValid || symleaseResult.Claims?.Jti != id)
+        {
+            activity?.SetStatus(ActivityStatusCode.Error, "Invalid Symlease Artifact");
+            return TypedResults.Problem(
+                statusCode: StatusCodes.Status403Forbidden,
+                title: "Invalid Symlease Artifact",
+                detail: symleaseResult.FailureReason ?? "The provided .symlease artifact does not match the active lease.",
+                type: ProblemTypes.InvalidProofOfPossession);
+        }
+
+        // 4. Release borrowed seat early
+        string licenseId = seat.LicenseId;
+        seat.LeaseId = null;
+        seat.HolderFp = null;
+        seat.MachineId = null;
+        seat.AcquiredAt = null;
+        seat.ExpiresAt = null;
+        seat.BorrowedUntil = null;
+        seat.PossessionKey = null;
+        seat.UserId = null;
+        seat.LeaseSeq = 0;
+
+        await db.SaveChangesAsync(ct).ConfigureAwait(false);
+        await featureEngine.ReleaseAllFeaturesForLeaseAsync(id, ct).ConfigureAwait(false);
+        metrics.RecordSeatReleased(1);
+
+        await audit.AppendAsync(new AuditEvent("seat.borrow_returned_early", licenseId, id, null, now, null), ct).ConfigureAwait(false);
+        await queueManager.TryPromoteNextAsync(licenseId, ct).ConfigureAwait(false);
+
+        activity?.SetStatus(ActivityStatusCode.Ok);
+        return TypedResults.Ok(new EarlyReturnResponseDto
+        {
+            Success = true,
+            ReturnedAt = now,
+            LeaseId = id
+        });
     }
 
     private static async Task<IResult> ActivateAsync(

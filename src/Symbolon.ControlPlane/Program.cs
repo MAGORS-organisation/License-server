@@ -63,6 +63,7 @@ builder.Services.AddHostedService<Symbolon.ControlPlane.Services.WebhookBackgrou
 builder.Services.AddHostedService<Symbolon.ControlPlane.Services.DiscoveryResponderService>();
 builder.Services.AddSingleton<Symbolon.ControlPlane.Queuing.IQueueManager, Symbolon.ControlPlane.Queuing.QueueManager>();
 builder.Services.AddHostedService<Symbolon.ControlPlane.Services.QueueReaperBackgroundService>();
+builder.Services.AddSingleton<Symbolon.Domain.Borrow.IReturnChallengeStore, Symbolon.Domain.Borrow.InMemoryReturnChallengeStore>();
 builder.Services.AddScoped<Symbolon.ControlPlane.Alerting.IAlertService, Symbolon.ControlPlane.Alerting.AlertService>();
 builder.Services.AddSingleton<Symbolon.Relay.Mesh.IRelayMeshCoordinator>(_ =>
     new Symbolon.Relay.Mesh.RelayMeshCoordinator("cp_primary_cluster", Enumerable.Range(1, 100)));

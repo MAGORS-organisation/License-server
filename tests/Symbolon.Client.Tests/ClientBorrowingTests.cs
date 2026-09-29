@@ -1,6 +1,7 @@
 using System.Net;
 using System.Text.Json;
 using FluentAssertions;
+using Symbolon.Crypto;
 using Symbolon.Format;
 using Symbolon.Protocol;
 using Xunit;
@@ -30,13 +31,20 @@ public sealed class ClientBorrowingTests
         var validKey = LicenseKey.Generate();
         string requestedLeaseId = "lse_borrow_test_1";
         var borrowedUntil = DateTimeOffset.UtcNow.AddDays(14);
+        var keyPair = ProofOfPossessionEngine.GenerateKeyPair();
 
         var handler = new MockHttpMessageHandler(req =>
         {
             req.Method.Should().Be(HttpMethod.Post);
             req.RequestUri!.ToString().Should().Contain($"/v1/leases/{requestedLeaseId}/borrow");
 
-            var responseDto = new BorrowResponseDto(requestedLeaseId, borrowedUntil, "offline_jwt_token_payload");
+            var responseDto = new BorrowResponseDto(
+                requestedLeaseId,
+                borrowedUntil,
+                "offline_jwt_token_payload",
+                symlease: "-----BEGIN SYMBOLON LEASE-----\ntest\n-----END SYMBOLON LEASE-----",
+                possessionKey: keyPair.PrivateKeyJwk);
+
             return new HttpResponseMessage(HttpStatusCode.OK)
             {
                 Content = new StringContent(
@@ -61,6 +69,8 @@ public sealed class ClientBorrowingTests
         result!.LeaseId.Should().Be(requestedLeaseId);
         result.BorrowedUntil.Should().Be(borrowedUntil);
         result.Token.Should().Be("offline_jwt_token_payload");
+        result.Symlease.Should().NotBeNull();
+        result.PossessionKey.Should().NotBeNull();
     }
 
     [Theory]
@@ -82,7 +92,74 @@ public sealed class ClientBorrowingTests
     }
 
     [Fact]
-    public async Task ReturnBorrowedSeatAsync_SendsDeleteRequest()
+    public async Task ReturnBorrowedSeatAsync_WithProofOfPossession_Flow()
+    {
+        var validKey = LicenseKey.Generate();
+        string leaseId = "lse_return_pop_1";
+        var keyPair = ProofOfPossessionEngine.GenerateKeyPair();
+        string symlease = "-----BEGIN SYMBOLON LEASE-----\ntest\n-----END SYMBOLON LEASE-----";
+        bool challengeCalled = false;
+        bool returnCalled = false;
+
+        var handler = new MockHttpMessageHandler(req =>
+        {
+            if (req.Method == HttpMethod.Post && req.RequestUri!.ToString().EndsWith($"/v1/leases/{leaseId}/return-challenge", StringComparison.Ordinal))
+            {
+                challengeCalled = true;
+                var chDto = new ReturnChallengeResponseDto
+                {
+                    LeaseId = leaseId,
+                    Nonce = "test-nonce-32-chars-long-base64url",
+                    ExpiresAt = DateTimeOffset.UtcNow.AddMinutes(5)
+                };
+                return new HttpResponseMessage(HttpStatusCode.OK)
+                {
+                    Content = new StringContent(
+                        JsonSerializer.Serialize(chDto, SymbolonProtocolJsonContext.Default.ReturnChallengeResponseDto),
+                        System.Text.Encoding.UTF8,
+                        "application/json")
+                };
+            }
+
+            if (req.Method == HttpMethod.Post && req.RequestUri!.ToString().EndsWith($"/v1/leases/{leaseId}/return", StringComparison.Ordinal))
+            {
+                returnCalled = true;
+                var retDto = new EarlyReturnResponseDto
+                {
+                    Success = true,
+                    LeaseId = leaseId,
+                    ReturnedAt = DateTimeOffset.UtcNow
+                };
+                return new HttpResponseMessage(HttpStatusCode.OK)
+                {
+                    Content = new StringContent(
+                        JsonSerializer.Serialize(retDto, SymbolonProtocolJsonContext.Default.EarlyReturnResponseDto),
+                        System.Text.Encoding.UTF8,
+                        "application/json")
+                };
+            }
+
+            return new HttpResponseMessage(HttpStatusCode.NotFound);
+        });
+
+        using var http = new HttpClient(handler) { BaseAddress = new Uri("https://licenses.example.com") };
+        using var client = new SymbolonClient(new SymbolonClientOptions
+        {
+            ServerUri = new Uri("https://licenses.example.com"),
+            LicenseKey = validKey.Canonical,
+            ProductCode = "test-prod",
+            HttpClient = http
+        });
+
+        bool success = await client.ReturnBorrowedSeatAsync(leaseId, symlease, keyPair.PrivateKeyJwk);
+
+        success.Should().BeTrue();
+        challengeCalled.Should().BeTrue();
+        returnCalled.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task ReturnBorrowedSeatAsync_ObsoleteDelete_SendsDeleteRequest()
     {
         var validKey = LicenseKey.Generate();
         string leaseId = "lse_return_test_1";
@@ -107,7 +184,9 @@ public sealed class ClientBorrowingTests
             HttpClient = http
         });
 
+#pragma warning disable CS0618
         bool success = await client.ReturnBorrowedSeatAsync(leaseId);
+#pragma warning restore CS0618
 
         success.Should().BeTrue();
         deleteCalled.Should().BeTrue();
@@ -118,13 +197,21 @@ public sealed class ClientBorrowingTests
     {
         string leaseId = "lse_roaming_seat_1";
         var borrowedUntil = DateTimeOffset.UtcNow.AddDays(7);
-        bool deleteCalled = false;
+        var keyPair = ProofOfPossessionEngine.GenerateKeyPair();
+        string symlease = "-----BEGIN SYMBOLON LEASE-----\ntest\n-----END SYMBOLON LEASE-----";
+        bool returnCalled = false;
 
         var handler = new MockHttpMessageHandler(req =>
         {
             if (req.Method == HttpMethod.Post && req.RequestUri!.ToString().Contains("/borrow", StringComparison.Ordinal))
             {
-                var responseDto = new BorrowResponseDto(leaseId, borrowedUntil, "offline_token_xyz");
+                var responseDto = new BorrowResponseDto(
+                    leaseId,
+                    borrowedUntil,
+                    "offline_token_xyz",
+                    symlease: symlease,
+                    possessionKey: keyPair.PrivateKeyJwk);
+
                 return new HttpResponseMessage(HttpStatusCode.OK)
                 {
                     Content = new StringContent(
@@ -133,11 +220,47 @@ public sealed class ClientBorrowingTests
                         "application/json")
                 };
             }
+
+            if (req.Method == HttpMethod.Post && req.RequestUri!.ToString().Contains("/return-challenge", StringComparison.Ordinal))
+            {
+                var chDto = new ReturnChallengeResponseDto
+                {
+                    LeaseId = leaseId,
+                    Nonce = "test-nonce-12345",
+                    ExpiresAt = DateTimeOffset.UtcNow.AddMinutes(5)
+                };
+                return new HttpResponseMessage(HttpStatusCode.OK)
+                {
+                    Content = new StringContent(
+                        JsonSerializer.Serialize(chDto, SymbolonProtocolJsonContext.Default.ReturnChallengeResponseDto),
+                        System.Text.Encoding.UTF8,
+                        "application/json")
+                };
+            }
+
+            if (req.Method == HttpMethod.Post && req.RequestUri!.ToString().Contains("/return", StringComparison.Ordinal))
+            {
+                returnCalled = true;
+                var retDto = new EarlyReturnResponseDto
+                {
+                    Success = true,
+                    LeaseId = leaseId,
+                    ReturnedAt = DateTimeOffset.UtcNow
+                };
+                return new HttpResponseMessage(HttpStatusCode.OK)
+                {
+                    Content = new StringContent(
+                        JsonSerializer.Serialize(retDto, SymbolonProtocolJsonContext.Default.EarlyReturnResponseDto),
+                        System.Text.Encoding.UTF8,
+                        "application/json")
+                };
+            }
+
             if (req.Method == HttpMethod.Delete)
             {
-                deleteCalled = true;
                 return new HttpResponseMessage(HttpStatusCode.OK);
             }
+
             return new HttpResponseMessage(HttpStatusCode.OK);
         });
 
@@ -165,15 +288,16 @@ public sealed class ClientBorrowingTests
         lease.State.Should().Be(SeatState.Borrowed);
         lease.Acquired.Should().BeTrue();
         lease.Token.Should().Be("offline_token_xyz");
+        lease.Symlease.Should().Be(symlease);
+        lease.PossessionKey.Should().Be(keyPair.PrivateKeyJwk);
 
         // Disposing when borrowed MUST NOT send delete request to server (offline laptop roam)
         await lease.DisposeAsync();
-        deleteCalled.Should().BeFalse();
 
-        // Explicit return must delete
+        // Explicit return uses proof of possession
         bool returned = await lease.ReturnBorrowedAsync();
         returned.Should().BeTrue();
-        deleteCalled.Should().BeTrue();
+        returnCalled.Should().BeTrue();
         lease.State.Should().Be(SeatState.Released);
     }
 }

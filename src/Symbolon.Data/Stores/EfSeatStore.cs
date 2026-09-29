@@ -251,6 +251,12 @@ public sealed class EfSeatStore(SymbolonDbContext db) : ISeatStore
             return false;
         }
 
+        // FLT-20: A borrowed seat cannot be released by a standard release before borrowedUntil
+        if (seats.Any(s => s.BorrowedUntil != null && s.BorrowedUntil > now))
+        {
+            return false;
+        }
+
         foreach (var seat in seats)
         {
             seat.LeaseId = null;
@@ -259,12 +265,88 @@ public sealed class EfSeatStore(SymbolonDbContext db) : ISeatStore
             seat.AcquiredAt = null;
             seat.ExpiresAt = null;
             seat.BorrowedUntil = null;
+            seat.PossessionKey = null;
             seat.UserId = null;
             seat.LeaseSeq = 0;
         }
 
         await db.SaveChangesAsync(ct).ConfigureAwait(false);
         return true;
+    }
+
+    public async Task<bool> TryBorrowSeatAsync(
+        string leaseId,
+        DateTimeOffset borrowedUntil,
+        string possessionKeyJwk,
+        CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(leaseId);
+
+        var seats = await db.Seats
+            .Where(s => s.LeaseId == leaseId)
+            .ToListAsync(ct)
+            .ConfigureAwait(false);
+
+        if (seats.Count == 0)
+        {
+            return false;
+        }
+
+        foreach (var seat in seats)
+        {
+            seat.BorrowedUntil = borrowedUntil;
+            seat.ExpiresAt = borrowedUntil;
+            seat.PossessionKey = possessionKeyJwk;
+        }
+
+        await db.SaveChangesAsync(ct).ConfigureAwait(false);
+        return true;
+    }
+
+    public async Task<bool> TryReturnBorrowedSeatAsync(
+        string leaseId,
+        DateTimeOffset now,
+        CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(leaseId);
+
+        var seats = await db.Seats
+            .Where(s => s.LeaseId == leaseId)
+            .ToListAsync(ct)
+            .ConfigureAwait(false);
+
+        if (seats.Count == 0)
+        {
+            return false;
+        }
+
+        foreach (var seat in seats)
+        {
+            seat.LeaseId = null;
+            seat.HolderFp = null;
+            seat.MachineId = null;
+            seat.AcquiredAt = null;
+            seat.ExpiresAt = null;
+            seat.BorrowedUntil = null;
+            seat.PossessionKey = null;
+            seat.UserId = null;
+            seat.LeaseSeq = 0;
+        }
+
+        await db.SaveChangesAsync(ct).ConfigureAwait(false);
+        return true;
+    }
+
+    public async Task<int> GetActiveBorrowedCountAsync(
+        string licenseId,
+        DateTimeOffset now,
+        CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(licenseId);
+
+        return await db.Seats
+            .CountAsync(s => s.LicenseId == licenseId && s.BorrowedUntil != null && s.BorrowedUntil > now, ct)
+            .ConfigureAwait(false);
     }
 
     public Task<SeatAllocation[]?> TryGetIdempotentAsync(

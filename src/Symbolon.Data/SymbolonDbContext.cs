@@ -131,6 +131,8 @@ public class SymbolonDbContext : DbContext
             b.HasIndex(s => s.LeaseId);
             b.Property(s => s.LeaseId).IsConcurrencyToken();
             b.Property(s => s.UserId).HasMaxLength(128);
+            b.Property(s => s.PossessionKey);
+            b.HasIndex(s => s.BorrowedUntil);
             b.HasOne(s => s.License)
              .WithMany(l => l.Seats)
              .HasForeignKey(s => s.LicenseId)

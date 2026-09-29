@@ -353,7 +353,7 @@ internal static class Program
     {
         if (args.Length == 0 || args[0] is "-h" or "--help")
         {
-            Console.WriteLine("Použitie: symbolon license <keygen|issue|inspect|borrow|return> [options]");
+            Console.WriteLine("Použitie: symbolon license <keygen|issue|inspect|borrow|return|inspect-borrow> [options]");
             return 0;
         }
 
@@ -364,6 +364,7 @@ internal static class Program
             "INSPECT" => HandleLicenseInspect(args[1..]),
             "BORROW" => await HandleLicenseBorrowAsync(args[1..]).ConfigureAwait(false),
             "RETURN" => await HandleLicenseReturnAsync(args[1..]).ConfigureAwait(false),
+            "INSPECT-BORROW" => HandleLicenseInspectBorrow(args[1..]),
             _ => UnknownCommand(args[0])
         };
     }
@@ -371,12 +372,14 @@ internal static class Program
     private static async Task<int> HandleLicenseBorrowAsync(string[] args)
     {
         string? serverUrl = GetArg(args, "--server") ?? "http://localhost:5000";
-        string? leaseId = GetArg(args, "--lease");
+        string? leaseId = GetArg(args, "--lease") ?? (args.Length > 0 && !args[0].StartsWith('-') ? args[0] : null);
         string? daysStr = GetArg(args, "--days") ?? "7";
+        string? outPath = GetArg(args, "--out");
+        string? outKeyPath = GetArg(args, "--out-key");
 
         if (string.IsNullOrWhiteSpace(leaseId))
         {
-            Console.Error.WriteLine("Chýba parameter --lease <lease-id>.");
+            Console.Error.WriteLine("Chýba parameter <lease-id> alebo --lease <lease-id>.");
             return 1;
         }
 
@@ -405,12 +408,26 @@ internal static class Program
             SymbolonProtocolJsonContext.Default.BorrowResponseDto).ConfigureAwait(false);
 
         Console.ForegroundColor = ConsoleColor.Green;
-        Console.WriteLine($"[OK] Sedadlo pre lease {leaseId} úspešne zapožičané na {days} dní.");
+        Console.WriteLine($"[OK] Sedadlo pre lease {leaseId} úspešne zapožičané na {days} dní (FLT-17..FLT-20).");
         Console.ResetColor();
         if (result is not null)
         {
             Console.WriteLine($"  Borrowed Until: {result.BorrowedUntil:yyyy-MM-dd HH:mm:ss 'UTC'}");
             Console.WriteLine($"  Offline Token:  {result.Token[..Math.Min(32, result.Token.Length)]}...");
+
+            if (!string.IsNullOrWhiteSpace(result.Symlease))
+            {
+                string symleaseFile = outPath ?? $"{leaseId}.symlease";
+                File.WriteAllText(symleaseFile, result.Symlease);
+                Console.WriteLine($"  Symlease File:  {symleaseFile}");
+            }
+
+            if (!string.IsNullOrWhiteSpace(result.PossessionKey))
+            {
+                string keyFile = outKeyPath ?? $"{leaseId}.key";
+                File.WriteAllText(keyFile, result.PossessionKey);
+                Console.WriteLine($"  Possession Key: {keyFile}");
+            }
         }
 
         return 0;
@@ -419,28 +436,186 @@ internal static class Program
     private static async Task<int> HandleLicenseReturnAsync(string[] args)
     {
         string? serverUrl = GetArg(args, "--server") ?? "http://localhost:5000";
-        string? leaseId = GetArg(args, "--lease");
+        string? leaseId = GetArg(args, "--lease") ?? (args.Length > 0 && !args[0].StartsWith('-') ? args[0] : null);
+        string? symleasePath = GetArg(args, "--symlease");
+        string? keyPath = GetArg(args, "--key");
 
         if (string.IsNullOrWhiteSpace(leaseId))
         {
-            Console.Error.WriteLine("Chýba parameter --lease <lease-id>.");
+            Console.Error.WriteLine("Chýba parameter <lease-id> alebo --lease <lease-id>.");
             return 1;
         }
 
         using var http = new HttpClient { BaseAddress = new Uri(serverUrl) };
-        var response = await http.DeleteAsync(new Uri($"v1/leases/{leaseId}", UriKind.Relative)).ConfigureAwait(false);
 
-        if (!response.IsSuccessStatusCode)
+        if (!string.IsNullOrWhiteSpace(symleasePath) && !string.IsNullOrWhiteSpace(keyPath))
+        {
+            if (!File.Exists(symleasePath))
+            {
+                Console.Error.WriteLine($"Chyba: Súbor symlease '{symleasePath}' neexistuje.");
+                return 1;
+            }
+
+            if (!File.Exists(keyPath))
+            {
+                Console.Error.WriteLine($"Chyba: Súbor kľúča '{keyPath}' neexistuje.");
+                return 1;
+            }
+
+            string symleasePem = File.ReadAllText(symleasePath).Trim();
+            string keyContent = File.ReadAllText(keyPath).Trim();
+
+            var challengeResponse = await http.PostAsync(
+                new Uri($"v1/leases/{leaseId}/return-challenge", UriKind.Relative),
+                null).ConfigureAwait(false);
+
+            if (!challengeResponse.IsSuccessStatusCode)
+            {
+                Console.ForegroundColor = ConsoleColor.Red;
+                Console.Error.WriteLine($"Zlyhanie získania výzvy na vrátenie: HTTP {(int)challengeResponse.StatusCode}");
+                Console.ResetColor();
+                return 1;
+            }
+
+            var challenge = await challengeResponse.Content.ReadFromJsonAsync(
+                SymbolonProtocolJsonContext.Default.ReturnChallengeResponseDto).ConfigureAwait(false);
+
+            if (challenge is null)
+            {
+                Console.Error.WriteLine("Chyba: Prázdna odpoveď výzvy zo servera.");
+                return 1;
+            }
+
+            string signature = ProofOfPossessionEngine.SignChallenge(challenge.Nonce, keyContent);
+
+            var returnDto = new EarlyReturnRequestDto
+            {
+                Symlease = symleasePem,
+                Nonce = challenge.Nonce,
+                Signature = signature
+            };
+
+            var returnResponse = await http.PostAsJsonAsync(
+                new Uri($"v1/leases/{leaseId}/return", UriKind.Relative),
+                returnDto,
+                SymbolonProtocolJsonContext.Default.EarlyReturnRequestDto).ConfigureAwait(false);
+
+            if (!returnResponse.IsSuccessStatusCode)
+            {
+                Console.ForegroundColor = ConsoleColor.Red;
+                Console.Error.WriteLine($"Zlyhanie predčasného vrátenia sedadla: HTTP {(int)returnResponse.StatusCode}");
+                Console.ResetColor();
+                return 1;
+            }
+
+            var returnResult = await returnResponse.Content.ReadFromJsonAsync(
+                SymbolonProtocolJsonContext.Default.EarlyReturnResponseDto).ConfigureAwait(false);
+
+            Console.ForegroundColor = ConsoleColor.Green;
+            Console.WriteLine($"[OK] Zapožičané sedadlo {leaseId} bolo úspešne predčasne vrátené pomocou kryptografického dôkazu držby (FLT-21).");
+            Console.ResetColor();
+            if (returnResult is not null)
+            {
+                Console.WriteLine($"  Returned At: {returnResult.ReturnedAt:yyyy-MM-dd HH:mm:ss 'UTC'}");
+            }
+            return 0;
+        }
+
+        // Plain DELETE attempt without proof-of-possession
+        var plainResponse = await http.DeleteAsync(new Uri($"v1/leases/{leaseId}", UriKind.Relative)).ConfigureAwait(false);
+
+        if (plainResponse.StatusCode == System.Net.HttpStatusCode.Forbidden)
         {
             Console.ForegroundColor = ConsoleColor.Red;
-            Console.Error.WriteLine($"Zlyhanie vrátenia sedadla: HTTP {(int)response.StatusCode}");
+            Console.Error.WriteLine($"[403 Forbidden] Sedadlo {leaseId} je zapožičané na offline roaming.");
+            Console.Error.WriteLine("Pre predčasné vrátenie sa vyžaduje kryptografický dôkaz držby: zadajte --symlease <subor> a --key <subor> (FLT-22).");
+            Console.ResetColor();
+            return 1;
+        }
+
+        if (!plainResponse.IsSuccessStatusCode)
+        {
+            Console.ForegroundColor = ConsoleColor.Red;
+            Console.Error.WriteLine($"Zlyhanie vrátenia sedadla: HTTP {(int)plainResponse.StatusCode}");
             Console.ResetColor();
             return 1;
         }
 
         Console.ForegroundColor = ConsoleColor.Green;
-        Console.WriteLine($"[OK] Zapožičané sedadlo {leaseId} bolo úspešne vrátené do plávajúceho fondu.");
+        Console.WriteLine($"[OK] Sedadlo {leaseId} bolo úspešne uvoľnené.");
         Console.ResetColor();
+        return 0;
+    }
+
+    private static int HandleLicenseInspectBorrow(string[] args)
+    {
+        string? filePath = args.Length > 0 && !args[0].StartsWith('-') ? args[0] : GetArg(args, "--file");
+        if (string.IsNullOrWhiteSpace(filePath) || !File.Exists(filePath))
+        {
+            Console.Error.WriteLine("Chyba: Zadať platný súbor offline roamingu (.symlease)");
+            return 1;
+        }
+
+        string pem = File.ReadAllText(filePath);
+        if (!PemArmor.TryUnwrap(pem, "SYMBOLON LEASE", out byte[]? rawJson))
+        {
+            Console.Error.WriteLine("Chyba: Súbor neobsahuje platnú PEM obálku SYMBOLON LEASE.");
+            return 1;
+        }
+
+        var jwsDoc = JsonSerializer.Deserialize(rawJson, SymbolonJsonContext.Default.JwsGeneralJson);
+        if (jwsDoc is null)
+        {
+            Console.Error.WriteLine("Chyba: Neplatný JWS JSON dokument.");
+            return 1;
+        }
+
+        byte[] payloadBytes = Base64Url.DecodeFromChars(jwsDoc.Payload);
+        var claims = JsonSerializer.Deserialize(payloadBytes, SymbolonJsonContext.Default.SymleaseClaims);
+
+        if (claims is null)
+        {
+            Console.Error.WriteLine("Chyba: Neplatné claims v symlease.");
+            return 1;
+        }
+
+        Console.ForegroundColor = ConsoleColor.Cyan;
+        Console.WriteLine("=== SYMBOLON OFFLINE ROAMING LEASE INSPECTION ===");
+        Console.ResetColor();
+        Console.WriteLine($"Lease ID (Jti):       {claims.Jti}");
+        Console.WriteLine($"Licencia (Sub):       {claims.Sub}");
+        Console.WriteLine($"Vydavateľ (Iss):      {claims.Iss}");
+        Console.WriteLine($"Hardvérový odtlačok:  {claims.Fp}");
+        Console.WriteLine($"Číslo sedadla:        #{claims.Seat}");
+        Console.WriteLine($"Entitlements:         {string.Join(", ", claims.Ent)}");
+        Console.WriteLine($"Doba zapožičania:     {claims.Borrow.Days} dní");
+        Console.WriteLine($"Zapožičané dňa:       {DateTimeOffset.FromUnixTimeSeconds(claims.Borrow.BorrowedAt):u}");
+        Console.WriteLine($"Platné do (Exp):      {DateTimeOffset.FromUnixTimeSeconds(claims.Exp):u}");
+        Console.WriteLine($"Possession Key JWK:   {claims.Borrow.PossessionKeyJwk[..Math.Min(32, claims.Borrow.PossessionKeyJwk.Length)]}...");
+        Console.WriteLine($"Prítomné podpisy:     {jwsDoc.Signatures.Count}");
+
+        for (int i = 0; i < jwsDoc.Signatures.Count; i++)
+        {
+            var sig = jwsDoc.Signatures[i];
+            string kid = "unknown";
+            string alg = "unknown";
+            try
+            {
+                byte[] hdrBytes = Base64Url.DecodeFromChars(sig.Protected);
+                var hdr = JsonSerializer.Deserialize(hdrBytes, SymbolonJsonContext.Default.JwsProtectedHeader);
+                if (hdr is not null)
+                {
+                    kid = hdr.Kid;
+                    alg = hdr.Alg;
+                }
+            }
+            catch (Exception)
+            {
+                // ignore parsing failure for display
+            }
+            Console.WriteLine($"  Podpis #{i + 1}: kid='{kid}', alg='{alg}'");
+        }
+
         return 0;
     }
 
@@ -683,8 +858,9 @@ internal static class Program
               license keygen [--prefix SYM]
               license issue --customer <id> --seats <n> [--out file]
               license inspect <file.symlic>
-              license borrow --lease <id> --days <n> [--server <url>]
-              license return --lease <id> [--server <url>]
+              license borrow <leaseId> --days <n> [--out <f.symlease>] [--out-key <f.key>] [--server <url>]
+              license return <leaseId> --symlease <f.symlease> --key <f.key> [--server <url>]
+              license inspect-borrow <f.symlease>
               doctor [--server <url>]
               import --file <cesta> --policy <policy-id> [--format <keygen|csv>] [--dry-run]
               export --out <cesta> [--format <json|csv>]

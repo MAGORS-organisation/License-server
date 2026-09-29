@@ -895,6 +895,8 @@
                             <div class="table-subtitle">Prehľad licencií v offline režime (1–30 dní) s možnosťou predčasného administrátorského uvoľnenia</div>
                         </div>
                         <div class="table-actions">
+                            <button class="btn btn-primary btn-sm" onclick="openBorrowModal()">+ Zapožičať Sedadlo</button>
+                            <button class="btn btn-secondary btn-sm" onclick="openReturnEarlyModal()">Predčasné Vrátenie (FLT-21)</button>
                             <button class="btn btn-secondary btn-sm" onclick="loadBorrowedSeats()">Obnoviť Výpožičky</button>
                         </div>
                     </div>
@@ -2641,6 +2643,71 @@
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" onclick="closeModal('modal-create-revocation')">Zrušiť</button>
                     <button type="submit" class="btn btn-primary" style="background: var(--accent-rose); border-color: var(--accent-rose);">Revokovať Subjekt</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal: Zapožičanie Sedadla (Offline Roaming) -->
+    <div class="modal-overlay" id="modal-borrow-seat">
+        <div class="modal-box" style="max-width: 550px;">
+            <div class="modal-header">
+                <div class="modal-title">💼 Zapožičanie Sedadla (Offline Roaming FLT-17..FLT-20)</div>
+                <button class="modal-close" onclick="closeModal('modal-borrow-seat')">&times;</button>
+            </div>
+            <form id="form-borrow-seat" onsubmit="borrowSeatSubmit(event)">
+                <div class="form-group">
+                    <label class="form-label" for="borrow-lease-id">Lease ID aktívneho sedadla</label>
+                    <input type="text" class="form-control" id="borrow-lease-id" required placeholder="napr. lse_01JQ...">
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="borrow-days">Doba zapožičania (1 – 30 dní)</label>
+                    <input type="number" class="form-control" id="borrow-days" min="1" max="30" value="7" required>
+                </div>
+                <div id="borrow-result-box" style="display: none; margin-top: 15px;">
+                    <div class="alert alert-success" style="margin-bottom: 10px; color: var(--accent-emerald);">
+                        Sedadlo úspešne zapožičané! Uložte si <strong>.symlease</strong> a privátny kľúč držby:
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">.symlease artefakt (PEM)</label>
+                        <textarea class="form-control" id="borrow-symlease-out" rows="4" readonly style="font-family: monospace; font-size: 11px;"></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Privátny kľúč držby (Possession Key JWK)</label>
+                        <textarea class="form-control" id="borrow-key-out" rows="3" readonly style="font-family: monospace; font-size: 11px;"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" onclick="closeModal('modal-borrow-seat')">Zavrieť</button>
+                    <button type="submit" class="btn btn-primary" id="btn-submit-borrow">Vystaviť Offline Roaming</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal: Predčasné Vrátenie (Proof-of-Possession FLT-21) -->
+    <div class="modal-overlay" id="modal-return-early">
+        <div class="modal-box" style="max-width: 550px;">
+            <div class="modal-header">
+                <div class="modal-title">🔐 Predčasné Vrátenie Sedadla (FLT-21, FLT-22)</div>
+                <button class="modal-close" onclick="closeModal('modal-return-early')">&times;</button>
+            </div>
+            <form id="form-return-early" onsubmit="returnEarlySubmit(event)">
+                <div class="form-group">
+                    <label class="form-label" for="return-lease-id">Lease ID zapožičaného sedadla</label>
+                    <input type="text" class="form-control" id="return-lease-id" required placeholder="napr. lse_01JQ...">
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="return-symlease">Obsah súboru .symlease</label>
+                    <textarea class="form-control" id="return-symlease" rows="4" required placeholder="-----BEGIN SYMBOLON LEASE-----&#10;...&#10;-----END SYMBOLON LEASE-----" style="font-family: monospace; font-size: 11px;"></textarea>
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="return-key">Privátny kľúč držby (JWK JSON)</label>
+                    <textarea class="form-control" id="return-key" rows="3" required placeholder='{"kty":"EC","crv":"P-256","x":"...","y":"...","d":"..."}' style="font-family: monospace; font-size: 11px;"></textarea>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" onclick="closeModal('modal-return-early')">Zrušiť</button>
+                    <button type="submit" class="btn btn-primary" id="btn-submit-return-early">Overiť Dôkaz a Vrátiť</button>
                 </div>
             </form>
         </div>
