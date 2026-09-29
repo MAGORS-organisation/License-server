@@ -61,6 +61,9 @@ function initNavigation() {
                 if (targetView === "view-revocations") {
                     loadRevocationsView();
                 }
+                if (targetView === "view-reports") {
+                    loadReportsView();
+                }
             }
         });
     });
@@ -85,7 +88,8 @@ async function refreshAllData() {
         loadMeshAndAlerts(),
         loadScimDirectory(),
         loadFeaturesView(),
-        loadRevocationsView()
+        loadRevocationsView(),
+        document.getElementById("view-reports")?.classList.contains("active") ? loadReportsView() : Promise.resolve()
     ]);
 }
 
@@ -3068,5 +3072,286 @@ async function createRevocationSubmit(event) {
         showToast("Chyba spojenia: " + e.message, "error");
     }
 }
+
+// ==============================================================================
+// ENTERPRISE AUDIT ANALYTICS & TRUE-UP REPORTING (PHASE 18)
+// FLT-37, FLT-38, FLT-39 Compliance
+// ==============================================================================
+
+function getReportsFilterParams() {
+    const licenseId = document.getElementById("report-filter-license")?.value?.trim();
+    const bucket = document.getElementById("report-filter-bucket")?.value || "hour";
+    const fromVal = document.getElementById("report-filter-from")?.value;
+    const toVal = document.getElementById("report-filter-to")?.value;
+
+    const params = new URLSearchParams();
+    if (licenseId) params.append("licenseId", licenseId);
+    if (bucket) params.append("bucket", bucket);
+    if (fromVal) params.append("from", new Date(fromVal).toISOString());
+    if (toVal) params.append("to", new Date(toVal).toISOString());
+    return params;
+}
+
+async function loadReportsView() {
+    const params = getReportsFilterParams();
+    await Promise.allSettled([
+        loadConcurrencyTimeline(params),
+        loadTrueUpReport(params),
+        loadDenialsReport(params)
+    ]);
+}
+
+async function loadConcurrencyTimeline(params) {
+    const timelineBody = document.getElementById("concurrency-timeline-table-body");
+    const peakKpi = document.getElementById("kpi-report-peak");
+    const peakSub = document.getElementById("kpi-report-peak-sub");
+
+    try {
+        const res = await fetch(`/admin/v1/reports/concurrency/timeline?${params.toString()}`);
+        if (!res.ok) {
+            if (timelineBody) timelineBody.innerHTML = `<tr><td colspan="6" style="text-align: center; color: var(--accent-rose); padding: 16px;">Chyba pri načítaní súbežnosti: HTTP ${res.status}</td></tr>`;
+            return;
+        }
+
+        const data = await res.json();
+        if (peakKpi) peakKpi.textContent = data.overallPeakConcurrency ?? 0;
+        if (peakSub) {
+            const cap = data.contractCapacity > 0 ? `${data.contractCapacity} sedadiel` : "neobmedzená";
+            peakSub.textContent = `Zmluvná kapacita: ${cap} · Priemer: ${Number(data.overallTimeWeightedAverage || 0).toFixed(1)}`;
+        }
+
+        if (!timelineBody) return;
+
+        if (!data.buckets || data.buckets.length === 0) {
+            timelineBody.innerHTML = `<tr><td colspan="6" style="text-align: center; color: var(--text-muted); padding: 20px;">Žiadne auditné záznamy o súbežnosti vo zvolenom období.</td></tr>`;
+            return;
+        }
+
+        const maxCap = Math.max(data.contractCapacity || 1, data.overallPeakConcurrency || 1);
+
+        timelineBody.innerHTML = data.buckets.map(b => {
+            const start = new Date(b.bucketStart).toLocaleString("sk-SK");
+            const end = new Date(b.bucketEnd).toLocaleTimeString("sk-SK");
+            const pct = Math.min(100, Math.round((b.peakConcurrency / maxCap) * 100));
+            const barColor = b.peakConcurrency > (data.contractCapacity || 0) && (data.contractCapacity || 0) > 0 
+                ? "var(--accent-rose)" 
+                : (pct >= 85 ? "var(--accent-amber)" : "var(--accent-emerald)");
+
+            return `
+                <tr>
+                    <td style="font-family: monospace; font-size: 12px; color: var(--text-primary);">${start} - ${end}</td>
+                    <td style="text-align: right; font-weight: 700; color: ${b.peakConcurrency > (data.contractCapacity || 0) && (data.contractCapacity || 0) > 0 ? "var(--accent-rose)" : "var(--accent-cyan)"};">${b.peakConcurrency}</td>
+                    <td style="text-align: right; font-family: monospace; color: var(--text-secondary);">${Number(b.timeWeightedAverage).toFixed(2)}</td>
+                    <td style="text-align: right; color: var(--accent-emerald); font-weight: 600;">+${b.checkoutsCount}</td>
+                    <td style="text-align: right; color: ${b.denialsCount > 0 ? "var(--accent-rose)" : "var(--text-muted)"}; font-weight: 600;">${b.denialsCount}</td>
+                    <td>
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                            <div style="flex: 1; height: 8px; background: rgba(255,255,255,0.1); border-radius: 4px; overflow: hidden;">
+                                <div style="width: ${pct}%; height: 100%; background: ${barColor};"></div>
+                            </div>
+                            <span style="font-size: 11px; font-family: monospace; width: 35px; text-align: right; color: var(--text-secondary);">${pct}%</span>
+                        </div>
+                    </td>
+                </tr>
+            `;
+        }).join("");
+    } catch (e) {
+        console.error("Chyba pri načítaní časovej osi súbežnosti:", e);
+        if (timelineBody) timelineBody.innerHTML = `<tr><td colspan="6" style="text-align: center; color: var(--accent-rose); padding: 16px;">Chyba: ${e.message}</td></tr>`;
+    }
+}
+
+async function loadTrueUpReport(params) {
+    const trueUpBody = document.getElementById("trueup-table-body");
+    const compKpi = document.getElementById("kpi-report-compliance");
+    const overageKpi = document.getElementById("kpi-report-overage");
+    const banner = document.getElementById("trueup-summary-banner");
+    const bannerText = document.getElementById("trueup-banner-text");
+
+    try {
+        const queryParams = new URLSearchParams(params);
+        queryParams.delete("bucket");
+        const res = await fetch(`/admin/v1/reports/true-up?${queryParams.toString()}`);
+        if (!res.ok) {
+            if (trueUpBody) trueUpBody.innerHTML = `<tr><td colspan="7" style="text-align: center; color: var(--accent-rose); padding: 16px;">Chyba pri načítaní True-Up: HTTP ${res.status}</td></tr>`;
+            return;
+        }
+
+        const data = await res.json();
+        
+        // Update KPI
+        if (compKpi) {
+            if (data.overallStatus === "Compliant") {
+                compKpi.innerHTML = `<span style="color: var(--accent-emerald);">✓ COMPLIANT</span>`;
+            } else if (data.overallStatus === "OverageWarning") {
+                compKpi.innerHTML = `<span style="color: var(--accent-amber);">⚠ VAROVANIE</span>`;
+            } else {
+                compKpi.innerHTML = `<span style="color: var(--accent-rose);">✗ NON-COMPLIANT</span>`;
+            }
+        }
+        if (overageKpi) {
+            overageKpi.textContent = `Prekročenie: ${Number(data.totalBillableOverageSeconds || 0).toLocaleString()} sedadlosekúnd`;
+        }
+
+        // Update Banner
+        if (banner && bannerText) {
+            if (data.overallStatus === "Compliant") {
+                banner.style.background = "rgba(16, 185, 129, 0.1)";
+                banner.style.borderColor = "var(--accent-emerald)";
+                bannerText.innerHTML = `<strong style="color: var(--accent-emerald);">VŠETKY LICENCIE V SÚLADE:</strong> Žiadne nadlimitné využitie sedadiel nebolo zaznamenané v období ${new Date(data.periodStart).toLocaleDateString("sk-SK")} - ${new Date(data.periodEnd).toLocaleDateString("sk-SK")}.`;
+            } else {
+                banner.style.background = "rgba(244, 63, 94, 0.1)";
+                banner.style.borderColor = "var(--accent-rose)";
+                bannerText.innerHTML = `<strong style="color: var(--accent-rose);">ZAZNAMENANÉ PREKROČENIE ZMLUVNÉHO LIMITU:</strong> Evidované spoplatniteľné prekročenie ${Number(data.totalBillableOverageSeconds || 0).toLocaleString()} seat-seconds. Odporúča sa doobjednať dodatočné kapacity.`;
+            }
+        }
+
+        if (!trueUpBody) return;
+
+        if (!data.licenses || data.licenses.length === 0) {
+            trueUpBody.innerHTML = `<tr><td colspan="7" style="text-align: center; color: var(--text-muted); padding: 20px;">Žiadne licencie pre True-Up vyhodnotenie vo zvolenom období.</td></tr>`;
+            return;
+        }
+
+        trueUpBody.innerHTML = data.licenses.map(lic => {
+            const isCompliant = lic.complianceStatus === "Compliant";
+            const badge = isCompliant 
+                ? `<span class="badge" style="background: rgba(16, 185, 129, 0.2); color: var(--accent-emerald); border: 1px solid var(--accent-emerald);">Compliant</span>`
+                : (lic.complianceStatus === "OverageWarning"
+                    ? `<span class="badge" style="background: rgba(245, 158, 11, 0.2); color: var(--accent-amber); border: 1px solid var(--accent-amber);">Warning</span>`
+                    : `<span class="badge" style="background: rgba(244, 63, 94, 0.2); color: var(--accent-rose); border: 1px solid var(--accent-rose);">Non-Compliant</span>`);
+
+            return `
+                <tr>
+                    <td><code style="font-family: monospace; font-size: 12px; color: var(--accent-cyan);">${escapeHtml(lic.licenseId || "-")}</code></td>
+                    <td><span style="color: var(--text-primary); font-weight: 500;">${escapeHtml(lic.licenseKey || "-")}</span></td>
+                    <td style="text-align: right; font-weight: 600;">${lic.contractSeats}</td>
+                    <td style="text-align: right; font-weight: 700; color: ${lic.peakConcurrency > lic.contractSeats ? "var(--accent-rose)" : "var(--accent-emerald)"};">${lic.peakConcurrency}</td>
+                    <td style="text-align: right; color: ${lic.overageSeats > 0 ? "var(--accent-rose)" : "var(--text-muted)"}; font-weight: 700;">+${lic.overageSeats}</td>
+                    <td style="text-align: right; font-family: monospace; color: var(--text-secondary);">${Number(lic.overageSeatSeconds).toLocaleString()} s</td>
+                    <td>${badge}</td>
+                </tr>
+            `;
+        }).join("");
+    } catch (e) {
+        console.error("Chyba pri načítaní True-Up:", e);
+        if (trueUpBody) trueUpBody.innerHTML = `<tr><td colspan="7" style="text-align: center; color: var(--accent-rose); padding: 16px;">Chyba: ${e.message}</td></tr>`;
+    }
+}
+
+async function loadDenialsReport(params) {
+    const denialsBody = document.getElementById("denials-table-body");
+    const denialsKpi = document.getElementById("kpi-report-denials");
+    const denialsSub = document.getElementById("kpi-report-denials-sub");
+
+    try {
+        const queryParams = new URLSearchParams(params);
+        queryParams.delete("bucket");
+        queryParams.append("limit", "50");
+        const res = await fetch(`/admin/v1/reports/denials?${queryParams.toString()}`);
+        if (!res.ok) {
+            if (denialsBody) denialsBody.innerHTML = `<tr><td colspan="6" style="text-align: center; color: var(--accent-rose); padding: 16px;">Chyba pri načítaní zamietnutí: HTTP ${res.status}</td></tr>`;
+            return;
+        }
+
+        const data = await res.json();
+        if (denialsKpi) denialsKpi.textContent = data.totalDenials ?? 0;
+        if (denialsSub) {
+            const reasons = Object.entries(data.denialsByReason || {}).map(([k, v]) => `${k}: ${v}`).join(", ") || "Žiadne zamietnutia";
+            denialsSub.textContent = reasons;
+        }
+
+        if (!denialsBody) return;
+
+        if (!data.records || data.records.length === 0) {
+            denialsBody.innerHTML = `<tr><td colspan="6" style="text-align: center; color: var(--text-muted); padding: 20px;">Žiadne zamietnutia (všetky požiadavky boli úspešne obslúžené).</td></tr>`;
+            return;
+        }
+
+        denialsBody.innerHTML = data.records.map(r => {
+            const ts = new Date(r.timestamp).toLocaleString("sk-SK");
+            let reasonBadge = `<span class="badge" style="background: rgba(244, 63, 94, 0.2); color: var(--accent-rose); border: 1px solid var(--accent-rose);">${escapeHtml(r.reason)}</span>`;
+
+            return `
+                <tr>
+                    <td style="font-size: 12px; color: var(--text-muted);">${ts}</td>
+                    <td>${reasonBadge}</td>
+                    <td><code style="font-family: monospace; font-size: 12px; color: var(--accent-cyan);">${escapeHtml(r.licenseId || "-")}</code></td>
+                    <td><span style="font-family: monospace; font-size: 12px; color: var(--text-primary);">${escapeHtml(r.machineFingerprint || "-")}</span></td>
+                    <td><span style="color: var(--text-secondary);">${escapeHtml(r.userName || "-")}</span></td>
+                    <td><span style="color: var(--accent-amber);">${escapeHtml(r.featureCode || "-")}</span></td>
+                </tr>
+            `;
+        }).join("");
+    } catch (e) {
+        console.error("Chyba pri načítaní zamietnutí:", e);
+        if (denialsBody) denialsBody.innerHTML = `<tr><td colspan="6" style="text-align: center; color: var(--accent-rose); padding: 16px;">Chyba: ${e.message}</td></tr>`;
+    }
+}
+
+function exportTrueUpCsv() {
+    const params = getReportsFilterParams();
+    params.delete("bucket");
+    params.append("format", "csv");
+    const downloadUrl = `/admin/v1/reports/true-up/export?${params.toString()}`;
+    window.open(downloadUrl, "_blank");
+}
+
+async function verifyAuditChainIntegrity() {
+    const statusEl = document.getElementById("chain-verif-status");
+    const countEl = document.getElementById("chain-verif-count");
+    const genesisEl = document.getElementById("chain-verif-genesis");
+    const latestEl = document.getElementById("chain-verif-latest");
+    const kpiStatus = document.getElementById("kpi-report-chain-status");
+    const kpiSub = document.getElementById("kpi-report-chain-sub");
+
+    if (statusEl) statusEl.textContent = "Prebieha výpočet SHA-256 hashov...";
+
+    try {
+        const res = await fetch("/admin/v1/reports/audit/verify-integrity", {
+            method: "POST"
+        });
+
+        if (!res.ok) {
+            const err = await res.text();
+            showToast("Chyba verifikácie: " + err, "error");
+            if (statusEl) statusEl.textContent = "Chyba servera";
+            return;
+        }
+
+        const data = await res.json();
+        if (data.isValid) {
+            if (statusEl) statusEl.innerHTML = `<span style="color: var(--accent-emerald);">✓ INTEGRITA PLATNÁ (100% ZHODA)</span>`;
+            if (countEl) countEl.textContent = `${data.verifiedRecordsCount} overených záznamov`;
+            if (genesisEl) genesisEl.textContent = data.genesisHash || "Genesis";
+            if (latestEl) latestEl.textContent = data.latestHash || "-";
+            if (kpiStatus) {
+                kpiStatus.textContent = "✓ Overený (Platný)";
+                kpiStatus.style.color = "var(--accent-emerald)";
+            }
+            if (kpiSub) kpiSub.textContent = `${data.verifiedRecordsCount} immutable blokov bez porušenia`;
+            showToast(`Auditný hash reťazec je platný (${data.verifiedRecordsCount} záznamov overených).`, "success");
+        } else {
+            if (statusEl) statusEl.innerHTML = `<span style="color: var(--accent-rose);">✗ PORUŠENÁ INTEGRITA AUDITU!</span>`;
+            if (countEl) countEl.textContent = `Zlyhanie pri zázname ID: ${data.brokenRecordId || "?"}`;
+            if (genesisEl) genesisEl.textContent = data.genesisHash || "-";
+            if (latestEl) latestEl.textContent = `Chyba: ${data.errorMessage || "Hash mismatch"}`;
+            if (kpiStatus) {
+                kpiStatus.textContent = "✗ Porušený!";
+                kpiStatus.style.color = "var(--accent-rose)";
+            }
+            if (kpiSub) kpiSub.textContent = `Chyba reťazenia na zázname ${data.brokenRecordId}`;
+            showToast(`POZOR: Hash reťazec je porušený na zázname ${data.brokenRecordId}!`, "error");
+        }
+    } catch (e) {
+        showToast("Chyba verifikácie reťazca: " + e.message, "error");
+        if (statusEl) statusEl.textContent = "Chyba spojenia: " + e.message;
+    }
+}
+
+window.loadReportsView = loadReportsView;
+window.exportTrueUpCsv = exportTrueUpCsv;
+window.verifyAuditChainIntegrity = verifyAuditChainIntegrity;
+
 
 

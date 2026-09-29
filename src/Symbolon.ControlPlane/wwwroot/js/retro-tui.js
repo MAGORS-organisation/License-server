@@ -28,6 +28,7 @@
         { id: 'relaye', label: 'Relay uzly', hotkey: 'R', view: 'view-relays', hasSub: false },
         { id: 'mesh', label: 'Relay Mesh & Klastre', hotkey: 'M', view: 'view-mesh', hasSub: false },
         { id: 'audit', label: 'Auditný denník', hotkey: 'A', view: 'view-audit', hasSub: false },
+        { id: 'reports', label: 'Reporty & True-Up', hotkey: 'y', view: 'view-reports', hasSub: false },
         { id: 'airgap', label: 'Air-Gap portál', hotkey: 'G', view: 'view-airgap', hasSub: false },
         { id: 'wasm', label: 'Wasm Validátor', hotkey: 'D', view: 'view-wasm', hasSub: false },
         { id: 'tokens', label: 'Tokeny & Kredity', hotkey: 'E', view: 'view-tokens', hasSub: false },
@@ -78,6 +79,7 @@
                 <li class="retro-menu-item" onclick="switchRetroView('view-relays')" tabindex="0"><span class="hotkey">R</span>elaye</li>
                 <li class="retro-menu-item" onclick="switchRetroView('view-mesh')" tabindex="0"><span class="hotkey">M</span>esh</li>
                 <li class="retro-menu-item" onclick="switchRetroView('view-audit')" tabindex="0"><span class="hotkey">A</span>udit</li>
+                <li class="retro-menu-item" onclick="switchRetroView('view-reports')" tabindex="0">Report<span class="hotkey">y</span></li>
                 <li class="retro-menu-item" onclick="switchRetroView('view-airgap')" tabindex="0">Air-<span class="hotkey">G</span>ap</li>
                 <li class="retro-menu-item" onclick="switchRetroView('view-wasm')" tabindex="0"><span class="hotkey">W</span>asm</li>
                 <li class="retro-menu-item" onclick="switchRetroView('view-tokens')" tabindex="0">Tok<span class="hotkey">e</span>ny</li>
@@ -184,6 +186,7 @@
                 <button class="fkey-btn" onclick="switchRetroView('view-webhooks')"><span class="fkey-badge">F8</span> Webhook</button>
                 <button class="fkey-btn" onclick="switchRetroView('view-system')"><span class="fkey-badge">F9</span> Súlad</button>
                 <button class="fkey-btn" onclick="switchRetroView('view-revocations')"><span class="fkey-badge">F11</span> Revokácie</button>
+                <button class="fkey-btn" onclick="switchRetroView('view-reports')"><span class="fkey-badge">F12</span> Reporty</button>
                 <button class="fkey-btn" onclick="toggleMainMenu()"><span class="fkey-badge">F10</span> Menu</button>
                 <button class="fkey-btn" onclick="handleEscKey()"><span class="fkey-badge">ESC</span> Späť</button>
             </div>
@@ -330,6 +333,10 @@
                 case 'F11':
                     e.preventDefault();
                     switchRetroView('view-revocations');
+                    return;
+                case 'F12':
+                    e.preventDefault();
+                    switchRetroView('view-reports');
                     return;
                 case 'F10':
                 case 'Alt':
@@ -601,6 +608,7 @@
             'view-keys': 'KRYPTOGRAFICKÉ KĽÚČE & POST-KVANTOVÁ KRYPTOGRAFIA (PQC)',
             'view-relays': 'ON-PREMISE RELAY UZLY S DELEGOVANOU KAPACITOU',
             'view-audit': 'KRYPTOGRAFICKY REŤAZENÝ AUDITNÝ DENNÍK (LEDGER)',
+            'view-reports': 'ENTERPRISE AUDIT ANALYTIKA, SÚBEŽNOSŤ & TRUE-UP VÝKAZY (FLT-38)',
             'view-airgap': 'AIR-GAP & OFFLINE LICENČNÝ PORTÁL',
             'view-wasm': 'WEBASSEMBLY & WEBCRYPTO OFFLINE VALIDÁTOR (100% AIR-GAP)',
             'view-webhooks': 'WEBHOOK NOTIFIKÁCIE & HISTÓRIA DORUČENIA',
@@ -617,6 +625,10 @@
         const titleEl = document.getElementById('retro-window-title');
         if (titleEl && titleMap[viewId]) {
             titleEl.textContent = titleMap[viewId];
+        }
+
+        if (viewId === 'view-reports' && typeof window.loadReportsView === 'function') {
+            window.loadReportsView();
         }
 
         // Zatvorenie podmenu pri prepnutí
@@ -636,6 +648,9 @@
         } else if (hash === 'revocations' || hash === 'crl') {
             switchRetroView('view-revocations');
             if (typeof window.loadRevocationsView === 'function') window.loadRevocationsView();
+        } else if (hash === 'reports' || hash === 'trueup' || hash === 'reporty') {
+            switchRetroView('view-reports');
+            if (typeof window.loadReportsView === 'function') window.loadReportsView();
         } else if (hash === 'licenses' || hash === 'licencie') {
             switchRetroView('view-licenses');
         } else if (hash === 'keys' || hash === 'kluce') {

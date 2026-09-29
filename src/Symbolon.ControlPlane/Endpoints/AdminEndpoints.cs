@@ -7,8 +7,10 @@ using Symbolon.ControlPlane.Models;
 using Symbolon.Data;
 using Symbolon.Data.Entities;
 using Symbolon.Domain;
+using Symbolon.Domain.Reporting;
 using Symbolon.Domain.Security;
 using Symbolon.Format;
+using Symbolon.Protocol.Reporting;
 
 namespace Symbolon.ControlPlane.Endpoints;
 
@@ -40,6 +42,11 @@ public static class AdminEndpoints
         group.MapGet("/audit", GetAuditEventsAsync).WithName("GetAuditEvents");
         group.MapGet("/alerts", GetAlertsAsync).WithName("GetAlerts");
         group.MapGet("/reports/concurrency", GetConcurrencyReportAsync).WithName("GetConcurrencyReport");
+        group.MapGet("/reports/concurrency/timeline", GetConcurrencyTimelineAsync).WithName("GetConcurrencyTimeline");
+        group.MapGet("/reports/true-up", GetTrueUpReportAsync).WithName("GetTrueUpReport");
+        group.MapGet("/reports/true-up/export", ExportTrueUpReportAsync).WithName("ExportTrueUpReport");
+        group.MapGet("/reports/denials", GetDenialsReportAsync).WithName("GetDenialsReport");
+        group.MapPost("/reports/audit/verify-integrity", VerifyAuditIntegrityAsync).WithName("VerifyAuditIntegrity");
 
         // Key Management & Rotation
         group.MapGet("/keys", GetKeysAsync).WithName("GetKeys");
@@ -551,6 +558,12 @@ public static class AdminEndpoints
         CancellationToken ct)
     {
         var now = time.GetUtcNow();
+        string? bucket = context.Request.Query["bucket"];
+        if (!string.IsNullOrWhiteSpace(bucket))
+        {
+            return await GetConcurrencyTimelineAsync(context, db, time, ct).ConfigureAwait(false);
+        }
+
         var seatsQuery = db.Seats.AsQueryable();
 
         if (!IsSuperAdmin(context))
@@ -577,6 +590,306 @@ public static class AdminEndpoints
             availableSeats,
             Math.Round(util, 1),
             denials));
+    }
+
+    private static async Task<IResult> GetConcurrencyTimelineAsync(
+        HttpContext context,
+        SymbolonDbContext db,
+        TimeProvider time,
+        CancellationToken ct)
+    {
+        var now = time.GetUtcNow();
+        string bucket = context.Request.Query["bucket"].FirstOrDefault() ?? "hour";
+        string? licenseId = context.Request.Query["licenseId"];
+
+        DateTimeOffset rangeStart = DateTimeOffset.TryParse(context.Request.Query["from"], out var parsedFrom)
+            ? parsedFrom
+            : now.AddDays(-7);
+
+        DateTimeOffset rangeEnd = DateTimeOffset.TryParse(context.Request.Query["to"], out var parsedTo)
+            ? parsedTo
+            : now;
+
+        var auditQuery = db.AuditEvents.Where(a => a.TsServer >= rangeStart && a.TsServer <= rangeEnd);
+        var seatsQuery = db.Seats.AsQueryable();
+
+        if (!IsSuperAdmin(context))
+        {
+            string? callerTenant = GetCallerTenantId(context);
+            if (!string.IsNullOrWhiteSpace(callerTenant))
+            {
+                var tenantLicenseIds = db.Licenses.Where(l => l.TenantId == callerTenant).Select(l => l.Id);
+                auditQuery = auditQuery.Where(a => a.TenantId == callerTenant || (a.LicenseId != null && tenantLicenseIds.Contains(a.LicenseId)));
+                seatsQuery = seatsQuery.Where(s => tenantLicenseIds.Contains(s.LicenseId));
+            }
+        }
+
+        if (!string.IsNullOrWhiteSpace(licenseId))
+        {
+            auditQuery = auditQuery.Where(a => a.LicenseId == licenseId);
+            seatsQuery = seatsQuery.Where(s => s.LicenseId == licenseId);
+        }
+
+        int capacity = await seatsQuery.CountAsync(ct).ConfigureAwait(false);
+        var rawEvents = await auditQuery.OrderBy(a => a.TsServer).ThenBy(a => a.Id).ToListAsync(ct).ConfigureAwait(false);
+
+        var domainEvents = rawEvents.Select(a => new ConcurrencyAuditEvent(
+            a.Id,
+            a.TsServer,
+            a.Type,
+            a.LicenseId,
+            a.Subject
+        )).ToList();
+
+        var result = AuditPeakConcurrencyCalculator.Calculate(
+            domainEvents,
+            rangeStart,
+            rangeEnd,
+            bucket,
+            licenseId,
+            capacity,
+            initialActiveSeats: 0
+        );
+
+        return TypedResults.Ok(result);
+    }
+
+    private static async Task<IResult> GetTrueUpReportAsync(
+        HttpContext context,
+        SymbolonDbContext db,
+        TimeProvider time,
+        CancellationToken ct)
+    {
+        var now = time.GetUtcNow();
+        string? licenseId = context.Request.Query["licenseId"];
+
+        DateTimeOffset rangeStart = DateTimeOffset.TryParse(context.Request.Query["from"], out var parsedFrom)
+            ? parsedFrom
+            : now.AddDays(-30);
+
+        DateTimeOffset rangeEnd = DateTimeOffset.TryParse(context.Request.Query["to"], out var parsedTo)
+            ? parsedTo
+            : now;
+
+        string? callerTenant = GetCallerTenantId(context);
+        var licenseQuery = db.Licenses.Include(l => l.Policy)!.ThenInclude(p => p!.Product).AsQueryable();
+        if (!IsSuperAdmin(context) && !string.IsNullOrWhiteSpace(callerTenant))
+        {
+            licenseQuery = licenseQuery.Where(l => l.TenantId == callerTenant);
+        }
+
+        if (!string.IsNullOrWhiteSpace(licenseId))
+        {
+            licenseQuery = licenseQuery.Where(l => l.Id == licenseId);
+        }
+
+        var license = await licenseQuery.FirstOrDefaultAsync(ct).ConfigureAwait(false);
+        string reportTenantId = license?.TenantId ?? callerTenant ?? "default";
+        int licensedSeats = license?.MaxSeats ?? 10;
+        string prodName = license?.Policy?.Product?.Name ?? "Symbolon Enterprise Suite";
+        int overageBuffer = 0;
+        if (license?.Policy != null && !string.Equals(license.Policy.OverageStrategy, "no-overage", StringComparison.OrdinalIgnoreCase))
+        {
+            overageBuffer = Math.Max(1, (int)(licensedSeats * 0.2));
+        }
+
+        var auditQuery = db.AuditEvents.Where(a => a.TsServer >= rangeStart && a.TsServer <= rangeEnd);
+        if (!IsSuperAdmin(context) && !string.IsNullOrWhiteSpace(callerTenant))
+        {
+            auditQuery = auditQuery.Where(a => a.TenantId == callerTenant);
+        }
+        if (!string.IsNullOrWhiteSpace(licenseId))
+        {
+            auditQuery = auditQuery.Where(a => a.LicenseId == licenseId);
+        }
+
+        var rawEvents = await auditQuery.OrderBy(a => a.TsServer).ThenBy(a => a.Id).ToListAsync(ct).ConfigureAwait(false);
+        var domainEvents = rawEvents.Select(a => new ConcurrencyAuditEvent(
+            a.Id,
+            a.TsServer,
+            a.Type,
+            a.LicenseId,
+            a.Subject
+        )).ToList();
+
+        var report = TrueUpReportGenerator.Generate(
+            reportTenantId,
+            licenseId,
+            prodName,
+            licensedSeats,
+            overageBuffer,
+            domainEvents,
+            rangeStart,
+            rangeEnd,
+            now
+        );
+
+        return TypedResults.Ok(report);
+    }
+
+    private static async Task<IResult> ExportTrueUpReportAsync(
+        HttpContext context,
+        SymbolonDbContext db,
+        TimeProvider time,
+        CancellationToken ct)
+    {
+        string format = context.Request.Query["format"].FirstOrDefault() ?? "csv";
+        var res = await GetTrueUpReportAsync(context, db, time, ct).ConfigureAwait(false);
+
+        if (res is Microsoft.AspNetCore.Http.HttpResults.Ok<TrueUpReportDto> ok && ok.Value is { } report)
+        {
+            if (string.Equals(format, "json", StringComparison.OrdinalIgnoreCase))
+            {
+                return TypedResults.Ok(report);
+            }
+
+            string csv = TrueUpReportGenerator.ExportToCsv(report);
+            return TypedResults.Content(csv, "text/csv; charset=utf-8", Encoding.UTF8);
+        }
+
+        return res;
+    }
+
+    private static async Task<IResult> GetDenialsReportAsync(
+        HttpContext context,
+        SymbolonDbContext db,
+        TimeProvider time,
+        CancellationToken ct)
+    {
+        var now = time.GetUtcNow();
+        string? licenseId = context.Request.Query["licenseId"];
+
+        DateTimeOffset rangeStart = DateTimeOffset.TryParse(context.Request.Query["from"], out var parsedFrom)
+            ? parsedFrom
+            : now.AddDays(-30);
+
+        DateTimeOffset rangeEnd = DateTimeOffset.TryParse(context.Request.Query["to"], out var parsedTo)
+            ? parsedTo
+            : now;
+
+        int limit = int.TryParse(context.Request.Query["limit"], out var parsedLimit)
+            ? Math.Clamp(parsedLimit, 1, 500)
+            : 50;
+
+        var auditQuery = db.AuditEvents.Where(a => a.Type == "deny" && a.TsServer >= rangeStart && a.TsServer <= rangeEnd);
+
+        if (!IsSuperAdmin(context))
+        {
+            string? callerTenant = GetCallerTenantId(context);
+            if (!string.IsNullOrWhiteSpace(callerTenant))
+            {
+                var tenantLicenseIds = db.Licenses.Where(l => l.TenantId == callerTenant).Select(l => l.Id);
+                auditQuery = auditQuery.Where(a => a.TenantId == callerTenant || (a.LicenseId != null && tenantLicenseIds.Contains(a.LicenseId)));
+            }
+        }
+
+        if (!string.IsNullOrWhiteSpace(licenseId))
+        {
+            auditQuery = auditQuery.Where(a => a.LicenseId == licenseId);
+        }
+
+        var rawEvents = await auditQuery.OrderByDescending(a => a.TsServer).ToListAsync(ct).ConfigureAwait(false);
+
+        var reasons = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+        var recent = new List<DenialRecordDto>();
+        var uniqueSubjects = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var ev in rawEvents)
+        {
+            if (!string.IsNullOrWhiteSpace(ev.Subject))
+            {
+                uniqueSubjects.Add(ev.Subject);
+            }
+
+            string reason = "seat-pool-exhausted";
+            string? feat = null;
+            if (!string.IsNullOrWhiteSpace(ev.PayloadJson))
+            {
+                try
+                {
+                    using var doc = JsonDocument.Parse(ev.PayloadJson);
+                    if (doc.RootElement.TryGetProperty("Detail", out var detailEl) && detailEl.ValueKind == JsonValueKind.String)
+                    {
+                        reason = detailEl.GetString() ?? reason;
+                    }
+                    else if (doc.RootElement.TryGetProperty("reason", out var rEl) && rEl.ValueKind == JsonValueKind.String)
+                    {
+                        reason = rEl.GetString() ?? reason;
+                    }
+
+                    if (doc.RootElement.TryGetProperty("feature", out var fEl) && fEl.ValueKind == JsonValueKind.String)
+                    {
+                        feat = fEl.GetString();
+                    }
+                }
+                catch (JsonException)
+                {
+                    // keep default
+                }
+            }
+
+            reasons[reason] = reasons.GetValueOrDefault(reason) + 1;
+
+            if (recent.Count < limit)
+            {
+                recent.Add(new DenialRecordDto(
+                    ev.TsServer,
+                    ev.LicenseId ?? string.Empty,
+                    ev.Subject,
+                    reason,
+                    feat,
+                    ev.Subject
+                ));
+            }
+        }
+
+        return TypedResults.Ok(new DenialsAnalyticsResponseDto(
+            rangeStart,
+            rangeEnd,
+            rawEvents.Count,
+            uniqueSubjects.Count,
+            reasons,
+            recent
+        ));
+    }
+
+    private static async Task<IResult> VerifyAuditIntegrityAsync(
+        HttpContext context,
+        SymbolonDbContext db,
+        TimeProvider time,
+        CancellationToken ct)
+    {
+        var now = time.GetUtcNow();
+        var auditQuery = db.AuditEvents.AsQueryable();
+
+        if (!IsSuperAdmin(context))
+        {
+            string? callerTenant = GetCallerTenantId(context);
+            if (!string.IsNullOrWhiteSpace(callerTenant))
+            {
+                auditQuery = auditQuery.Where(a => a.TenantId == callerTenant);
+            }
+        }
+
+        var rawEvents = await auditQuery
+            .OrderBy(a => a.TsServer)
+            .ThenBy(a => a.Id)
+            .ToListAsync(ct)
+            .ConfigureAwait(false);
+
+        var items = rawEvents.Select(a => new AuditRecordItem(
+            a.Id,
+            a.TsServer,
+            a.Type,
+            a.LicenseId,
+            a.Subject,
+            a.PayloadJson,
+            a.PrevHash,
+            a.Hash
+        )).ToList();
+
+        var proof = AuditChainIntegrityVerifier.Verify(items, now);
+        return TypedResults.Ok(proof);
     }
 
     private static async Task<IResult> GetKeysAsync(

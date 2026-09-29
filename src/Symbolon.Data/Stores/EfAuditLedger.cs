@@ -35,8 +35,10 @@ public sealed class EfAuditLedger(SymbolonDbContext db) : IAuditLedger
                 auditEvent.Detail
             });
 
+            var canonicalTimestamp = DateTimeOffset.FromUnixTimeMilliseconds(auditEvent.Timestamp.ToUnixTimeMilliseconds());
+
             // Hash = SHA256(prevHash || id || type || licenseId || payload || timestamp)
-            var inputBytes = Encoding.UTF8.GetBytes($"{Convert.ToHexString(prevHash ?? [])}:{id}:{auditEvent.Type}:{auditEvent.LicenseId}:{auditEvent.Fingerprint}:{payload}:{auditEvent.Timestamp:O}");
+            var inputBytes = Encoding.UTF8.GetBytes($"{Convert.ToHexString(prevHash ?? [])}:{id}:{auditEvent.Type}:{auditEvent.LicenseId}:{auditEvent.Fingerprint}:{payload}:{canonicalTimestamp:O}");
             byte[] hash = SHA256.HashData(inputBytes);
 
             // Find tenantId from license if possible, or from seat by leaseId, or first tenant
@@ -68,7 +70,7 @@ public sealed class EfAuditLedger(SymbolonDbContext db) : IAuditLedger
             {
                 Id = id,
                 TenantId = tenantId,
-                TsServer = auditEvent.Timestamp,
+                TsServer = canonicalTimestamp,
                 Type = auditEvent.Type,
                 LicenseId = auditEvent.LicenseId,
                 Subject = auditEvent.Fingerprint,

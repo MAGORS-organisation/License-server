@@ -10,6 +10,28 @@ a projekt striktne dodržiava [Sémantické Verziovanie (Semantic Versioning 2.0
 ## [Unreleased]
 
 ### Pridané (Added)
+- **Enterprise Audit Engine, True-Up Compliance Reporting & Audit-Chain Concurrency Analytics (FLT-37, FLT-38, FLT-39, Goal G5, §6.5 Enterprise Procurement)**:
+  - **Doménová a analytická vrstva (`Symbolon.Domain.Reporting`)**:
+    - `AuditPeakConcurrencyCalculator`: Deterministická schodisková funkcia špičkovej súbežnosti počítaná priamo z nemenných auditných udalostí (`SeatCheckoutCompleted`, `SeatReleased`, `HeartbeatRenewed`, `SeatAcquisitionDenied`, `FeatureAcquired`, `FeatureReleased`) podľa normatívneho pravidla **FLT-38** bez akejkoľvek aproximácie či vzorkovania. Poskytuje presné diskrétne časové vedrá (`hour`, `day`, `week`, `month`) s výpočtom špičky (peak), časovo váženého priemeru (time-weighted average), počtu checkoutov a zamietnutí.
+    - `TrueUpReportGenerator`: Enterprise True-Up audit výkaz pre oddelenie nákupu (Procurement) podľa cieľa **G5** a kapitoly §6.5. Vyhodnocuje zmluvný stav licencie (`Compliant`, `OverageWarning`, `NonCompliant`), presné množstvo nadlimitných sedadiel a spoplatniteľné sedadlosekundy (billable seat-seconds) s natívnym exportom do formátu CSV a JSON.
+    - `AuditChainIntegrityVerifier`: Matematická kryptografická verifikácia append-only reťazca SHA-256 hashov podľa normatívneho pravidla **FLT-37**. Zabezpečuje fixed-time porovnávanie hashov, detekciu manipulácie, vymazania alebo spätnej úpravy auditných záznamov s kanonickou milisekundovou normalizáciou časových pečiatok.
+  - **Protokol a AOT serializácia (`Symbolon.Protocol.Reporting`)**:
+    - DTO kontrakty: `ConcurrencyTimeBucketDto`, `ConcurrencyAnalyticsResponseDto`, `TrueUpLicenseSummaryDto`, `TrueUpReportDto`, `DenialRecordDto`, `DenialsAnalyticsResponseDto`, `AuditVerificationProofDto`.
+    - Plná registrácia v `SymbolonProtocolJsonContext` pre nulovú alokáciu a natívnu AOT kompiláciu.
+  - **REST API (`Symbolon.ControlPlane`)**:
+    - `GET /admin/v1/reports/concurrency` (so spätnou kompatibilitou) a `GET /admin/v1/reports/concurrency/timeline`
+    - `GET /admin/v1/reports/true-up`
+    - `GET /admin/v1/reports/true-up/export?format=csv|json`
+    - `GET /admin/v1/reports/denials` (FLT-39 analytika zamietnutí a úzkych hrdiel)
+    - `POST /admin/v1/reports/audit/verify-integrity` (FLT-37 kryptografická kontrola)
+  - **CLI Nástroje (`symbolon reports`)**:
+    - Príkazy `symbolon reports concurrency`, `symbolon reports true-up`, `symbolon reports denials` a `symbolon reports verify-audit` s ANSI minigrafmi vyťaženia (`RenderMiniBar`), farebnými stavmi súladu a podporou parametrov `--server`, `--license`, `--from`, `--to`, `--bucket`, `--export`.
+  - **Web Dashboard & Retro FoxPro TUI**:
+    - Obrazovka `view-reports` s dynamickým filtrom (licencia, časové vedro, časové rozpätie), 4 KPI kartami, časovou osou súbežnosti, prehľadom True-Up prekročení a interaktívnym spúšťaním verifikácie hashov.
+    - Retro FoxPro TUI navigácia s klávesovou skratkou `F12` / `Reporty`, akcelerátorom `y` a integráciou kaskádového menu.
+  - **Testovacie Pokrytie**:
+    - 334 .NET unit/integration testov naprieč všetkými 10 projektmi (100% pass rate, 0 varovaní, 0 chýb s `TreatWarningsAsErrors=true`).
+
 - **Zero-Config Server Discovery, Resilient Multi-Server Failover Pool & Enterprise Environment Variable Resolution (UDP Multicast / Broadcast, SYMBOLON_LICENSE_SERVER, SDK Auto-Discovery & CLI)**:
   - **Protokolová vrstva (`Symbolon.Protocol`)**:
     - Štandardný UDP discovery port `7584` (`0x1D90`) podľa špecifikácie.

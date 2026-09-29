@@ -60,6 +60,14 @@ namespace Symbolon.Protocol;
 [JsonSerializable(typeof(Symbolon.Protocol.K8s.SymbolonLicenseStatus))]
 [JsonSerializable(typeof(DiscoveryProbePacket))]
 [JsonSerializable(typeof(DiscoveryAnnouncementPacket))]
+[JsonSerializable(typeof(Symbolon.Protocol.Reporting.ConcurrencyTimeBucketDto))]
+[JsonSerializable(typeof(List<Symbolon.Protocol.Reporting.ConcurrencyTimeBucketDto>))]
+[JsonSerializable(typeof(Symbolon.Protocol.Reporting.ConcurrencyAnalyticsResponseDto))]
+[JsonSerializable(typeof(Symbolon.Protocol.Reporting.TrueUpReportDto))]
+[JsonSerializable(typeof(Symbolon.Protocol.Reporting.DenialRecordDto))]
+[JsonSerializable(typeof(List<Symbolon.Protocol.Reporting.DenialRecordDto>))]
+[JsonSerializable(typeof(Symbolon.Protocol.Reporting.DenialsAnalyticsResponseDto))]
+[JsonSerializable(typeof(Symbolon.Protocol.Reporting.AuditVerificationProofDto))]
 public sealed partial class SymbolonProtocolJsonContext : JsonSerializerContext
 {
 }
