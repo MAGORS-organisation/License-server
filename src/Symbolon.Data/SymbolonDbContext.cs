@@ -277,7 +277,7 @@ public class SymbolonDbContext : DbContext
             b.HasKey(q => q.Ticket);
             b.Property(q => q.Fingerprint).HasMaxLength(128).IsRequired();
             b.Property(q => q.Status).HasMaxLength(32).IsRequired();
-            b.HasIndex(q => new { q.LicenseId, q.Status, q.CreatedAt });
+            b.HasIndex(q => new { q.LicenseId, q.Status, q.Priority, q.CreatedAt });
             b.HasOne(q => q.License)
              .WithMany(l => l.QueueTickets)
              .HasForeignKey(q => q.LicenseId)

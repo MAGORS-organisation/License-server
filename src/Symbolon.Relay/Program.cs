@@ -38,6 +38,7 @@ builder.Services.AddSingleton(TimeProvider.System);
 
 // Domain Engine
 builder.Services.AddSingleton<LeaseEngine>();
+builder.Services.AddSingleton<RelayQueueManager>();
 
 builder.Services.AddHostedService<RelayDiscoveryResponderService>();
 

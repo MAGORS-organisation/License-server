@@ -35,6 +35,7 @@
         { id: 'migrate', label: 'Migrácia (FlexNet)', hotkey: 'I', view: 'view-migrate', hasSub: false },
         { id: 'features', label: 'F[u]nkcie & Moduly', hotkey: 'U', view: 'view-features', hasSub: false },
         { id: 'revocations', label: 'Revokácie & CRL', hotkey: 'X', view: 'view-revocations', hasSub: false },
+        { id: 'queue', label: 'Licenčný Rad (FLT-31)', hotkey: 'Q', view: 'view-queue', hasSub: false },
         { id: 'webhooky', label: 'Webhooky', hotkey: 'W', view: 'view-webhooks', hasSub: false },
         { isSeparator: true },
         { id: 'sulad', label: 'Súlad & CRA / SBOM', hotkey: 'S', view: 'view-system', hasSub: false },
@@ -86,6 +87,7 @@
                 <li class="retro-menu-item" onclick="switchRetroView('view-migrate')" tabindex="0">M<span class="hotkey">i</span>grácia</li>
                 <li class="retro-menu-item" onclick="switchRetroView('view-webhooks')" tabindex="0"><span class="hotkey">W</span>ebhooky</li>
                 <li class="retro-menu-item" onclick="switchRetroView('view-revocations')" tabindex="0">Revo<span class="hotkey">k</span>ácie</li>
+                <li class="retro-menu-item" onclick="switchRetroView('view-queue')" tabindex="0"><span class="hotkey">Q</span>ueue Rad</li>
                 <li class="retro-menu-item" onclick="switchRetroView('view-system')" tabindex="0"><span class="hotkey">S</span>úlad CRA</li>
                 <li class="retro-menu-item" onclick="openModal('modal-auth-config')" tabindex="0">K<span class="hotkey">o</span>nfigurácia</li>
             </ul>
@@ -617,6 +619,7 @@
             'view-apikeys': 'SPRÁVA API KĽÚČOV & MERKLE STROM INTEGRITA',
             'view-features': 'GRANULÁRNE MODULY, BALÍKOVÉ SUITY & MERAČE VYŤAŽENIA',
             'view-revocations': 'KRYPTOGRAFICKÝ REVOKAČNÝ ZOZNAM (.SYMRL) & ENTERPRISE CRL',
+            'view-queue': 'ENTERPRISE LICENČNÝ RAD & PRIORITNÁ REZERVÁCIA (FLT-31)',
             'view-tokens': 'KREDITOVÉ PEŇAŽENKY & PAY-AS-YOU-GO SPOTREBA',
             'view-migrate': 'MIGRÁCIA Z FLEXNET PUBLISHER (FLEXLM) & KEYGEN.SH',
             'view-scim': 'SCIM 2.0 IDENTITA & FIREMNÁ SYNCHRONIZÁCIA'
@@ -629,6 +632,9 @@
 
         if (viewId === 'view-reports' && typeof window.loadReportsView === 'function') {
             window.loadReportsView();
+        }
+        if (viewId === 'view-queue' && typeof window.loadQueueView === 'function') {
+            window.loadQueueView();
         }
 
         // Zatvorenie podmenu pri prepnutí
@@ -648,6 +654,9 @@
         } else if (hash === 'revocations' || hash === 'crl') {
             switchRetroView('view-revocations');
             if (typeof window.loadRevocationsView === 'function') window.loadRevocationsView();
+        } else if (hash === 'queue' || hash === 'rad') {
+            switchRetroView('view-queue');
+            if (typeof window.loadQueueView === 'function') window.loadQueueView();
         } else if (hash === 'reports' || hash === 'trueup' || hash === 'reporty') {
             switchRetroView('view-reports');
             if (typeof window.loadReportsView === 'function') window.loadReportsView();

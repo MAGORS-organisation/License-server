@@ -17,6 +17,7 @@ public interface IQueueManager
         int quantity,
         IReadOnlyList<string>? features,
         TimeSpan ttl,
+        int priority = 0,
         CancellationToken ct = default);
 
     Task<QueueStatusResponseDto?> GetStatusAsync(string ticket, CancellationToken ct = default);
@@ -24,6 +25,12 @@ public interface IQueueManager
     Task<bool> CancelAsync(string ticket, CancellationToken ct = default);
 
     Task<int> TryPromoteNextAsync(string licenseId, CancellationToken ct = default);
+
+    Task<bool> PromoteTicketAsync(string ticket, CancellationToken ct = default);
+
+    Task<List<QueueTicketItemDto>> GetTicketsAsync(string? licenseId = null, string? status = null, int limit = 50, CancellationToken ct = default);
+
+    Task<int> SweepExpiredTicketsAsync(CancellationToken ct = default);
 }
 
 public sealed class QueueManager : IQueueManager
@@ -50,6 +57,7 @@ public sealed class QueueManager : IQueueManager
         int quantity,
         IReadOnlyList<string>? features,
         TimeSpan ttl,
+        int priority = 0,
         CancellationToken ct = default)
     {
         using var scope = _scopeFactory.CreateScope();
@@ -59,6 +67,16 @@ public sealed class QueueManager : IQueueManager
         var expiresAt = now.Add(ttl);
         string ticketId = $"q_{Guid.NewGuid():N}";
 
+        int resolvedPriority = priority;
+        if (resolvedPriority == 0 && !string.IsNullOrWhiteSpace(userId))
+        {
+            var user = await db.LicenseUsers.AsNoTracking().FirstOrDefaultAsync(u => u.LicenseId == licenseId && u.UserId == userId, ct).ConfigureAwait(false);
+            if (user?.GroupName is { } g && (g.Contains("power", StringComparison.OrdinalIgnoreCase) || g.Contains("vip", StringComparison.OrdinalIgnoreCase) || g.Contains("admin", StringComparison.OrdinalIgnoreCase)))
+            {
+                resolvedPriority = 10;
+            }
+        }
+
         var ticket = new QueueTicketEntity
         {
             Ticket = ticketId,
@@ -67,6 +85,7 @@ public sealed class QueueManager : IQueueManager
             MachineId = machineId,
             UserId = userId,
             Quantity = quantity,
+            Priority = resolvedPriority,
             FeaturesJson = JsonSerializer.Serialize(features ?? []),
             Status = "waiting",
             ExpiresAt = expiresAt,
@@ -78,7 +97,7 @@ public sealed class QueueManager : IQueueManager
 
         if (_logger.IsEnabled(LogLevel.Information))
         {
-            _logger.LogInformation("Client enqueued ticket {Ticket} for license {LicenseId}", ticketId, licenseId);
+            _logger.LogInformation("Client enqueued ticket {Ticket} for license {LicenseId} (Priority: {Priority})", ticketId, licenseId, resolvedPriority);
         }
         return ticket;
     }
@@ -108,6 +127,7 @@ public sealed class QueueManager : IQueueManager
                 Ticket = entity.Ticket,
                 Status = "ready",
                 Position = 0,
+                Priority = entity.Priority,
                 LeaseId = entity.PromotedLeaseId,
                 Token = entity.PromotedToken,
                 Seat = entity.PromotedSeatNo,
@@ -118,22 +138,48 @@ public sealed class QueueManager : IQueueManager
         if (entity.Status == "waiting")
         {
             int position = await db.QueueTickets
-                .Where(q => q.LicenseId == entity.LicenseId && q.Status == "waiting" && q.CreatedAt < entity.CreatedAt)
+                .Where(q => q.LicenseId == entity.LicenseId && q.Status == "waiting" &&
+                            (q.Priority > entity.Priority || (q.Priority == entity.Priority && q.CreatedAt < entity.CreatedAt)))
                 .CountAsync(ct)
                 .ConfigureAwait(false) + 1;
+
+            var nextExpiring = await db.Seats
+                .Where(s => s.LicenseId == entity.LicenseId && s.LeaseId != null && s.ExpiresAt > now)
+                .OrderBy(s => s.ExpiresAt)
+                .Select(s => s.ExpiresAt)
+                .Take(Math.Max(1, position))
+                .ToListAsync(ct)
+                .ConfigureAwait(false);
+
+            TimeSpan waitEstimate = TimeSpan.FromMinutes(2);
+            if (nextExpiring.Count > 0)
+            {
+                var targetExp = nextExpiring[^1];
+                if (targetExp.HasValue && targetExp.Value > now)
+                {
+                    waitEstimate = targetExp.Value - now;
+                }
+            }
+
+            int retryAfterSec = Math.Clamp((int)(waitEstimate.TotalSeconds / 4), 2, 10);
+            string waitIso = System.Xml.XmlConvert.ToString(waitEstimate);
 
             return new QueueStatusResponseDto
             {
                 Ticket = entity.Ticket,
                 Status = "waiting",
-                Position = position
+                Position = position,
+                Priority = entity.Priority,
+                EstimatedWait = waitIso,
+                RetryAfterSeconds = retryAfterSec
             };
         }
 
         return new QueueStatusResponseDto
         {
             Ticket = entity.Ticket,
-            Status = entity.Status
+            Status = entity.Status,
+            Priority = entity.Priority
         };
     }
 
@@ -158,11 +204,13 @@ public sealed class QueueManager : IQueueManager
         using var scope = _scopeFactory.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<SymbolonDbContext>();
         var engine = scope.ServiceProvider.GetRequiredService<LeaseEngine>();
+        var webhooks = scope.ServiceProvider.GetService<Webhooks.IWebhookDispatcher>();
 
         var now = _timeProvider.GetUtcNow();
         var waitingTickets = await db.QueueTickets
             .Where(q => q.LicenseId == licenseId && q.Status == "waiting" && q.ExpiresAt > now)
-            .OrderBy(q => q.CreatedAt)
+            .OrderByDescending(q => q.Priority)
+            .ThenBy(q => q.CreatedAt)
             .Take(10)
             .ToListAsync(ct)
             .ConfigureAwait(false);
@@ -195,7 +243,19 @@ public sealed class QueueManager : IQueueManager
                 promotedCount++;
                 if (_logger.IsEnabled(LogLevel.Information))
                 {
-                    _logger.LogInformation("Promoted queue ticket {Ticket} to lease {LeaseId}", ticket.Ticket, alloc.LeaseId);
+                    _logger.LogInformation("Promoted queue ticket {Ticket} (Priority {Priority}) to lease {LeaseId}", ticket.Ticket, ticket.Priority, alloc.LeaseId);
+                }
+
+                if (webhooks != null)
+                {
+                    await webhooks.PublishEventAsync("queue.promoted", new
+                    {
+                        ticket = ticket.Ticket,
+                        licenseId = ticket.LicenseId,
+                        leaseId = alloc.LeaseId,
+                        seat = alloc.SeatNo,
+                        priority = ticket.Priority
+                    }, null, ct).ConfigureAwait(false);
                 }
             }
             else
@@ -211,5 +271,125 @@ public sealed class QueueManager : IQueueManager
         }
 
         return promotedCount;
+    }
+
+    public async Task<bool> PromoteTicketAsync(string ticket, CancellationToken ct = default)
+    {
+        using var scope = _scopeFactory.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<SymbolonDbContext>();
+        var engine = scope.ServiceProvider.GetRequiredService<LeaseEngine>();
+        var webhooks = scope.ServiceProvider.GetService<Webhooks.IWebhookDispatcher>();
+
+        var entity = await db.QueueTickets.FirstOrDefaultAsync(q => q.Ticket == ticket, ct).ConfigureAwait(false);
+        if (entity is null || entity.Status != "waiting")
+        {
+            return false;
+        }
+
+        var features = JsonSerializer.Deserialize<List<string>>(entity.FeaturesJson);
+        var cmd = new CheckoutCommand(
+            entity.LicenseId,
+            entity.Fingerprint,
+            entity.MachineId,
+            entity.Quantity,
+            features,
+            entity.Ticket,
+            AllowQueue: false,
+            Ttl: TimeSpan.FromMinutes(10));
+
+        var result = await engine.CheckoutAsync(cmd, ct).ConfigureAwait(false);
+        if (result.IsSuccess && result.Allocations is { Count: > 0 } && result.Tokens is { Count: > 0 })
+        {
+            var alloc = result.Allocations[0];
+            entity.Status = "ready";
+            entity.PromotedLeaseId = alloc.LeaseId;
+            entity.PromotedToken = result.Tokens[0];
+            entity.PromotedSeatNo = alloc.SeatNo;
+            entity.PromotedExpiresAt = alloc.ExpiresAt;
+
+            await db.SaveChangesAsync(ct).ConfigureAwait(false);
+            if (webhooks != null)
+            {
+                await webhooks.PublishEventAsync("queue.promoted", new
+                {
+                    ticket = entity.Ticket,
+                    licenseId = entity.LicenseId,
+                    leaseId = alloc.LeaseId,
+                    seat = alloc.SeatNo,
+                    priority = entity.Priority
+                }, null, ct).ConfigureAwait(false);
+            }
+            return true;
+        }
+
+        return false;
+    }
+
+    public async Task<List<QueueTicketItemDto>> GetTicketsAsync(string? licenseId = null, string? status = null, int limit = 50, CancellationToken ct = default)
+    {
+        using var scope = _scopeFactory.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<SymbolonDbContext>();
+
+        var query = db.QueueTickets.AsNoTracking().AsQueryable();
+
+        if (!string.IsNullOrWhiteSpace(licenseId))
+        {
+            query = query.Where(q => q.LicenseId == licenseId);
+        }
+        if (!string.IsNullOrWhiteSpace(status))
+        {
+            query = query.Where(q => q.Status == status);
+        }
+
+        var tickets = await query
+            .OrderByDescending(q => q.Priority)
+            .ThenBy(q => q.CreatedAt)
+            .Take(limit)
+            .ToListAsync(ct)
+            .ConfigureAwait(false);
+
+        var list = new List<QueueTicketItemDto>(tickets.Count);
+        for (int i = 0; i < tickets.Count; i++)
+        {
+            var t = tickets[i];
+            list.Add(new QueueTicketItemDto
+            {
+                Ticket = t.Ticket,
+                LicenseId = t.LicenseId,
+                Fingerprint = t.Fingerprint,
+                MachineId = t.MachineId,
+                UserId = t.UserId,
+                Quantity = t.Quantity,
+                Priority = t.Priority,
+                Status = t.Status,
+                Position = t.Status == "waiting" ? (i + 1) : 0,
+                CreatedAt = t.CreatedAt,
+                ExpiresAt = t.ExpiresAt
+            });
+        }
+
+        return list;
+    }
+
+    public async Task<int> SweepExpiredTicketsAsync(CancellationToken ct = default)
+    {
+        using var scope = _scopeFactory.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<SymbolonDbContext>();
+
+        var now = _timeProvider.GetUtcNow();
+        var expired = await db.QueueTickets
+            .Where(q => q.Status == "waiting" && q.ExpiresAt < now)
+            .ToListAsync(ct)
+            .ConfigureAwait(false);
+
+        if (expired.Count == 0) return 0;
+
+        foreach (var t in expired)
+        {
+            t.Status = "expired";
+        }
+
+        await db.SaveChangesAsync(ct).ConfigureAwait(false);
+        return expired.Count;
     }
 }

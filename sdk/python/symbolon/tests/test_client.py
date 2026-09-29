@@ -158,6 +158,44 @@ class TestSymbolonPythonSdk(unittest.TestCase):
             del os.environ["SYMBOLON_LICENSE_SERVER"]
 
 
+    def test_acquire_seat_with_queue_auto_wait_success(self):
+        from symbolon.client import SymbolonClient
+
+        client = SymbolonClient("http://localhost:5000", "test-product")
+        client._post_json = lambda url, payload: {
+            "status": "queued",
+            "ticket": "q_py_123",
+            "position": 1,
+            "retryAfterSeconds": 1
+        }
+        client._get_json = lambda url: {
+            "ticket": "q_py_123",
+            "status": "ready",
+            "leaseId": "lse_queue_promo",
+            "token": "jwt.promoted.seat",
+            "seat": 3,
+            "expiresAt": "2026-12-31T23:59:59Z",
+            "entitlements": ["core"]
+        }
+
+        lease = client.acquire_seat("SYM-TEST-KEY", allow_queue=True, max_queue_wait_seconds=5.0)
+        self.assertEqual(lease.lease_id, "lse_queue_promo")
+        self.assertEqual(lease.token.seat_number, 3)
+
+    def test_acquire_seat_queue_denied_when_not_allowed(self):
+        from symbolon.client import SymbolonClient
+        from symbolon.models import SeatAllocationDenied
+
+        client = SymbolonClient("http://localhost:5000", "test-product")
+        client._post_json = lambda url, payload: {
+            "status": "queued",
+            "ticket": "q_py_456"
+        }
+
+        with self.assertRaises(SeatAllocationDenied):
+            client.acquire_seat("SYM-TEST-KEY", allow_queue=False)
+
+
 if __name__ == "__main__":
     unittest.main()
 

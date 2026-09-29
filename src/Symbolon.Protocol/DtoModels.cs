@@ -34,6 +34,10 @@ public sealed record CheckoutRequestDto
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? UserId { get; init; }
 
+    [JsonPropertyName("priority")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public int? Priority { get; init; }
+
     public string ToFingerprintHash() => FingerprintHelper.ComputeHash(FingerprintComponents);
 }
 
@@ -145,6 +149,9 @@ public sealed record BorrowResponseDto
 
 public sealed record QueuedResponseDto
 {
+    [JsonPropertyName("status")]
+    public string Status { get; init; } = "queued";
+
     [JsonPropertyName("ticket")]
     public required string Ticket { get; init; }
 
@@ -154,6 +161,14 @@ public sealed record QueuedResponseDto
     [JsonPropertyName("estimatedWait")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? EstimatedWait { get; init; }
+
+    [JsonPropertyName("retryAfterSeconds")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public int? RetryAfterSeconds { get; init; }
+
+    [JsonPropertyName("priority")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public int? Priority { get; init; }
 }
 
 public sealed record QueueStatusResponseDto
@@ -167,6 +182,18 @@ public sealed record QueueStatusResponseDto
     [JsonPropertyName("position")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public int? Position { get; init; }
+
+    [JsonPropertyName("priority")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public int? Priority { get; init; }
+
+    [JsonPropertyName("estimatedWait")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? EstimatedWait { get; init; }
+
+    [JsonPropertyName("retryAfterSeconds")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public int? RetryAfterSeconds { get; init; }
 
     [JsonPropertyName("leaseId")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
@@ -183,6 +210,44 @@ public sealed record QueueStatusResponseDto
     [JsonPropertyName("expiresAt")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public DateTimeOffset? ExpiresAt { get; init; }
+}
+
+public sealed record QueueTicketItemDto
+{
+    [JsonPropertyName("ticket")]
+    public required string Ticket { get; init; }
+
+    [JsonPropertyName("licenseId")]
+    public required string LicenseId { get; init; }
+
+    [JsonPropertyName("fingerprint")]
+    public required string Fingerprint { get; init; }
+
+    [JsonPropertyName("machineId")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? MachineId { get; init; }
+
+    [JsonPropertyName("userId")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? UserId { get; init; }
+
+    [JsonPropertyName("quantity")]
+    public int Quantity { get; init; } = 1;
+
+    [JsonPropertyName("priority")]
+    public int Priority { get; init; }
+
+    [JsonPropertyName("status")]
+    public required string Status { get; init; }
+
+    [JsonPropertyName("position")]
+    public int Position { get; init; }
+
+    [JsonPropertyName("createdAt")]
+    public DateTimeOffset CreatedAt { get; init; }
+
+    [JsonPropertyName("expiresAt")]
+    public DateTimeOffset ExpiresAt { get; init; }
 }
 
 public sealed record ConsumeQuotaRequestDto
@@ -373,5 +438,7 @@ public static class ProblemTypes
     public const string FeatureCapacityExceeded = "https://symbolon.dev/errors/feature-capacity-exceeded";
     public const string Unauthorized = "https://symbolon.dev/errors/unauthorized";
     public const string Forbidden = "https://symbolon.dev/errors/forbidden";
+    public const string NotFound = "https://symbolon.dev/errors/not-found";
+    public const string QueueNotFound = "https://symbolon.dev/errors/queue-not-found";
 }
 

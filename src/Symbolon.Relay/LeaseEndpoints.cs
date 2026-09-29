@@ -12,10 +12,10 @@ internal static class LeaseEndpoints
 {
     public static RouteGroupBuilder MapLeases(this IEndpointRouteBuilder app)
     {
-        var group = app.MapGroup("/v1/leases")
+        var group = app.MapGroup("/v1")
                        .WithTags("Leases");
 
-        group.MapPost("/", CheckoutAsync)
+        group.MapPost("/leases", CheckoutAsync)
              .WithName("CheckoutSeat")
              .WithSummary("Vyžiada sedadlo z floating poolu licencie.")
              .Produces<CheckoutResponseDto>(StatusCodes.Status200OK)
@@ -23,18 +23,30 @@ internal static class LeaseEndpoints
              .ProducesProblem(StatusCodes.Status400BadRequest)
              .ProducesProblem(StatusCodes.Status409Conflict);
 
-        group.MapPost("/{id}/renew", RenewAsync)
+        group.MapPost("/leases/{id}/renew", RenewAsync)
              .WithName("RenewLease")
              .WithSummary("Obnoví existujúci lease.")
              .Produces<RenewResponseDto>(StatusCodes.Status200OK)
              .ProducesProblem(StatusCodes.Status409Conflict)
              .ProducesProblem(StatusCodes.Status410Gone);
 
-        group.MapDelete("/{id}", ReleaseAsync)
+        group.MapDelete("/leases/{id}", ReleaseAsync)
              .WithName("ReleaseLease")
              .WithSummary("Explicitne uvoľní sedadlo späť do poolu.")
              .Produces<ReleaseResponseDto>(StatusCodes.Status200OK)
              .Produces(StatusCodes.Status404NotFound);
+
+        group.MapGet("/queue/{ticket}", GetQueueStatusAsync)
+             .WithName("GetQueueStatus")
+             .WithSummary("Vráti stav čakania v rade.")
+             .Produces<QueueStatusResponseDto>(StatusCodes.Status200OK)
+             .ProducesProblem(StatusCodes.Status404NotFound);
+
+        group.MapDelete("/queue/{ticket}", CancelQueueTicketAsync)
+             .WithName("CancelQueueTicket")
+             .WithSummary("Zruší čakanie v rade.")
+             .Produces(StatusCodes.Status204NoContent)
+             .ProducesProblem(StatusCodes.Status404NotFound);
 
         return group;
     }
@@ -42,7 +54,9 @@ internal static class LeaseEndpoints
     private static async Task<IResult> CheckoutAsync(
         [FromBody] CheckoutRequestDto dto,
         [FromHeader(Name = "Idempotency-Key")] string? idempotencyKey,
+        HttpContext httpContext,
         LeaseEngine engine,
+        RelayQueueManager queueManager,
         CancellationToken ct)
     {
         ArgumentNullException.ThrowIfNull(dto);
@@ -88,13 +102,27 @@ internal static class LeaseEndpoints
 
         if (result.QueueTicket is not null)
         {
+            var ticket = queueManager.Enqueue(
+                licenseId,
+                fingerprintHash,
+                dto.MachineId,
+                dto.Quantity ?? 1,
+                dto.Features,
+                dto.Priority ?? 0,
+                TimeSpan.FromMinutes(10));
+
+            int position = queueManager.GetPosition(ticket);
+            httpContext.Response.Headers.RetryAfter = "3";
+
             return Results.Accepted(
-                $"/v1/queue/{result.QueueTicket}",
+                $"/v1/queue/{ticket.Ticket}",
                 new QueuedResponseDto
                 {
-                    Ticket = result.QueueTicket,
-                    Position = 1,
-                    EstimatedWait = result.EstimatedWait?.ToString()
+                    Ticket = ticket.Ticket,
+                    Position = position,
+                    Priority = ticket.Priority,
+                    EstimatedWait = "PT2M",
+                    RetryAfterSeconds = 3
                 });
         }
 
@@ -187,5 +215,46 @@ internal static class LeaseEndpoints
         return released
             ? Results.Ok(new ReleaseResponseDto { Success = true })
             : Results.NotFound(new ReleaseResponseDto { Success = false });
+    }
+
+    private static async Task<IResult> GetQueueStatusAsync(
+        string ticket,
+        HttpContext httpContext,
+        RelayQueueManager queueManager,
+        CancellationToken ct)
+    {
+        var status = await queueManager.GetStatusAsync(ticket, ct).ConfigureAwait(false);
+        if (status is null)
+        {
+            return Results.Problem(
+                statusCode: StatusCodes.Status404NotFound,
+                type: ProblemTypes.QueueNotFound,
+                title: "Queue Ticket Not Found",
+                detail: $"Queue ticket '{ticket}' was not found.");
+        }
+
+        if (status.Status == "waiting" && status.RetryAfterSeconds.HasValue)
+        {
+            httpContext.Response.Headers.RetryAfter = status.RetryAfterSeconds.Value.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        }
+
+        return Results.Ok(status);
+    }
+
+    private static IResult CancelQueueTicketAsync(
+        string ticket,
+        RelayQueueManager queueManager)
+    {
+        bool cancelled = queueManager.Cancel(ticket);
+        if (!cancelled)
+        {
+            return Results.Problem(
+                statusCode: StatusCodes.Status404NotFound,
+                type: ProblemTypes.QueueNotFound,
+                title: "Queue Ticket Not Found",
+                detail: $"Waiting queue ticket '{ticket}' was not found or is already completed.");
+        }
+
+        return Results.NoContent();
     }
 }

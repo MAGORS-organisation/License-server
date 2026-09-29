@@ -290,13 +290,20 @@ public static class PublicEndpoints
                 quantity,
                 dto.Features,
                 ttl: TimeSpan.FromMinutes(10),
+                priority: dto.Priority ?? 0,
                 ct).ConfigureAwait(false);
+
+            var qStatus = await queueManager.GetStatusAsync(ticket.Ticket, ct).ConfigureAwait(false);
+            int retryAfter = qStatus?.RetryAfterSeconds ?? 2;
+            context.Response.Headers.RetryAfter = retryAfter.ToString(CultureInfo.InvariantCulture);
 
             return TypedResults.Accepted($"/v1/queue/{ticket.Ticket}", new QueuedResponseDto
             {
                 Ticket = ticket.Ticket,
-                Position = 1,
-                EstimatedWait = "PT2M"
+                Position = qStatus?.Position ?? 1,
+                Priority = ticket.Priority,
+                EstimatedWait = qStatus?.EstimatedWait ?? "PT2M",
+                RetryAfterSeconds = retryAfter
             });
         }
 
@@ -892,6 +899,7 @@ public static class PublicEndpoints
 
     private static async Task<IResult> GetQueueStatusAsync(
         string ticket,
+        HttpContext context,
         Queuing.IQueueManager queueManager,
         CancellationToken ct)
     {
@@ -908,6 +916,11 @@ public static class PublicEndpoints
                 title: "Queue Ticket No Longer Valid",
                 detail: $"Queue ticket '{ticket}' is {status.Status}.",
                 type: ProblemTypes.InvalidRequest);
+        }
+
+        if (status.Status == "waiting")
+        {
+            context.Response.Headers.RetryAfter = (status.RetryAfterSeconds ?? 2).ToString(CultureInfo.InvariantCulture);
         }
 
         return TypedResults.Ok(status);

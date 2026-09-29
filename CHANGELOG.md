@@ -10,6 +10,31 @@ a projekt striktne dodržiava [Sémantické Verziovanie (Semantic Versioning 2.0
 ## [Unreleased]
 
 ### Pridané (Added)
+- **Enterprise License Priority Queueing, Reaper Service & Client Auto-Wait (FLT-31, §7.1, §7.2, §7.5)**:
+  - **Dátová a protokolová vrstva (`Symbolon.Protocol`, `Symbolon.Data`)**:
+    - DTO kontrakty `QueuedResponseDto`, `QueueStatusResponseDto`, `CheckoutRequestDto`, `QueueTicketItemDto` s podporou priority (`Priority`), `Status`, `RetryAfterSeconds` a registrácia v `SymbolonProtocolJsonContext` pre AOT kompiláciu.
+    - Entita `QueueTicketEntity` s prioritným atribútom a kompozitným indexom `(LicenseId, Status, Priority, CreatedAt)` v `SymbolonDbContext`.
+  - **Serverové riadenie fronty (`Symbolon.ControlPlane`)**:
+    - `QueueManager`: Prioritné zaraďovanie (`OrderByDescending(Priority).ThenBy(CreatedAt)`), dynamický výpočet pozície v rade, odhadovaná doba čakania (`estimatedWait`), manuálna aj automatická propagácia sedadla (`PromoteTicketAsync`, `TryPromoteNextAsync`), webhook udalosť `queue.promoted`.
+    - `QueueReaperBackgroundService`: Pravidelné čistenie expirovaných lístkov a vyhodnocovanie čakacích radov na pozadí každých 5s.
+    - REST endpointy: `CheckoutAsync` (vracia `202 Accepted` s `Retry-After` hlavičkou pri vyčerpanej kapacite), `ReleaseAsync` (automaticky propaguje ďalší lístok v rade pri uvoľnení sedadla), `GET /v1/queue/{ticket}`, `DELETE /v1/queue/{ticket}`.
+    - Admin API: `GET /admin/v1/queue`, `POST /admin/v1/queue/{ticket}/promote`, `DELETE /admin/v1/queue/{ticket}`.
+  - **Edge Relay Server Local Queueing (`Symbolon.Relay`)**:
+    - `RelayQueueManager`: Lokálny in-memory prioritný manažér fronty pre offline/edge prevádzku s podporou propagácie a pozícií.
+    - Endpoints `/v1/queue/{ticket}` (GET & DELETE) priamo v `LeaseEndpoints`.
+  - **Klientske SDK Auto-Wait (`Symbolon.Client`)**:
+    - `SymbolonClient.AcquireSeatAsync`: Podpora parametrov `allowQueue`, `maxQueueWait`, `priority`, adaptívny polling cyklus s `TimeProvider`, verifikácia tokenu a korektné uvoľnenie/zrušenie lístka pri vypršaní timeoutu.
+    - Rozšírenie `SymbolonClientOptions` o `AllowQueue`, `MaxQueueWait`, `Priority`, `UserId`, `MachineId`.
+  - **Viacjazyčné SDK (Multi-Language Parity)**:
+    - **Python SDK**: `acquire_seat` s parametrami `allow_queue`, `max_queue_wait_seconds`, `priority`, `user_id`, automatickým čakaním vo fronte a zrušením lístka pri timeoute.
+  - **CLI Nástroje (`Symbolon.Cli`)**:
+    - Príkazy `symbolon queue list`, `symbolon queue status <ticket>`, `symbolon queue cancel <ticket>`, `symbolon queue promote <ticket>`.
+  - **Web Dashboard & Retro FoxPro TUI**:
+    - Obrazovka `view-queue` s KPI kartami (čakajúci, priemerná priorita, odhadovaný čas čakania), tabuľkou lístkov a akciami na manuálnu propagáciu a zrušenie lístkov.
+    - Retro FoxPro TUI integrácia s klávesovou skratkou `Q` a hash navigáciou `#queue`.
+  - **Testovacie Pokrytie**:
+    - 344 .NET unit/integration testov naprieč všetkými 11 projektmi (100% pass rate, 0 varovaní, 0 chýb s `TreatWarningsAsErrors=true`), 17 Python SDK testov.
+
 - **Enterprise Audit Engine, True-Up Compliance Reporting & Audit-Chain Concurrency Analytics (FLT-37, FLT-38, FLT-39, Goal G5, §6.5 Enterprise Procurement)**:
   - **Doménová a analytická vrstva (`Symbolon.Domain.Reporting`)**:
     - `AuditPeakConcurrencyCalculator`: Deterministická schodisková funkcia špičkovej súbežnosti počítaná priamo z nemenných auditných udalostí (`SeatCheckoutCompleted`, `SeatReleased`, `HeartbeatRenewed`, `SeatAcquisitionDenied`, `FeatureAcquired`, `FeatureReleased`) podľa normatívneho pravidla **FLT-38** bez akejkoľvek aproximácie či vzorkovania. Poskytuje presné diskrétne časové vedrá (`hour`, `day`, `week`, `month`) s výpočtom špičky (peak), časovo váženého priemeru (time-weighted average), počtu checkoutov a zamietnutí.

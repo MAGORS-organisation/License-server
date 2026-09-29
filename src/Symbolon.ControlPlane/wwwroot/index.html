@@ -117,6 +117,12 @@
                 </a>
             </li>
             <li class="nav-item">
+                <a class="nav-link" data-view="view-queue">
+                    <span class="nav-icon">⏳</span>
+                    <span>Licenčný Rad (FLT-31)</span>
+                </a>
+            </li>
+            <li class="nav-item">
                 <a class="nav-link" data-view="view-system">
                     <span class="nav-icon">⚡</span>
                     <span>API &amp; Diagnostika</span>
@@ -1553,6 +1559,86 @@
                         <tbody id="revocations-table-body">
                             <tr>
                                 <td colspan="5" style="text-align: center; color: var(--text-muted); padding: 18px;">Načítavam revokácie...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <!-- VIEW: Licenčný Rad & Prioritná Rezervácia (FLT-31) -->
+            <section id="view-queue" class="view-section">
+                <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 24px;">
+                    <div>
+                        <h2 style="font-size: 20px; font-weight: 700; color: var(--text-primary); margin-bottom: 4px;">
+                            ⏳ Enterprise Licenčný Rad &amp; Prioritná Rezervácia (FLT-31)
+                        </h2>
+                        <p style="color: var(--text-secondary); font-size: 13px;">
+                            Prioritné radenie požiadaviek pri vyčerpanom floating poole, automatické povýšenie na lease a klientsky auto-wait.
+                        </p>
+                    </div>
+                    <div style="display: flex; gap: 8px;">
+                        <button type="button" class="btn btn-secondary btn-sm" onclick="loadQueueView()">🔄 Obnoviť</button>
+                    </div>
+                </div>
+
+                <div class="kpi-grid">
+                    <div class="kpi-card" style="border-left: 3px solid var(--accent-amber);">
+                        <div class="kpi-label">Čakajúce v Rade</div>
+                        <div class="kpi-value" id="queue-kpi-waiting">0</div>
+                        <div class="kpi-subtext">Aktívne čakacie tickety</div>
+                    </div>
+                    <div class="kpi-card" style="border-left: 3px solid var(--accent-emerald);">
+                        <div class="kpi-label">Povýšené na Lease</div>
+                        <div class="kpi-value" id="queue-kpi-ready">0</div>
+                        <div class="kpi-subtext">Pripravené na vyzdvihnutie</div>
+                    </div>
+                    <div class="kpi-card" style="border-left: 3px solid var(--accent-indigo);">
+                        <div class="kpi-label">VIP &amp; Prioritné</div>
+                        <div class="kpi-value" id="queue-kpi-priority">0</div>
+                        <div class="kpi-subtext">Priorita &gt; 0 (Power / Admin)</div>
+                    </div>
+                    <div class="kpi-card" style="border-left: 3px solid var(--accent-rose);">
+                        <div class="kpi-label">Expirované / Zrušené</div>
+                        <div class="kpi-value" id="queue-kpi-closed">0</div>
+                        <div class="kpi-subtext">Neaktívne záznamy</div>
+                    </div>
+                </div>
+
+                <div class="table-card">
+                    <div class="table-header" style="display: flex; justify-content: space-between; align-items: center;">
+                        <div>
+                            <div class="table-title">Monitor Licenčného Radu</div>
+                            <div class="table-subtitle">Požiadavky zoradené podľa priority a času príchodu (FIFO v rámci priority)</div>
+                        </div>
+                        <div style="display: flex; gap: 10px; align-items: center;">
+                            <select id="queue-status-filter" class="form-control" style="width: 140px; padding: 4px 8px; font-size: 13px;" onchange="loadQueueView()">
+                                <option value="">Všetky stavy</option>
+                                <option value="waiting" selected>Čakajúce (waiting)</option>
+                                <option value="ready">Povýšené (ready)</option>
+                                <option value="cancelled">Zrušené (cancelled)</option>
+                                <option value="expired">Expirované (expired)</option>
+                            </select>
+                        </div>
+                    </div>
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th style="width: 60px;">Pozícia</th>
+                                <th style="width: 180px;">Ticket</th>
+                                <th>Licenčný Kľúč</th>
+                                <th>Používateľ / Stroj</th>
+                                <th style="width: 80px;">Priorita</th>
+                                <th style="width: 100px;">Stav</th>
+                                <th style="width: 140px;">Vytvorené</th>
+                                <th style="width: 140px;">Expirácia</th>
+                                <th style="width: 140px; text-align: right;">Akcie</th>
+                            </tr>
+                        </thead>
+                        <tbody id="queue-table-body">
+                            <tr>
+                                <td colspan="9" style="text-align: center; color: var(--text-secondary); padding: 24px;">
+                                    Načítavam záznamy radu...
+                                </td>
                             </tr>
                         </tbody>
                     </table>

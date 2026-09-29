@@ -174,8 +174,12 @@ class SymbolonClient:
         license_key: str,
         features: Optional[List[str]] = None,
         quantity: int = 1,
+        allow_queue: bool = False,
+        max_queue_wait_seconds: Optional[float] = 120.0,
+        user_id: Optional[str] = None,
+        priority: int = 0,
     ) -> SeatLease:
-        """Acquires a floating concurrent seat from ControlPlane or Relay."""
+        """Acquires a floating concurrent seat from ControlPlane or Relay with optional queue waiting."""
         components = get_hardware_components()
         payload = {
             "licenseKey": license_key.strip(),
@@ -183,10 +187,45 @@ class SymbolonClient:
             "quantity": quantity,
             "features": features or [],
         }
+        if allow_queue:
+            payload["allowQueue"] = True
+        if user_id:
+            payload["userId"] = user_id
+        if priority != 0:
+            payload["priority"] = priority
 
         # Try server, fallback to relay
         url = f"{self.server_url}/v1/leases"
         data = self._post_json(url, payload)
+
+        if "ticket" in data and ("leaseId" not in data or not data.get("leaseId")):
+            ticket = data["ticket"]
+            if not allow_queue:
+                raise SeatAllocationDenied(f"Request was queued with ticket {ticket} but allow_queue is False.")
+            # Auto-wait loop
+            start_time = time.time()
+            max_wait = max_queue_wait_seconds if max_queue_wait_seconds is not None else 120.0
+            delay = int(data.get("retryAfterSeconds") or 3)
+            while (time.time() - start_time) < max_wait:
+                time.sleep(min(max(delay, 1), 10))
+                status_url = f"{self.server_url}/v1/queue/{ticket}"
+                status_data = self._get_json(status_url)
+                if status_data.get("status") == "ready" and status_data.get("leaseId") and status_data.get("token"):
+                    data = status_data
+                    break
+                elif status_data.get("status") in ("cancelled", "expired"):
+                    raise SeatAllocationDenied(f"Queue ticket {ticket} {status_data.get('status')}.")
+                if status_data.get("retryAfterSeconds"):
+                    delay = int(status_data["retryAfterSeconds"])
+            else:
+                # Timeout exceeded - cancel ticket (best effort)
+                try:
+                    del_req = urllib.request.Request(f"{self.server_url}/v1/queue/{ticket}", method="DELETE")
+                    with urllib.request.urlopen(del_req, timeout=self.timeout):
+                        pass
+                except Exception:
+                    pass
+                raise SeatAllocationDenied(f"Queue wait timeout exceeded ({max_wait}s).")
 
         token = LeaseToken(
             lease_id=data["leaseId"],
@@ -333,6 +372,24 @@ class SymbolonClient:
         except urllib.error.HTTPError as e:
             if e.code == 409:
                 raise SeatAllocationDenied("Floating capacity exhausted (0 seats available).")
+            err_text = e.read().decode("utf-8", errors="ignore")
+            raise SymbolonException(f"HTTP error {e.code}: {err_text}")
+        except Exception as e:
+            raise SymbolonException(f"Network error: {e}")
+
+    def _get_json(self, url: str) -> dict:
+        req = urllib.request.Request(
+            url,
+            headers={
+                "User-Agent": "Symbolon-Python-SDK/1.0",
+                "traceparent": _generate_w3c_traceparent(),
+            },
+            method="GET",
+        )
+        try:
+            with urllib.request.urlopen(req, timeout=self.timeout) as res:
+                return json.loads(res.read().decode("utf-8"))
+        except urllib.error.HTTPError as e:
             err_text = e.read().decode("utf-8", errors="ignore")
             raise SymbolonException(f"HTTP error {e.code}: {err_text}")
         except Exception as e:

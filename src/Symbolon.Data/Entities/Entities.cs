@@ -269,6 +269,7 @@ public sealed class QueueTicketEntity
     public string? MachineId { get; set; }
     public string? UserId { get; set; }
     public int Quantity { get; set; } = 1;
+    public int Priority { get; set; }
     public string FeaturesJson { get; set; } = "[]";
     public string Status { get; set; } = "waiting"; // waiting, ready, cancelled, expired
     public string? PromotedLeaseId { get; set; }

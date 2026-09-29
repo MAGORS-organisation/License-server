@@ -119,4 +119,51 @@ public sealed class RelayApiTests : IClassFixture<WebApplicationFactory<Program>
         releaseBody.Should().NotBeNull();
         releaseBody!.Success.Should().BeTrue();
     }
+
+    [Fact]
+    public async Task Checkout_WhenPoolExhaustedAndAllowQueue_ReturnsAccepted_AndCanPollStatusAndCancel()
+    {
+        var client = _factory.CreateClient();
+        var store = _factory.Services.GetRequiredService<SqliteSeatStore>();
+
+        var key = LicenseKey.Generate();
+        await store.SeedSeatsAsync(key.Canonical, seatCount: 1);
+
+        var components1 = new Dictionary<string, string> { ["host"] = "host-1" };
+        var components2 = new Dictionary<string, string> { ["host"] = "host-2" };
+
+        // 1. Occupy the single seat
+        var chk1 = await client.PostAsJsonAsync("/v1/leases", new CheckoutRequestDto
+        {
+            LicenseKey = key.Canonical,
+            FingerprintComponents = components1
+        });
+        chk1.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        // 2. Second checkout with AllowQueue
+        var chk2 = await client.PostAsJsonAsync("/v1/leases", new CheckoutRequestDto
+        {
+            LicenseKey = key.Canonical,
+            FingerprintComponents = components2,
+            AllowQueue = true
+        });
+        chk2.StatusCode.Should().Be(HttpStatusCode.Accepted);
+        chk2.Headers.Contains("Retry-After").Should().BeTrue();
+
+        var queued = await chk2.Content.ReadFromJsonAsync(SymbolonProtocolJsonContext.Default.QueuedResponseDto);
+        queued.Should().NotBeNull();
+        queued!.Ticket.Should().StartWith("q_");
+        queued.Position.Should().Be(1);
+
+        // 3. Poll queue status
+        var statusRes = await client.GetAsync($"/v1/queue/{queued.Ticket}");
+        statusRes.StatusCode.Should().Be(HttpStatusCode.OK);
+        var status = await statusRes.Content.ReadFromJsonAsync(SymbolonProtocolJsonContext.Default.QueueStatusResponseDto);
+        status.Should().NotBeNull();
+        status!.Status.Should().Be("waiting");
+
+        // 4. Cancel ticket
+        var cancelRes = await client.DeleteAsync($"/v1/queue/{queued.Ticket}");
+        cancelRes.StatusCode.Should().Be(HttpStatusCode.NoContent);
+    }
 }

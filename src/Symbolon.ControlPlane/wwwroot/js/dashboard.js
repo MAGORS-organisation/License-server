@@ -64,6 +64,9 @@ function initNavigation() {
                 if (targetView === "view-reports") {
                     loadReportsView();
                 }
+                if (targetView === "view-queue") {
+                    loadQueueView();
+                }
             }
         });
     });
@@ -89,7 +92,8 @@ async function refreshAllData() {
         loadScimDirectory(),
         loadFeaturesView(),
         loadRevocationsView(),
-        document.getElementById("view-reports")?.classList.contains("active") ? loadReportsView() : Promise.resolve()
+        document.getElementById("view-reports")?.classList.contains("active") ? loadReportsView() : Promise.resolve(),
+        document.getElementById("view-queue")?.classList.contains("active") ? loadQueueView() : Promise.resolve()
     ]);
 }
 
@@ -3352,6 +3356,136 @@ async function verifyAuditChainIntegrity() {
 window.loadReportsView = loadReportsView;
 window.exportTrueUpCsv = exportTrueUpCsv;
 window.verifyAuditChainIntegrity = verifyAuditChainIntegrity;
+
+// ==========================================
+// Licenčný Rad & Prioritná Rezervácia (FLT-31)
+// ==========================================
+async function loadQueueView() {
+    const statusFilter = document.getElementById("queue-status-filter")?.value || "";
+    const tbody = document.getElementById("queue-table-body");
+    if (!tbody) return;
+
+    try {
+        let url = "/admin/v1/queue?limit=100";
+        if (statusFilter) {
+            url += `&status=${encodeURIComponent(statusFilter)}`;
+        }
+
+        const res = await fetch(url);
+        if (!res.ok) {
+            tbody.innerHTML = `<tr><td colspan="9" style="text-align: center; color: var(--accent-rose); padding: 18px;">Chyba načítania radu: ${res.status}</td></tr>`;
+            return;
+        }
+
+        const items = await res.json();
+
+        // Update KPIs
+        const waitingCount = items.filter(i => i.status === "waiting").length;
+        const readyCount = items.filter(i => i.status === "ready").length;
+        const priorityCount = items.filter(i => (i.priority || 0) > 0).length;
+        const closedCount = items.filter(i => i.status === "cancelled" || i.status === "expired").length;
+
+        if (document.getElementById("queue-kpi-waiting")) document.getElementById("queue-kpi-waiting").textContent = waitingCount;
+        if (document.getElementById("queue-kpi-ready")) document.getElementById("queue-kpi-ready").textContent = readyCount;
+        if (document.getElementById("queue-kpi-priority")) document.getElementById("queue-kpi-priority").textContent = priorityCount;
+        if (document.getElementById("queue-kpi-closed")) document.getElementById("queue-kpi-closed").textContent = closedCount;
+
+        if (!items || items.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="9" style="text-align: center; color: var(--text-muted); padding: 24px;">Žiadne záznamy v rade</td></tr>`;
+            return;
+        }
+
+        tbody.innerHTML = items.map(item => {
+            const statusBadge = item.status === "waiting" 
+                ? `<span class="badge" style="background: rgba(245, 158, 11, 0.15); color: var(--accent-amber); border: 1px solid var(--accent-amber);">waiting</span>`
+                : item.status === "ready"
+                ? `<span class="badge" style="background: rgba(16, 185, 129, 0.15); color: var(--accent-emerald); border: 1px solid var(--accent-emerald);">ready</span>`
+                : item.status === "cancelled"
+                ? `<span class="badge" style="background: rgba(100, 116, 139, 0.15); color: #94a3b8; border: 1px solid #64748b;">cancelled</span>`
+                : `<span class="badge" style="background: rgba(239, 68, 68, 0.15); color: var(--accent-rose); border: 1px solid var(--accent-rose);">${item.status}</span>`;
+
+            const posBadge = item.position > 0 
+                ? `<span style="font-weight: 700; color: var(--accent-primary);">#${item.position}</span>`
+                : `<span style="color: var(--text-muted);">-</span>`;
+
+            const priorityBadge = (item.priority || 0) > 0
+                ? `<span class="badge" style="background: rgba(99, 102, 241, 0.2); color: var(--accent-indigo); font-weight: 700;">★ ${item.priority}</span>`
+                : `<span style="color: var(--text-muted);">0</span>`;
+
+            const identity = item.userId 
+                ? `<span style="color: var(--text-primary); font-weight: 500;">👤 ${escapeHtml(item.userId)}</span>`
+                : item.machineId 
+                ? `<span style="color: var(--text-secondary);">💻 ${escapeHtml(item.machineId)}</span>`
+                : `<code style="font-size: 11px;">${escapeHtml((item.fingerprint || "").slice(0, 10))}...</code>`;
+
+            const createdStr = item.createdAt ? new Date(item.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : "-";
+            const expiresStr = item.expiresAt ? new Date(item.expiresAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : "-";
+
+            let actions = "-";
+            if (item.status === "waiting") {
+                actions = `
+                    <button class="btn btn-sm btn-primary" style="padding: 2px 8px; font-size: 11px;" onclick="promoteQueueTicket('${item.ticket}')">Povýšiť</button>
+                    <button class="btn btn-sm btn-danger" style="padding: 2px 8px; font-size: 11px;" onclick="cancelQueueTicket('${item.ticket}')">Zrušiť</button>
+                `;
+            }
+
+            return `
+                <tr>
+                    <td>${posBadge}</td>
+                    <td><code style="font-size: 12px; color: var(--accent-cyan);">${escapeHtml(item.ticket)}</code></td>
+                    <td><code style="font-size: 12px;">${escapeHtml(item.licenseId)}</code></td>
+                    <td>${identity}</td>
+                    <td>${priorityBadge}</td>
+                    <td>${statusBadge}</td>
+                    <td style="font-size: 12px; color: var(--text-secondary);">${createdStr}</td>
+                    <td style="font-size: 12px; color: var(--text-secondary);">${expiresStr}</td>
+                    <td style="text-align: right;">${actions}</td>
+                </tr>
+            `;
+        }).join("");
+
+    } catch (e) {
+        tbody.innerHTML = `<tr><td colspan="9" style="text-align: center; color: var(--accent-rose); padding: 18px;">Chyba: ${e.message}</td></tr>`;
+    }
+}
+
+async function promoteQueueTicket(ticket) {
+    if (!confirm(`Naozaj chcete manuálne povýšiť čakací ticket ${ticket} na aktívny lease?`)) return;
+
+    try {
+        const res = await fetch(`/admin/v1/queue/${encodeURIComponent(ticket)}/promote`, { method: "POST" });
+        if (res.ok) {
+            showToast(`Ticket ${ticket} bol úspešne povýšený na lease!`, "success");
+            loadQueueView();
+        } else {
+            const err = await res.json().catch(() => ({}));
+            showToast(`Povýšenie zlyhalo: ${err.detail || res.statusText}`, "error");
+        }
+    } catch (e) {
+        showToast("Chyba: " + e.message, "error");
+    }
+}
+
+async function cancelQueueTicket(ticket) {
+    if (!confirm(`Naozaj chcete zrušiť čakací ticket ${ticket}?`)) return;
+
+    try {
+        const res = await fetch(`/admin/v1/queue/${encodeURIComponent(ticket)}`, { method: "DELETE" });
+        if (res.ok) {
+            showToast(`Ticket ${ticket} bol zrušený.`, "success");
+            loadQueueView();
+        } else {
+            showToast(`Zrušenie zlyhalo: ${res.statusText}`, "error");
+        }
+    } catch (e) {
+        showToast("Chyba: " + e.message, "error");
+    }
+}
+
+window.loadQueueView = loadQueueView;
+window.promoteQueueTicket = promoteQueueTicket;
+window.cancelQueueTicket = cancelQueueTicket;
+
 
 
 

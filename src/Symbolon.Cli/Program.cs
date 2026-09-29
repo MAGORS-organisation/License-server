@@ -59,6 +59,7 @@ internal static class Program
                 "DISCOVER" or "SERVERS" => await Commands.DiscoverCommands.HandleDiscoverAsync(args[1..]).ConfigureAwait(false),
                 "REVOCATIONS" or "REVOCATION" or "CRL" => await Commands.RevocationCommands.HandleRevocationsAsync(args[1..]).ConfigureAwait(false),
                 "REPORTS" or "REPORT" => await Commands.ReportCommands.HandleReportsAsync(args[1..]).ConfigureAwait(false),
+                "QUEUE" => await Commands.QueueCommands.HandleQueueAsync(args[1..]).ConfigureAwait(false),
                 _ => UnknownCommand(args[0])
             };
         }
@@ -702,6 +703,7 @@ internal static class Program
               discover | servers [resolve]              Zero-Config detekcia serverov cez UDP broadcast a riešenie SYMBOLON_LICENSE_SERVER
               revocations fetch|inspect|revoke|list     Kryptografické revokačné zoznamy (.symrl), delta sync a CRL správa
               reports concurrency|true-up|denials|verify-audit Enterprise audit výkazy, peak concurrency (FLT-38), true-up a overenie integrity
+              queue list|status|cancel|promote          Prioritný licenčný rad (FLT-31), monitoring ticketov a auto-wait
             """);
     }
 }

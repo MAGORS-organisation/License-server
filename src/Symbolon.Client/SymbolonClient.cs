@@ -105,8 +105,17 @@ public sealed class SymbolonClient : IDisposable
     /// <summary>
     /// Requests a floating seat allocation from the license server with automatic multi-server failover.
     /// </summary>
+    public Task<SeatLease> AcquireSeatAsync(
+        IReadOnlyList<string>? features,
+        CancellationToken ct) => AcquireSeatAsync(features, allowQueue: null, maxQueueWait: null, ct);
+
+    /// <summary>
+    /// Requests a floating seat allocation from the license server with automatic multi-server failover and optional queue waiting.
+    /// </summary>
     public async Task<SeatLease> AcquireSeatAsync(
         IReadOnlyList<string>? features = null,
+        bool? allowQueue = null,
+        TimeSpan? maxQueueWait = null,
         CancellationToken ct = default)
     {
         using var activity = SymbolonTracing.ActivitySource.StartActivity(SymbolonTracing.OpCheckout);
@@ -126,12 +135,17 @@ public sealed class SymbolonClient : IDisposable
             throw new SymbolonRevocationException(revokedMachine);
         }
 
+        bool effectiveAllowQueue = allowQueue ?? _options.AllowQueue;
         var checkoutDto = new CheckoutRequestDto
         {
             LicenseKey = _options.LicenseKey,
             FingerprintComponents = _fingerprint,
             Quantity = 1,
-            Features = features
+            Features = features,
+            AllowQueue = effectiveAllowQueue ? true : null,
+            MachineId = _options.MachineId,
+            UserId = _options.UserId,
+            Priority = _options.Priority != 0 ? _options.Priority : null
         };
 
         try
@@ -148,6 +162,149 @@ public sealed class SymbolonClient : IDisposable
                 if ((int)response.StatusCode is 502 or 503 or 504)
                 {
                     throw new HttpRequestException($"Server node {serverUri} returned {(int)response.StatusCode}");
+                }
+
+                if (response.StatusCode == System.Net.HttpStatusCode.Accepted)
+                {
+                    var queuedBody = await response.Content.ReadFromJsonAsync(
+                        SymbolonProtocolJsonContext.Default.QueuedResponseDto,
+                        token).ConfigureAwait(false);
+
+                    if (queuedBody is null || string.IsNullOrWhiteSpace(queuedBody.Ticket))
+                    {
+                        activity?.SetStatus(ActivityStatusCode.Error, "Malformed queued response");
+                        return SeatLease.Denied("Malformed queued response");
+                    }
+
+                    if (!effectiveAllowQueue)
+                    {
+                        activity?.SetStatus(ActivityStatusCode.Error, "Queuing disabled on client");
+                        return SeatLease.Denied($"Queue ticket {queuedBody.Ticket} issued but client auto-wait is disabled.");
+                    }
+
+                    TimeSpan waitTimeout = maxQueueWait ?? _options.MaxQueueWait;
+                    using var waitCts = CancellationTokenSource.CreateLinkedTokenSource(token);
+                    waitCts.CancelAfter(waitTimeout);
+
+                    int delaySec = (queuedBody.RetryAfterSeconds.HasValue && queuedBody.RetryAfterSeconds.Value > 0) ? queuedBody.RetryAfterSeconds.Value : 3;
+                    if (response.Headers.RetryAfter?.Delta is { } delta)
+                    {
+                        delaySec = (int)delta.TotalSeconds;
+                    }
+
+                    string ticket = queuedBody.Ticket;
+                    activity?.SetTag("queue.ticket", ticket);
+
+                    try
+                    {
+                        while (!waitCts.IsCancellationRequested)
+                        {
+                            await Task.Delay(TimeSpan.FromSeconds(Math.Clamp(delaySec, 1, 10)), _options.TimeProvider, waitCts.Token).ConfigureAwait(false);
+
+                            var queueStatusUri = new Uri(serverUri, $"v1/queue/{Uri.EscapeDataString(ticket)}");
+                            using var statusResp = await http.GetAsync(queueStatusUri, waitCts.Token).ConfigureAwait(false);
+
+                            if (!statusResp.IsSuccessStatusCode)
+                            {
+                                activity?.SetStatus(ActivityStatusCode.Error, $"Queue status HTTP {(int)statusResp.StatusCode}");
+                                return SeatLease.Denied($"Queue status request failed: {(int)statusResp.StatusCode}");
+                            }
+
+                            var statusDto = await statusResp.Content.ReadFromJsonAsync(
+                                SymbolonProtocolJsonContext.Default.QueueStatusResponseDto,
+                                waitCts.Token).ConfigureAwait(false);
+
+                            if (statusDto is null)
+                            {
+                                continue;
+                            }
+
+                            if (statusResp.Headers.RetryAfter?.Delta is { } pollDelta)
+                            {
+                                delaySec = (int)pollDelta.TotalSeconds;
+                            }
+                            else if (statusDto.RetryAfterSeconds.HasValue && statusDto.RetryAfterSeconds.Value > 0)
+                            {
+                                delaySec = statusDto.RetryAfterSeconds.Value;
+                            }
+
+                            if (statusDto.Status == "ready" && !string.IsNullOrWhiteSpace(statusDto.LeaseId) && !string.IsNullOrWhiteSpace(statusDto.Token))
+                            {
+                                activity?.SetTag(SymbolonTracing.TagLeaseId, statusDto.LeaseId);
+
+                                if (_revocationCache.IsLeaseRevoked(statusDto.LeaseId, out var revokedQueueLease))
+                                {
+                                    activity?.SetStatus(ActivityStatusCode.Error, "Lease revoked");
+                                    throw new SymbolonRevocationException(revokedQueueLease);
+                                }
+
+                                if (_verifier is not null)
+                                {
+                                    string expectedFpHash = FingerprintHelper.ComputeHash(_fingerprint);
+                                    var verifyResult = _verifier.Verify(
+                                        token: statusDto.Token,
+                                        expectedFpHash: expectedFpHash,
+                                        expectedLicenseId: null);
+
+                                    if (!verifyResult.IsValid)
+                                    {
+                                        activity?.SetStatus(ActivityStatusCode.Error, "Token verification failed");
+                                        return SeatLease.Denied($"Token verification failed: {verifyResult.FailureReason}");
+                                    }
+                                }
+
+                                activity?.SetStatus(ActivityStatusCode.Ok);
+                                return new SeatLease(
+                                    acquired: true,
+                                    reason: null,
+                                    leaseId: statusDto.LeaseId,
+                                    token: statusDto.Token,
+                                    seatNo: statusDto.Seat ?? 1,
+                                    expiresAt: statusDto.ExpiresAt ?? _options.TimeProvider.GetUtcNow().AddMinutes(10),
+                                    entitlements: features ?? Array.Empty<string>(),
+                                    http: http,
+                                    time: _options.TimeProvider,
+                                    heartbeatInterval: _options.HeartbeatInterval,
+                                    gracePeriod: _options.GracePeriod,
+                                    fingerprint: _fingerprint,
+                                    log: _log);
+                            }
+
+                            if (statusDto.Status is "cancelled" or "expired")
+                            {
+                                activity?.SetStatus(ActivityStatusCode.Error, $"Queue ticket {statusDto.Status}");
+                                return SeatLease.Denied($"Queue ticket {statusDto.Status}");
+                            }
+                        }
+                    }
+                    catch (OperationCanceledException) when (!token.IsCancellationRequested)
+                    {
+                        try
+                        {
+                            var cancelUri = new Uri(serverUri, $"v1/queue/{Uri.EscapeDataString(ticket)}");
+                            using var cancelResp = await http.DeleteAsync(cancelUri, CancellationToken.None).ConfigureAwait(false);
+                        }
+                        catch (HttpRequestException)
+                        {
+                            // best effort cleanup
+                        }
+
+                        activity?.SetStatus(ActivityStatusCode.Error, "Queue timeout exceeded");
+                        return SeatLease.Denied("Queue wait timeout exceeded");
+                    }
+                    catch (OperationCanceledException) when (token.IsCancellationRequested)
+                    {
+                        try
+                        {
+                            var cancelUri = new Uri(serverUri, $"v1/queue/{Uri.EscapeDataString(ticket)}");
+                            using var cancelResp = await http.DeleteAsync(cancelUri, CancellationToken.None).ConfigureAwait(false);
+                        }
+                        catch (HttpRequestException)
+                        {
+                            // best effort cleanup
+                        }
+                        throw;
+                    }
                 }
 
                 if (!response.IsSuccessStatusCode)

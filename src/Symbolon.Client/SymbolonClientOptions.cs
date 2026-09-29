@@ -42,4 +42,29 @@ public sealed class SymbolonClientOptions
     /// Optional revocation cache instance for real-time revocation enforcement (RVL-12 to RVL-16).
     /// </summary>
     public RevocationCache? RevocationCache { get; init; }
+
+    /// <summary>
+    /// If true, enables enterprise queuing when all floating seats are occupied (FLT-31).
+    /// </summary>
+    public bool AllowQueue { get; init; }
+
+    /// <summary>
+    /// Maximum duration to wait in queue before timing out and cancelling the ticket (default 2 minutes).
+    /// </summary>
+    public TimeSpan MaxQueueWait { get; init; } = TimeSpan.FromMinutes(2);
+
+    /// <summary>
+    /// Explicit request priority for queuing (higher numbers get scheduled first).
+    /// </summary>
+    public int Priority { get; init; }
+
+    /// <summary>
+    /// Optional user ID for named user licensing and VIP queue priority resolution.
+    /// </summary>
+    public string? UserId { get; init; }
+
+    /// <summary>
+    /// Optional machine ID identifier.
+    /// </summary>
+    public string? MachineId { get; init; }
 }

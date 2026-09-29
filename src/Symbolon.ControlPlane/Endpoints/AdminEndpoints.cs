@@ -11,6 +11,7 @@ using Symbolon.Domain.Reporting;
 using Symbolon.Domain.Security;
 using Symbolon.Format;
 using Symbolon.Protocol.Reporting;
+using Symbolon.ControlPlane.Queuing;
 
 namespace Symbolon.ControlPlane.Endpoints;
 
@@ -76,6 +77,11 @@ public static class AdminEndpoints
 
         // SCIM 2.0 Directory Management
         group.MapGet("/scim/users", GetScimUsersSummaryAsync).WithName("GetScimUsersSummary");
+
+        // Enterprise License Queue Management (FLT-31)
+        group.MapGet("/queue", GetQueueTicketsAdminAsync).WithName("GetQueueTicketsAdmin");
+        group.MapPost("/queue/{ticket}/promote", PromoteQueueTicketAdminAsync).WithName("PromoteQueueTicketAdmin");
+        group.MapDelete("/queue/{ticket}", CancelQueueTicketAdminAsync).WithName("CancelQueueTicketAdmin");
 
         group.AddEndpointFilter(async (invocationContext, next) =>
         {
@@ -1344,6 +1350,53 @@ public static class AdminEndpoints
         }, tenantId, ct).ConfigureAwait(false);
 
         return TypedResults.Created($"/admin/v1/revocations/{rev.Id}", rev);
+    }
+
+    private static async Task<IResult> GetQueueTicketsAdminAsync(
+        string? licenseId,
+        string? status,
+        int? limit,
+        IQueueManager queueManager,
+        CancellationToken ct)
+    {
+        var tickets = await queueManager.GetTicketsAsync(licenseId, status, limit ?? 50, ct).ConfigureAwait(false);
+        return TypedResults.Ok(tickets);
+    }
+
+    private static async Task<IResult> PromoteQueueTicketAdminAsync(
+        string ticket,
+        IQueueManager queueManager,
+        CancellationToken ct)
+    {
+        bool success = await queueManager.PromoteTicketAsync(ticket, ct).ConfigureAwait(false);
+        if (!success)
+        {
+            return Results.Problem(
+                statusCode: StatusCodes.Status409Conflict,
+                title: "Queue Ticket Promotion Failed",
+                detail: $"Ticket {ticket} could not be promoted. Either it is not waiting or the license pool has no available capacity.",
+                type: Symbolon.Protocol.ProblemTypes.PoolExhausted);
+        }
+
+        return TypedResults.Ok(new { status = "promoted", ticket });
+    }
+
+    private static async Task<IResult> CancelQueueTicketAdminAsync(
+        string ticket,
+        IQueueManager queueManager,
+        CancellationToken ct)
+    {
+        bool cancelled = await queueManager.CancelAsync(ticket, ct).ConfigureAwait(false);
+        if (!cancelled)
+        {
+            return Results.Problem(
+                statusCode: StatusCodes.Status404NotFound,
+                title: "Queue Ticket Not Found",
+                detail: $"Waiting queue ticket '{ticket}' was not found or is already completed.",
+                type: Symbolon.Protocol.ProblemTypes.QueueNotFound);
+        }
+
+        return TypedResults.NoContent();
     }
 }
 
