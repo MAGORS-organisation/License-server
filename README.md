@@ -167,6 +167,21 @@ Rieši to, čo dnešné cloud-first platformy ponúkajú iba ako obmedzený dopl
     - **Fuzzy Node-Lock Matching Engine (FPR-5 – FPR-9)**: Podpora stratégií `match-any`, `match-two`, `match-most` (predvolená, >50%) a `match-all` s automatickou degradáciou na `match-all` pri menej ako 2 spoločných komponentoch (FPR-8).
     - **Anti-Virtualizácia & Kontajnerová Izolácia (FPR-10 – FPR-14)**: Detekcia Docker, Containerd, Kubernetes a hypervízorových prostredí, persistentný volume UUID manažment a odporúčanie prechodu na floating lízing.
     - **Životný Cyklus Aktivácie & Správa Uzlov (FPR-15 – FPR-17)**: Registrácia uzlov cez `POST /v1/activations`, kontrola unikátnosti podľa politiky, overenie zhody cez `POST /v1/activations/verify-match` a okamžité uvoľnenie slotu pri deaktivácii.
+35. **Air-Gapped Capacity Transfer, Signed `.symreq` Request & Delegated Seat Grant Issuance Protocol (GNT-1 – GNT-10, FLT-32 – FLT-35, §5, §7.7)**
+    - **Delegované Poverenia `.symgrant` & Žiadosti `.symreq`**: JWS General JSON artefakty s PEM obálkou a hybridným podpisom (ES256 + ML-DSA-65) pre izolované priemyselné závody.
+    - **Disjunctive Grant Allocator (GNT-3, GNT-4, GNT-5)**: Deterministické prideľovanie disjunktných rozsahov sedadiel `[SeatFrom..SeatTo]` s matematickou zárukou nulového prekrývania kapacít.
+    - **Monotónna Ochrana & Merkle Digest (GNT-7, GNT-9, FLT-33)**: Prísna kontrola sekvenčných čísiel, automatické nahradenie predchádzajúcich grantov (`supersedes`) a overenie auditného Merkle hash reťazca pri USB prenose.
+    - **Offline Edge Relay Enforcement (GNT-10)**: Striktné ohraničenie lokálnych leasingov do delegovaného intervalu a registrácia efemérneho podpisového kľúča.
+36. **A/B Testovanie a Experimentačný Engine (Vytvorenie, Deterministický Bucketing & Reálne Záťažové Testovanie A/B)**
+    - **Deterministický Bezstavový Hashing**: Rozdeľovanie klientov do experimentálnych bucketov (0–99%) pomocou $\text{Murmur3}(\text{LicenseKey} \mathbin{\Vert} \text{MachineId} \mathbin{\Vert} \text{Salt}) \pmod{100}$ bez nutnosti databázového stavu.
+    - **Sticky Session Invariant**: Záruka nulového posunu (zero-drift) — klient zostáva v identickom variante počas celého životného cyklu leasingu (checkout ➜ heartbeat ➜ renew ➜ release).
+    - **Reálne Testovanie A/B Testovaním**: Automatizovaný validačný harness s **10 000 paralelnými virtuálnymi klientmi**, Chi-Square ($\chi^2$) testom dobrej zhody ($p > 0.05$), overením chaos failoveru a canary circuit breakerom (<100 ms automatický rollback pri chybovosti).
+    - **Štatistické Vyhodnotenie v Reálnom Čase**: Výpočet Z-score, 95% konfidenčného intervalu a p-hodnoty v databázovom akumulátore s riadením vo Web TUI.
+37. **Post-Quantum Era — Komplexná Pripravenosť na Post-Kvantovú Éru (FIPS 203, FIPS 204, FIPS 205 & Profil `pqc-strict`)**
+    - **Plná NIST PQC Suite**: Integrácia **FIPS 203 (ML-KEM-768/1024)** pre hybridný TLS 1.3 / mTLS kľúčový handshake a ochranu voči útokom typu *Harvest Now, Decrypt Later (HNDL)*.
+    - **Stateless Hash Signatures (FIPS 205 / SLH-DSA)**: Matematicky nezávislý záložný podpisový algoritmus eliminujúci riziko prípadného prelomenia mriežkovej kryptografie (LWE).
+    - **Režim `pqc-strict`**: Režim bez klasickej kryptografie (nulové RSA / ECDSA) spĺňajúci štandardy **CNSA 2.0** a európske smernice **NIS 2 / NIS Cooperation Group Roadmap 2030**.
+    - **Quantum Vulnerability & Migration Scanner (`symbolon pqc scan`)**: Integrovaný skener v CLI a Web Dashboarde s výpočtom PQC Readiness Indexu (0–100%) a migračným plánom.
 
 ---
 
@@ -513,21 +528,21 @@ Všetkých 10 testovacích projektov má 100% úspešnosť testov bez zlyhania:
 
 ```text
 Passed!  - Failed: 0, Passed:  28, Skipped: 0, Total:  28 - Symbolon.Crypto.Tests.dll
-Passed!  - Failed: 0, Passed:  44, Skipped: 0, Total:  44 - Symbolon.Format.Tests.dll
-Passed!  - Failed: 0, Passed:  16, Skipped: 0, Total:  16 - Symbolon.Protocol.Tests.dll
-Passed!  - Failed: 0, Passed:  89, Skipped: 0, Total:  89 - Symbolon.Domain.Tests.dll
-Passed!  - Failed: 0, Passed:  10, Skipped: 0, Total:  10 - Symbolon.Relay.Tests.dll
-Passed!  - Failed: 0, Passed:  30, Skipped: 0, Total:  30 - Symbolon.Client.Tests.dll
-Passed!  - Failed: 0, Passed:  30, Skipped: 0, Total:  30 - Symbolon.Cli.Tests.dll
-Passed!  - Failed: 0, Passed:  17, Skipped: 0, Total:  17 - Symbolon.Data.Tests.dll
+Passed!  - Failed: 0, Passed:  60, Skipped: 0, Total:  60 - Symbolon.Format.Tests.dll
+Passed!  - Failed: 0, Passed:  24, Skipped: 0, Total:  24 - Symbolon.Protocol.Tests.dll
+Passed!  - Failed: 0, Passed: 113, Skipped: 0, Total: 113 - Symbolon.Domain.Tests.dll
+Passed!  - Failed: 0, Passed:  13, Skipped: 0, Total:  13 - Symbolon.Relay.Tests.dll
+Passed!  - Failed: 0, Passed:  31, Skipped: 0, Total:  31 - Symbolon.Client.Tests.dll
+Passed!  - Failed: 0, Passed:  37, Skipped: 0, Total:  37 - Symbolon.Cli.Tests.dll
+Passed!  - Failed: 0, Passed:  20, Skipped: 0, Total:  20 - Symbolon.Data.Tests.dll
 Passed!  - Failed: 0, Passed:   8, Skipped: 0, Total:   8 - Symbolon.Operator.Tests.dll
-Passed!  - Failed: 0, Passed: 100, Skipped: 0, Total: 100 - Symbolon.ControlPlane.Tests.dll
+Passed!  - Failed: 0, Passed: 112, Skipped: 0, Total: 112 - Symbolon.ControlPlane.Tests.dll
 
 Viacjazyčné SDK & WebAssembly testovacie sady:
-Passed!  - Failed: 0, Passed: 17, Skipped: 0, Total: 17 - Python SDK (unittest)
+Passed!  - Failed: 0, Passed: 29, Skipped: 0, Total: 29 - Python SDK (unittest)
 Passed!  - Failed: 0, Passed: 12, Skipped: 0, Total: 12 - WebAssembly / WebCrypto SDK (node:test)
 
-Celkovo: 401 úspešných automatizovaných testov (372 .NET + 17 Python + 12 Node/Wasm), 0 zlyhaní, 0 chýb.
+Celkovo: 487 úspešných automatizovaných testov (446 .NET + 29 Python + 12 Node/Wasm), 0 zlyhaní, 0 chýb.
 ```
 
 ---

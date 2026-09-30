@@ -10,6 +10,17 @@ a projekt striktne dodržiava [Sémantické Verziovanie (Semantic Versioning 2.0
 ## [Unreleased]
 
 ### Pridané (Added)
+- **Strategická Roadmapa: A/B Testovanie a Pripravenosť na Post-Kvantovú Éru (`docs/13-roadmapa-a-rizika.md`, §13.4, §13.5)**:
+  - **A/B Testovanie a Experimentálny Engine**:
+    - Špecifikácia architektúry experimentov s bezstavovým deterministickým bucketingom cez Murmur3 hashing (`Bucket = Murmur3(Key + Machine + Salt) % 100`).
+    - Sticky Session invariant (garancia nulového driftu počas celého životného cyklu leasingu).
+    - Reálne testovanie A/B testovaním: automatizovaný simulačný záťažový framework s 10 000 paralelnými klientmi, Chi-Square ($\chi^2$) testom dobrej zhody ($p > 0.05$), chaos rekonfiguráciou a canary circuit breakerom (<100 ms automatický rollback pri chybovosti).
+    - Integrované štatistické vyhodnocovanie v reálnom čase (Z-score, 95% konfidenčný interval, p-hodnota) s riadením vo Web TUI a Control Plane API.
+  - **Post-Quantum Era — Komplexná Pripravenosť Celého Riešenia**:
+    - Kompletná NIST PQC Suite: FIPS 203 (ML-KEM-768/1024) pre kľúčovú enkapsuláciu, hybridný TLS 1.3 / mTLS handshake a ochranu voči útokom typu *Harvest Now, Decrypt Later (HNDL)*.
+    - FIPS 204 (ML-DSA-65) pre digitálne podpisy artefaktov bez klasickej zložky a FIPS 205 (SLH-DSA / SPHINCS+) ako bezstavová hašovacia poistka pri teoretickom prelomení mriežkovej kryptografie.
+    - Striktný profil `pqc-strict` spĺňajúci požiadavky CNSA 2.0 a európskej smernice NIS 2 / NIS Cooperation Group Roadmap 2030 (vyradenie RSA, ECDSA P-256 a Diffie-Hellman).
+    - Vstavaný Quantum Vulnerability & Migration Scanner (`symbolon pqc scan`) s výpočtom PQC Readiness Indexu (0–100%) a integrácia s hardvérovými modulmi HSM cez PKCS#11 v3.2.
 - **Air-Gapped Capacity Transfer, Signed `.symreq` Request & Delegated Seat Grant Issuance Protocol (GNT-1 – GNT-10, FLT-32 – FLT-35, §5, §7.7)**:
   - **Formátová a Kryptografická vrstva (`Symbolon.Format`, `Symbolon.Crypto`)**:
     - `SeatGrantClaims`, `SeatGrantSigner`, `SeatGrantVerifier`: JWS General JSON formát `.symgrant` artefaktu s PEM obálkou `-----BEGIN SYMBOLON SEAT GRANT-----` a hybridným kryptografickým podpisom (ES256 + ML-DSA-65). Striktné overovanie invariantov: integrita a disjunkcia intervalu (`GNT-3`: `(SeatTo - SeatFrom + 1) == Seats`), časové okná (`GNT-2`), a efemérne privátne kľúče pre relay signing (`spec/05-seat-grant.md` §5.2).
