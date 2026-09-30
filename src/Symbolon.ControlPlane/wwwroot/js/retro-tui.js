@@ -39,6 +39,8 @@
         { id: 'policyrules', label: 'Pravidlá & Options', hotkey: 'Z', view: 'view-policy-rules', hasSub: false },
         { id: 'machines', label: 'Stroje & Node-Lock', hotkey: 'N', view: 'view-machines', hasSub: false },
         { id: 'webhooky', label: 'Webhooky', hotkey: 'W', view: 'view-webhooks', hasSub: false },
+        { id: 'experiments', label: 'A/B Experimenty (AB-1)', hotkey: 'B', view: 'view-experiments', hasSub: false },
+        { id: 'pqc', label: 'Post-Quantum Era (M7)', hotkey: 'q', view: 'view-pqc', hasSub: false },
         { isSeparator: true },
         { id: 'sulad', label: 'Súlad & CRA / SBOM', hotkey: 'S', view: 'view-system', hasSub: false },
         { id: 'apikeys', label: 'API Kľúče & Merkle', hotkey: 'T', view: 'view-apikeys', hasSub: false },
@@ -94,6 +96,8 @@
                 <li class="retro-menu-item" onclick="switchRetroView('view-queue')" tabindex="0"><span class="hotkey">Q</span>ueue Rad</li>
                 <li class="retro-menu-item" onclick="switchRetroView('view-policy-rules')" tabindex="0"><span class="hotkey">Z</span>ásady (FLT-24)</li>
                 <li class="retro-menu-item" onclick="switchRetroView('view-machines')" tabindex="0"><span class="hotkey">N</span>ode-Lock</li>
+                <li class="retro-menu-item" onclick="switchRetroView('view-experiments')" tabindex="0">A/<span class="hotkey">B</span> Exp</li>
+                <li class="retro-menu-item" onclick="switchRetroView('view-pqc')" tabindex="0">P<span class="hotkey">Q</span>C M7</li>
                 <li class="retro-menu-item" onclick="switchRetroView('view-system')" tabindex="0"><span class="hotkey">S</span>úlad CRA</li>
                 <li class="retro-menu-item" onclick="openModal('modal-auth-config')" tabindex="0">K<span class="hotkey">o</span>nfigurácia</li>
             </ul>
@@ -630,7 +634,9 @@
             'view-machines': 'NODE-LOCK STROJE & HARDVÉROVÉ FINGERPRINTY (FPR-1 – FPR-19, §8)',
             'view-tokens': 'KREDITOVÉ PEŇAŽENKY & PAY-AS-YOU-GO SPOTREBA',
             'view-migrate': 'MIGRÁCIA Z FLEXNET PUBLISHER (FLEXLM) & KEYGEN.SH',
-            'view-scim': 'SCIM 2.0 IDENTITA & FIREMNÁ SYNCHRONIZÁCIA'
+            'view-scim': 'SCIM 2.0 IDENTITA & FIREMNÁ SYNCHRONIZÁCIA',
+            'view-experiments': 'A/B TESTOVANIE & EXPERIMENTAČNÝ ENGINE (AB-1 .. AB-15)',
+            'view-pqc': 'POST-QUANTUM ERA SUITE & QUANTUM READINESS AUDIT (M7, §13.5)'
         };
 
         const titleEl = document.getElementById('retro-window-title');
@@ -649,6 +655,12 @@
         }
         if (viewId === 'view-machines' && typeof window.loadMachinesView === 'function') {
             window.loadMachinesView();
+        }
+        if (viewId === 'view-experiments' && typeof window.loadExperimentsView === 'function') {
+            window.loadExperimentsView();
+        }
+        if (viewId === 'view-pqc' && typeof window.loadPqcView === 'function') {
+            window.loadPqcView();
         }
 
         // Zatvorenie podmenu pri prepnutí
@@ -677,6 +689,18 @@
         } else if (hash === 'reports' || hash === 'trueup' || hash === 'reporty') {
             switchRetroView('view-reports');
             if (typeof window.loadReportsView === 'function') window.loadReportsView();
+        } else if (hash === 'experiments' || hash === 'view-experiments' || hash === 'ab') {
+            switchRetroView('view-experiments');
+            if (typeof window.loadExperimentsView === 'function') window.loadExperimentsView();
+        } else if (hash === 'exp-report') {
+            switchRetroView('view-experiments');
+            setTimeout(() => { if (typeof window.showExperimentReport === 'function') window.showExperimentReport('exp-lease-ttl'); }, 300);
+        } else if (hash === 'exp-sim') {
+            switchRetroView('view-experiments');
+            setTimeout(() => { if (typeof window.openSimulateModal === 'function') window.openSimulateModal('exp-lease-ttl'); }, 300);
+        } else if (hash === 'pqc' || hash === 'view-pqc' || hash === 'quantum') {
+            switchRetroView('view-pqc');
+            if (typeof window.loadPqcView === 'function') window.loadPqcView();
         } else if (hash === 'licenses' || hash === 'licencie') {
             switchRetroView('view-licenses');
         } else if (hash === 'keys' || hash === 'kluce') {

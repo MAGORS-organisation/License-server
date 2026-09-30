@@ -35,6 +35,13 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // Auto refresh every 15 seconds
     setInterval(refreshAllData, 15000);
+
+    if (window.location.hash) {
+        const hashView = window.location.hash.replace("#", "");
+        if (hashView) {
+            setTimeout(() => switchToView(hashView), 100);
+        }
+    }
 });
 
 // Navigation Handling
@@ -86,6 +93,14 @@ function initNavigation() {
         });
     });
 }
+
+function switchToView(targetView) {
+    const link = document.querySelector(`.nav-link[data-view="${targetView}"]`);
+    if (link) {
+        link.click();
+    }
+}
+window.switchToView = switchToView;
 
 // Global Refresh
 async function refreshAllData() {
@@ -4580,7 +4595,7 @@ function updateExperimentsKPIs(experiments) {
 
     if (!experiments || !Array.isArray(experiments)) return;
 
-    const activeCount = experiments.filter(e => e.status === "Running").length;
+    const activeCount = experiments.filter(e => e.status === "Active" || e.status === "Running").length;
     const draftCount = experiments.filter(e => e.status === "Draft").length;
     const pausedCount = experiments.filter(e => e.status === "Paused").length;
 
@@ -4593,7 +4608,12 @@ function updateExperimentsKPIs(experiments) {
         Promise.all(experiments.map(e =>
             fetch(`/admin/v1/experiments/${encodeURIComponent(e.id)}/report`)
                 .then(r => r.ok ? r.json() : null)
-                .then(rep => rep ? rep.totalRequests : 0)
+                .then(rep => {
+                    if (!rep) return 0;
+                    const cReq = rep.controlMetrics?.totalRequests || 0;
+                    const tReq = rep.treatmentMetrics?.totalRequests || 0;
+                    return (cReq + tReq) || rep.totalRequests || 0;
+                })
                 .catch(() => 0)
         )).then(results => {
             total = results.reduce((acc, curr) => acc + curr, 0);
@@ -4613,49 +4633,53 @@ function renderExperimentsTable(experiments) {
 
     tbody.innerHTML = experiments.map(exp => {
         let statusBadge = "";
-        switch (exp.status) {
-            case "Running":
-                statusBadge = '<span class="badge badge-emerald">Aktívny (Running)</span>';
-                break;
-            case "Paused":
-                statusBadge = '<span class="badge badge-amber">Pozastavený</span>';
-                break;
-            case "Draft":
-                statusBadge = '<span class="badge badge-slate">Návrh (Draft)</span>';
-                break;
-            case "Concluded":
-                statusBadge = '<span class="badge badge-indigo">Ukončený</span>';
-                break;
-            default:
-                statusBadge = `<span class="badge badge-slate">${escapeHtml(exp.status)}</span>`;
+        const s = String(exp.status);
+        if (s === "Active" || s === "Running") {
+            statusBadge = '<span class="badge badge-emerald">Aktívny (Active)</span>';
+        } else if (s === "Completed" || s === "Concluded") {
+            statusBadge = '<span class="badge badge-indigo">Ukončený</span>';
+        } else if (s === "Paused") {
+            statusBadge = '<span class="badge badge-amber">Pozastavený</span>';
+        } else if (s === "RolledBack") {
+            statusBadge = '<span class="badge badge-rose">Rolled Back</span>';
+        } else if (s === "Draft") {
+            statusBadge = '<span class="badge badge-slate">Návrh (Draft)</span>';
+        } else {
+            statusBadge = `<span class="badge badge-slate">${escapeHtml(s)}</span>`;
         }
 
         const variantsHtml = (exp.variants || []).map(v => {
+            const varId = v.variantId || v.id || "var";
+            const varName = v.name || varId;
             const isCtrl = v.isControl ? " (Control)" : "";
+            const weight = v.weight ?? v.weightPercent ?? 50;
             const ttlText = v.overrides && v.overrides.leaseTtlSeconds ? ` [TTL: ${v.overrides.leaseTtlSeconds}s]` : "";
-            return `<div><code>${escapeHtml(v.id)}</code>: ${escapeHtml(v.name)}${isCtrl} - <strong>${v.weightPercent}%</strong>${ttlText}</div>`;
+            return `<div><code>${escapeHtml(varId)}</code>: ${escapeHtml(varName)}${isCtrl} - <strong>${weight}%</strong>${ttlText}</div>`;
         }).join("");
 
+        const alloc = exp.trafficAllocation ?? exp.trafficAllocationPercent ?? 100;
         const createdDate = exp.createdAt ? new Date(exp.createdAt).toLocaleDateString() : "-";
         const startedDate = exp.startedAt ? `<br><small style="color: var(--accent-emerald);">Spustené: ${new Date(exp.startedAt).toLocaleDateString()}</small>` : "";
 
         // Action buttons depending on status
         let actionsHtml = `<div style="display: flex; gap: 4px; flex-wrap: wrap;">`;
 
-        if (exp.status === "Draft") {
+        if (s === "Draft") {
             actionsHtml += `<button class="btn btn-primary btn-sm" onclick="startExperiment('${escapeHtml(exp.id)}')">▶ Spustiť</button>`;
-        } else if (exp.status === "Running") {
+        } else if (s === "Active" || s === "Running") {
             actionsHtml += `<button class="btn btn-secondary btn-sm" onclick="pauseExperiment('${escapeHtml(exp.id)}')">⏸ Pozastaviť</button>`;
             actionsHtml += `<button class="btn btn-secondary btn-sm" onclick="showExperimentReport('${escapeHtml(exp.id)}')">📊 Report</button>`;
             actionsHtml += `<button class="btn btn-secondary btn-sm" onclick="openSimulateModal('${escapeHtml(exp.id)}')">🎲 Simulovať</button>`;
 
             // Variant promote buttons
             (exp.variants || []).forEach(v => {
-                actionsHtml += `<button class="btn btn-secondary btn-sm" title="Promovať variant ${escapeHtml(v.name)} na 100%" onclick="promoteExperiment('${escapeHtml(exp.id)}', '${escapeHtml(v.id)}')">⭐ 100% ${escapeHtml(v.id)}</button>`;
+                const varId = v.variantId || v.id;
+                const varName = v.name || varId;
+                actionsHtml += `<button class="btn btn-secondary btn-sm" title="Promovať variant ${escapeHtml(varName)} na 100%" onclick="promoteExperiment('${escapeHtml(exp.id)}', '${escapeHtml(varId)}')">⭐ 100% ${escapeHtml(varId)}</button>`;
             });
 
             actionsHtml += `<button class="btn btn-secondary btn-sm" style="color: var(--accent-amber);" onclick="rollbackExperiment('${escapeHtml(exp.id)}')">↩ Rollback</button>`;
-        } else if (exp.status === "Paused") {
+        } else if (s === "Paused") {
             actionsHtml += `<button class="btn btn-primary btn-sm" onclick="startExperiment('${escapeHtml(exp.id)}')">▶ Pokračovať</button>`;
             actionsHtml += `<button class="btn btn-secondary btn-sm" onclick="showExperimentReport('${escapeHtml(exp.id)}')">📊 Report</button>`;
             actionsHtml += `<button class="btn btn-secondary btn-sm" style="color: var(--accent-amber);" onclick="rollbackExperiment('${escapeHtml(exp.id)}')">↩ Rollback</button>`;
@@ -4674,7 +4698,7 @@ function renderExperimentsTable(experiments) {
                     ${exp.description ? `<div style="font-size: 12px; color: var(--text-muted); margin-top: 2px;">${escapeHtml(exp.description)}</div>` : ""}
                 </td>
                 <td>${statusBadge}</td>
-                <td><strong>${exp.trafficAllocationPercent}%</strong> prevádzky</td>
+                <td><strong>${alloc}%</strong> prevádzky</td>
                 <td style="font-size: 12px;">${variantsHtml}</td>
                 <td><code>${escapeHtml(exp.salt || "-")}</code></td>
                 <td>${createdDate}${startedDate}</td>
@@ -4863,37 +4887,46 @@ async function showExperimentReport(id) {
             ? `<span class="badge badge-emerald">Áno (p < 0.05, Z=${r.zScore ? r.zScore.toFixed(2) : "-"})</span>`
             : `<span class="badge badge-slate">Nie (p=${r.pValue !== null ? r.pValue.toFixed(4) : "nedostatok dát"})</span>`;
 
-        let variantsRows = "";
-        if (r.variantReports && r.variantReports.length > 0) {
-            variantsRows = r.variantReports.map(v => `
-                <tr>
-                    <td><strong>${escapeHtml(v.variantName)}</strong> <code>(${escapeHtml(v.variantId)})</code> ${v.isControl ? '<span class="badge badge-slate">Control</span>' : ""}</td>
-                    <td>${v.sampleCount.toLocaleString()}</td>
-                    <td style="color: var(--accent-emerald);">${v.successCount.toLocaleString()}</td>
-                    <td style="color: ${v.errorCount > 0 ? 'var(--accent-rose)' : 'inherit'};">${v.errorCount.toLocaleString()}</td>
-                    <td><strong>${v.successRatePercent.toFixed(2)}%</strong></td>
-                    <td>${v.avgLatencyMs.toFixed(2)} ms</td>
-                </tr>
-            `).join("");
+        const variants = [];
+        if (r.controlMetrics) {
+            variants.push({ ...r.controlMetrics, name: "Control (Baseline)", isControl: true });
+        }
+        if (r.treatmentMetrics) {
+            variants.push({ ...r.treatmentMetrics, name: "Treatment (Nový variant)", isControl: false });
         }
 
-        const ciText = (r.confidenceIntervalLow !== null && r.confidenceIntervalHigh !== null)
-            ? `[${(r.confidenceIntervalLow * 100).toFixed(2)}% .. ${(r.confidenceIntervalHigh * 100).toFixed(2)}%]`
+        const variantsRows = variants.map(v => `
+            <tr>
+                <td><strong>${escapeHtml(v.name)}</strong> <code>(${escapeHtml(v.variantId)})</code> ${v.isControl ? '<span class="badge badge-slate">Control</span>' : '<span class="badge badge-emerald">Treatment</span>'}</td>
+                <td>${(v.totalRequests || 0).toLocaleString()}</td>
+                <td style="color: var(--accent-emerald);">${(v.successfulCheckouts || 0).toLocaleString()}</td>
+                <td style="color: ${(v.errors || 0) > 0 ? 'var(--accent-rose)' : 'inherit'};">${(v.errors || 0).toLocaleString()}</td>
+                <td><strong>${((v.successRate || 0) * 100).toFixed(2)}%</strong></td>
+                <td>${(v.averageLatencyMs || 0).toFixed(2)} ms</td>
+            </tr>
+        `).join("");
+
+        const ciLow = r.confidenceIntervalLower !== undefined ? r.confidenceIntervalLower : r.confidenceIntervalLow;
+        const ciHigh = r.confidenceIntervalUpper !== undefined ? r.confidenceIntervalUpper : r.confidenceIntervalHigh;
+        const ciText = (ciLow !== null && ciLow !== undefined && ciHigh !== null && ciHigh !== undefined)
+            ? `[${(ciLow * 100).toFixed(2)}% .. ${(ciHigh * 100).toFixed(2)}%]`
             : "N/A";
+
+        const totalReq = (r.controlMetrics?.totalRequests || 0) + (r.treatmentMetrics?.totalRequests || 0) || r.totalRequests || 0;
 
         container.innerHTML = `
             <div style="background: rgba(255,255,255,0.02); border: 1px solid var(--border-color); border-radius: 8px; padding: 16px; margin-bottom: 16px;">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
                     <div>
-                        <strong style="font-size: 15px;">${escapeHtml(r.experimentName)}</strong>
-                        <div style="font-size: 12px; color: var(--text-secondary);">ID: <code>${escapeHtml(r.experimentId)}</code></div>
+                        <strong style="font-size: 15px;">${escapeHtml(r.experimentName || id)}</strong>
+                        <div style="font-size: 12px; color: var(--text-secondary);">ID: <code>${escapeHtml(r.experimentId || id)}</code></div>
                     </div>
                     <div>${sigBadge}</div>
                 </div>
                 <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; font-size: 12px;">
-                    <div><strong>Celkovo vzoriek:</strong> ${r.totalRequests.toLocaleString()}</div>
+                    <div><strong>Celkovo vzoriek:</strong> ${totalReq.toLocaleString()}</div>
                     <div><strong>Z-Skóre:</strong> ${r.zScore !== null ? r.zScore.toFixed(3) : "N/A"}</div>
-                    <div><strong>P-Hodnota:</strong> ${r.pValue !== null ? r.pValue.toFixed(4) : "N/A"}</div>
+                    <div><strong>P-Hodnota:</strong> ${r.pValue !== null ? r.pValue.toFixed(5) : "N/A"}</div>
                     <div><strong>95% Konfidenčný Interval:</strong> ${ciText}</div>
                     <div><strong>Welch's t p-value (latencia):</strong> ${r.latencyPValue !== null ? r.latencyPValue.toFixed(4) : "N/A"}</div>
                     <div><strong>Odporúčanie:</strong> <span style="color: var(--accent-primary); font-weight: 600;">${escapeHtml(r.recommendation)}</span></div>
