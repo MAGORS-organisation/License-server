@@ -1,5 +1,6 @@
 using System.ComponentModel.DataAnnotations;
 using System.Text.Json.Serialization;
+using Symbolon.Domain.Experiments;
 
 namespace Symbolon.ControlPlane.Models;
 
@@ -278,6 +279,53 @@ public sealed record SetLicenseEntitlementDto(
     bool IsEnabled = true,
     string? ParametersJson = null);
 
+public sealed record CreateExperimentDto
+{
+    [Required, MaxLength(64)] public required string Id { get; init; }
+    [Required, MaxLength(256)] public required string Name { get; init; }
+    public string? Description { get; init; }
+    public int TrafficAllocation { get; init; } = 100;
+    public ExperimentTargeting? Targeting { get; init; }
+    public IReadOnlyList<ExperimentVariant>? Variants { get; init; }
+    public ExperimentCircuitBreaker? CircuitBreaker { get; init; }
+}
 
+public sealed record UpdateExperimentDto
+{
+    [Required, MaxLength(256)] public required string Name { get; init; }
+    public string? Description { get; init; }
+    public int TrafficAllocation { get; init; } = 100;
+    public ExperimentTargeting? Targeting { get; init; }
+    public IReadOnlyList<ExperimentVariant>? Variants { get; init; }
+    public ExperimentCircuitBreaker? CircuitBreaker { get; init; }
+}
 
+public sealed record ExperimentDto(
+    string Id,
+    string? TenantId,
+    string Name,
+    string? Description,
+    string Status,
+    string Salt,
+    int TrafficAllocation,
+    ExperimentTargeting Targeting,
+    IReadOnlyList<ExperimentVariant> Variants,
+    ExperimentCircuitBreaker CircuitBreaker,
+    string? PromotedVariantId,
+    DateTimeOffset CreatedAt,
+    DateTimeOffset? StartedAt,
+    DateTimeOffset? EndedAt);
+
+public sealed record SimulateExperimentDto(
+    int ClientCount = 1000,
+    string? TenantId = null,
+    string? SdkLanguage = null,
+    string? OsPlatform = null);
+
+public sealed record SimulateExperimentResultDto(
+    string ExperimentId,
+    int TotalSimulated,
+    int TotalInExperiment,
+    int TotalBaseline,
+    IReadOnlyDictionary<string, int> VariantCounts);
 

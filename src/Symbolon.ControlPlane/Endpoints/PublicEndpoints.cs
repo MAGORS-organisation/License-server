@@ -19,6 +19,7 @@ using Symbolon.Format;
 using Symbolon.Protocol;
 using Symbolon.Protocol.Tracing;
 using Symbolon.Domain.Borrow;
+using Symbolon.Domain.Experiments;
 
 namespace Symbolon.ControlPlane.Endpoints;
 
@@ -123,6 +124,7 @@ public static class PublicEndpoints
         Observability.SymbolonMetrics metrics,
         Alerting.IAlertService alertService,
         IFraudDetectionService fraudDetection,
+        IExperimentStore experimentStore,
         CancellationToken ct)
     {
         using var activity = SymbolonTracing.ActivitySource.StartActivity(SymbolonTracing.OpCheckout);
@@ -227,9 +229,75 @@ public static class PublicEndpoints
         }
 
         // ====================================================================
+        // A/B Testing & Experimentation Evaluation (AB-1 .. AB-15, §13.4)
+        // ====================================================================
+        var checkoutSw = Stopwatch.StartNew();
+        string machineId = dto.MachineId ?? fingerprint;
+        string? osPlatform = context.Request.Headers["X-Symbolon-Platform"].FirstOrDefault();
+        if (string.IsNullOrWhiteSpace(osPlatform) && dto.FingerprintComponents.TryGetValue("os", out var osComp))
+        {
+            osPlatform = osComp;
+        }
+
+        var clientContext = new ExperimentClientContext
+        {
+            SdkLanguage = context.Request.Headers["X-Symbolon-Sdk-Language"].FirstOrDefault(),
+            SdkVersion = context.Request.Headers["X-Symbolon-Sdk-Version"].FirstOrDefault(),
+            OsPlatform = osPlatform,
+            ClientIp = clientIp
+        };
+
+        ExperimentEvaluationResult? expResult = null;
+        Experiment? activeExp = null;
+        var activeExperiments = await experimentStore.GetActiveAsync(license.TenantId, ct).ConfigureAwait(false);
+        if (activeExperiments.Count > 0)
+        {
+            foreach (var exp in activeExperiments)
+            {
+                var eval = DeterministicBucketRouter.Route(exp, license.TenantId, dto.LicenseKey, machineId, clientContext);
+                if (eval.IsInExperiment)
+                {
+                    expResult = eval;
+                    activeExp = exp;
+                    context.Response.Headers["X-Symbolon-Experiment"] = $"{eval.ExperimentId}={eval.VariantId}";
+                    break;
+                }
+            }
+        }
+
+        async Task RecordExperimentAsync(bool isSuccess, bool isDenial, bool isError)
+        {
+            if (expResult is null || activeExp is null) return;
+            double latency = checkoutSw.Elapsed.TotalMilliseconds;
+            await experimentStore.RecordMetricAsync(
+                expResult.ExperimentId,
+                expResult.VariantId,
+                isSuccess,
+                isRenewal: false,
+                isDenial,
+                isError,
+                latency,
+                ct).ConfigureAwait(false);
+
+            if (activeExp.CircuitBreaker.AutoRollback && isError)
+            {
+                var curMetrics = await experimentStore.GetMetricsAsync(activeExp.Id, ct).ConfigureAwait(false);
+                var vm = curMetrics.FirstOrDefault(m => m.VariantId == expResult.VariantId);
+                if (vm is not null &&
+                    vm.TotalRequests >= activeExp.CircuitBreaker.MinSamplesThreshold &&
+                    vm.ErrorRate > activeExp.CircuitBreaker.MaxErrorRate)
+                {
+                    activeExp.Status = ExperimentStatus.RolledBack;
+                    activeExp.EndedAt = time.GetUtcNow();
+                    await experimentStore.SaveAsync(activeExp, license.TenantId, ct).ConfigureAwait(false);
+                }
+            }
+        }
+
+        // ====================================================================
         // Options File & Policy Rules Evaluation (FLT-23, FLT-24, FLT-25, §7.5)
         // ====================================================================
-        string? rulesYaml = license.RulesYaml ?? license.Policy?.RulesYaml;
+        string? rulesYaml = expResult?.Overrides.PolicyRulesYaml ?? license.RulesYaml ?? license.Policy?.RulesYaml;
         string? reservationTarget = null;
         int? ruleDerivedPriority = null;
 
@@ -280,6 +348,7 @@ public static class PublicEndpoints
 
             if (!evalResult.Allowed)
             {
+                await RecordExperimentAsync(isSuccess: false, isDenial: true, isError: false).ConfigureAwait(false);
                 metrics.RecordCheckoutDenied(license.Id);
                 await alertService.RecordDenialSpikeAsync(license.Id, license.TenantId, evalResult.DenyType ?? "rule-denied", ct).ConfigureAwait(false);
 
@@ -317,7 +386,8 @@ public static class PublicEndpoints
         }
 
         int quantity = dto.Quantity ?? 1;
-        var ttl = TimeSpan.FromSeconds(license.Policy?.LeaseTtlSeconds ?? 600);
+        int leaseTtlSeconds = expResult?.Overrides.LeaseTtlSeconds ?? license.Policy?.LeaseTtlSeconds ?? 600;
+        var ttl = TimeSpan.FromSeconds(leaseTtlSeconds);
 
         var expandedFeatures = dto.Features is { Count: > 0 }
             ? await featureEngine.ExpandFeaturesAsync(license.TenantId, dto.Features, ct).ConfigureAwait(false)
@@ -375,6 +445,7 @@ public static class PublicEndpoints
 
             activity?.SetTag(SymbolonTracing.TagLeaseId, alloc.LeaseId ?? string.Empty);
             activity?.SetStatus(ActivityStatusCode.Ok);
+            await RecordExperimentAsync(isSuccess: true, isDenial: false, isError: false).ConfigureAwait(false);
             return TypedResults.Ok(new CheckoutResponseDto
             {
                 LeaseId = alloc.LeaseId ?? string.Empty,
@@ -402,6 +473,7 @@ public static class PublicEndpoints
             int retryAfter = qStatus?.RetryAfterSeconds ?? 2;
             context.Response.Headers.RetryAfter = retryAfter.ToString(CultureInfo.InvariantCulture);
 
+            await RecordExperimentAsync(isSuccess: true, isDenial: false, isError: false).ConfigureAwait(false);
             return TypedResults.Accepted($"/v1/queue/{ticket.Ticket}", new QueuedResponseDto
             {
                 Ticket = ticket.Ticket,
@@ -412,6 +484,7 @@ public static class PublicEndpoints
             });
         }
 
+        await RecordExperimentAsync(isSuccess: false, isDenial: true, isError: false).ConfigureAwait(false);
         metrics.RecordCheckoutDenied(license.Id);
         await alertService.RecordDenialSpikeAsync(license.Id, license.TenantId, result.Reason ?? "seat-pool-exhausted", ct).ConfigureAwait(false);
 
@@ -455,8 +528,10 @@ public static class PublicEndpoints
     private static async Task<IResult> RenewAsync(
         string id,
         RenewRequestDto dto,
+        HttpContext context,
         LeaseEngine engine,
         Observability.SymbolonMetrics metrics,
+        IExperimentStore experimentStore,
         CancellationToken ct)
     {
         using var activity = SymbolonTracing.ActivitySource.StartActivity(SymbolonTracing.OpRenew);
@@ -480,6 +555,24 @@ public static class PublicEndpoints
             TimeSpan.FromMinutes(5),
             null,
             ct).ConfigureAwait(false);
+
+        string? expHeader = context.Request.Headers["X-Symbolon-Experiment"].FirstOrDefault();
+        if (!string.IsNullOrWhiteSpace(expHeader))
+        {
+            var parts = expHeader.Split('=', 2);
+            if (parts.Length == 2)
+            {
+                await experimentStore.RecordMetricAsync(
+                    parts[0],
+                    parts[1],
+                    isSuccess: result.IsSuccess,
+                    isRenewal: true,
+                    isDenial: !result.IsSuccess,
+                    isError: false,
+                    latencyMs: 0.0,
+                    ct).ConfigureAwait(false);
+            }
+        }
 
         if (result.IsSuccess && result.Allocation is not null && result.Token is not null)
         {

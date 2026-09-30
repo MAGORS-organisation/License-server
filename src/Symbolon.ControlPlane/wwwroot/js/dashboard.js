@@ -76,6 +76,9 @@ function initNavigation() {
                 if (targetView === "view-airgap") {
                     loadAirGapView();
                 }
+                if (targetView === "view-experiments") {
+                    loadExperimentsView();
+                }
             }
         });
     });
@@ -4540,6 +4543,462 @@ window.onAirGapLicenseChanged = onAirGapLicenseChanged;
 window.refreshAirGapSeatMap = refreshAirGapSeatMap;
 window.revokeAirGapGrant = revokeAirGapGrant;
 window.downloadAirGapGrantPem = downloadAirGapGrantPem;
+
+// ==========================================
+// Phase 24: A/B Testing & Experimentation Engine (AB-1..15)
+// ==========================================
+let currentSimulateExperimentId = null;
+
+async function loadExperimentsView() {
+    const tbody = document.getElementById("experiments-table-body");
+    if (!tbody) return;
+
+    tbody.innerHTML = `<tr><td colspan="7" style="text-align: center; color: var(--text-secondary); padding: 24px;">Načítavam experimenty...</td></tr>`;
+
+    try {
+        const res = await fetch("/admin/v1/experiments");
+        if (!res.ok) {
+            tbody.innerHTML = `<tr><td colspan="7" style="text-align: center; color: var(--accent-rose); padding: 24px;">Chyba pri načítaní (${res.status})</td></tr>`;
+            return;
+        }
+
+        const experiments = await res.json();
+        updateExperimentsKPIs(experiments);
+        renderExperimentsTable(experiments);
+    } catch (err) {
+        tbody.innerHTML = `<tr><td colspan="7" style="text-align: center; color: var(--accent-rose); padding: 24px;">Chyba siete: ${escapeHtml(err.message)}</td></tr>`;
+    }
+}
+
+function updateExperimentsKPIs(experiments) {
+    const activeEl = document.getElementById("kpi-exp-active");
+    const activeSubEl = document.getElementById("kpi-exp-active-sub");
+    const totalReqEl = document.getElementById("kpi-exp-total-requests");
+
+    if (!experiments || !Array.isArray(experiments)) return;
+
+    const activeCount = experiments.filter(e => e.status === "Running").length;
+    const draftCount = experiments.filter(e => e.status === "Draft").length;
+    const pausedCount = experiments.filter(e => e.status === "Paused").length;
+
+    if (activeEl) activeEl.textContent = activeCount.toString();
+    if (activeSubEl) activeSubEl.textContent = `${draftCount} v príprave (Draft), ${pausedCount} pozastavených`;
+
+    // Asynchronously update total requests count
+    if (totalReqEl) {
+        let total = 0;
+        Promise.all(experiments.map(e =>
+            fetch(`/admin/v1/experiments/${encodeURIComponent(e.id)}/report`)
+                .then(r => r.ok ? r.json() : null)
+                .then(rep => rep ? rep.totalRequests : 0)
+                .catch(() => 0)
+        )).then(results => {
+            total = results.reduce((acc, curr) => acc + curr, 0);
+            totalReqEl.textContent = total.toLocaleString();
+        });
+    }
+}
+
+function renderExperimentsTable(experiments) {
+    const tbody = document.getElementById("experiments-table-body");
+    if (!tbody) return;
+
+    if (!experiments || experiments.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="7" style="text-align: center; color: var(--text-secondary); padding: 24px;">Žiadne aktívne ani navrhnuté experimenty. Kliknite na <strong>+ Nový Experiment</strong> pre vytvorenie.</td></tr>`;
+        return;
+    }
+
+    tbody.innerHTML = experiments.map(exp => {
+        let statusBadge = "";
+        switch (exp.status) {
+            case "Running":
+                statusBadge = '<span class="badge badge-emerald">Aktívny (Running)</span>';
+                break;
+            case "Paused":
+                statusBadge = '<span class="badge badge-amber">Pozastavený</span>';
+                break;
+            case "Draft":
+                statusBadge = '<span class="badge badge-slate">Návrh (Draft)</span>';
+                break;
+            case "Concluded":
+                statusBadge = '<span class="badge badge-indigo">Ukončený</span>';
+                break;
+            default:
+                statusBadge = `<span class="badge badge-slate">${escapeHtml(exp.status)}</span>`;
+        }
+
+        const variantsHtml = (exp.variants || []).map(v => {
+            const isCtrl = v.isControl ? " (Control)" : "";
+            const ttlText = v.overrides && v.overrides.leaseTtlSeconds ? ` [TTL: ${v.overrides.leaseTtlSeconds}s]` : "";
+            return `<div><code>${escapeHtml(v.id)}</code>: ${escapeHtml(v.name)}${isCtrl} - <strong>${v.weightPercent}%</strong>${ttlText}</div>`;
+        }).join("");
+
+        const createdDate = exp.createdAt ? new Date(exp.createdAt).toLocaleDateString() : "-";
+        const startedDate = exp.startedAt ? `<br><small style="color: var(--accent-emerald);">Spustené: ${new Date(exp.startedAt).toLocaleDateString()}</small>` : "";
+
+        // Action buttons depending on status
+        let actionsHtml = `<div style="display: flex; gap: 4px; flex-wrap: wrap;">`;
+
+        if (exp.status === "Draft") {
+            actionsHtml += `<button class="btn btn-primary btn-sm" onclick="startExperiment('${escapeHtml(exp.id)}')">▶ Spustiť</button>`;
+        } else if (exp.status === "Running") {
+            actionsHtml += `<button class="btn btn-secondary btn-sm" onclick="pauseExperiment('${escapeHtml(exp.id)}')">⏸ Pozastaviť</button>`;
+            actionsHtml += `<button class="btn btn-secondary btn-sm" onclick="showExperimentReport('${escapeHtml(exp.id)}')">📊 Report</button>`;
+            actionsHtml += `<button class="btn btn-secondary btn-sm" onclick="openSimulateModal('${escapeHtml(exp.id)}')">🎲 Simulovať</button>`;
+
+            // Variant promote buttons
+            (exp.variants || []).forEach(v => {
+                actionsHtml += `<button class="btn btn-secondary btn-sm" title="Promovať variant ${escapeHtml(v.name)} na 100%" onclick="promoteExperiment('${escapeHtml(exp.id)}', '${escapeHtml(v.id)}')">⭐ 100% ${escapeHtml(v.id)}</button>`;
+            });
+
+            actionsHtml += `<button class="btn btn-secondary btn-sm" style="color: var(--accent-amber);" onclick="rollbackExperiment('${escapeHtml(exp.id)}')">↩ Rollback</button>`;
+        } else if (exp.status === "Paused") {
+            actionsHtml += `<button class="btn btn-primary btn-sm" onclick="startExperiment('${escapeHtml(exp.id)}')">▶ Pokračovať</button>`;
+            actionsHtml += `<button class="btn btn-secondary btn-sm" onclick="showExperimentReport('${escapeHtml(exp.id)}')">📊 Report</button>`;
+            actionsHtml += `<button class="btn btn-secondary btn-sm" style="color: var(--accent-amber);" onclick="rollbackExperiment('${escapeHtml(exp.id)}')">↩ Rollback</button>`;
+        } else {
+            actionsHtml += `<button class="btn btn-secondary btn-sm" onclick="showExperimentReport('${escapeHtml(exp.id)}')">📊 Report</button>`;
+        }
+
+        actionsHtml += `<button class="btn btn-secondary btn-sm" style="color: var(--accent-rose);" onclick="deleteExperiment('${escapeHtml(exp.id)}')">🗑 Zmazať</button>`;
+        actionsHtml += `</div>`;
+
+        return `
+            <tr>
+                <td>
+                    <strong>${escapeHtml(exp.name)}</strong>
+                    <div style="font-size: 11px; color: var(--text-secondary); font-family: monospace;">${escapeHtml(exp.id)}</div>
+                    ${exp.description ? `<div style="font-size: 12px; color: var(--text-muted); margin-top: 2px;">${escapeHtml(exp.description)}</div>` : ""}
+                </td>
+                <td>${statusBadge}</td>
+                <td><strong>${exp.trafficAllocationPercent}%</strong> prevádzky</td>
+                <td style="font-size: 12px;">${variantsHtml}</td>
+                <td><code>${escapeHtml(exp.salt || "-")}</code></td>
+                <td>${createdDate}${startedDate}</td>
+                <td>${actionsHtml}</td>
+            </tr>
+        `;
+    }).join("");
+}
+
+function openNewExperimentModal() {
+    const form = document.getElementById("form-new-experiment");
+    if (form) form.reset();
+    openModal("modal-new-experiment");
+}
+
+async function submitNewExperiment(event) {
+    if (event) event.preventDefault();
+
+    const id = document.getElementById("exp-id")?.value?.trim();
+    const name = document.getElementById("exp-name")?.value?.trim();
+    const desc = document.getElementById("exp-desc")?.value?.trim();
+    const alloc = parseInt(document.getElementById("exp-allocation")?.value || "100", 10);
+    const weightA = parseInt(document.getElementById("exp-var-a-weight")?.value || "50", 10);
+    const ttlA = parseInt(document.getElementById("exp-var-a-ttl")?.value || "600", 10);
+    const weightB = parseInt(document.getElementById("exp-var-b-weight")?.value || "50", 10);
+    const ttlB = parseInt(document.getElementById("exp-var-b-ttl")?.value || "60", 10);
+    const maxErr = parseFloat(document.getElementById("exp-cb-max-error")?.value || "5");
+    const minSamples = parseInt(document.getElementById("exp-cb-min-samples")?.value || "50", 10);
+
+    if (!id || !name) {
+        showToast("Zadajte ID a názov experimentu", "error");
+        return;
+    }
+
+    if (weightA + weightB !== 100) {
+        showToast("Súčet váh variantov musí byť 100%", "error");
+        return;
+    }
+
+    const payload = {
+        id: id,
+        name: name,
+        description: desc,
+        trafficAllocationPercent: alloc,
+        variants: [
+            {
+                id: "A",
+                name: "Control (A)",
+                weightPercent: weightA,
+                isControl: true,
+                overrides: { leaseTtlSeconds: ttlA }
+            },
+            {
+                id: "B",
+                name: "Treatment (B)",
+                weightPercent: weightB,
+                isControl: false,
+                overrides: { leaseTtlSeconds: ttlB }
+            }
+        ],
+        circuitBreaker: {
+            maxErrorRatePercent: maxErr,
+            minSamples: minSamples,
+            autoRollback: true
+        }
+    };
+
+    try {
+        const res = await fetch("/admin/v1/experiments", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload)
+        });
+
+        if (res.ok) {
+            closeModal("modal-new-experiment");
+            showToast("Experiment bol úspešne vytvorený!", "success");
+            await loadExperimentsView();
+        } else {
+            const err = await res.text();
+            showToast("Chyba pri vytváraní experimentu: " + err, "error");
+        }
+    } catch (e) {
+        showToast("Sieťová chyba: " + e.message, "error");
+    }
+}
+
+async function startExperiment(id) {
+    try {
+        const res = await fetch(`/admin/v1/experiments/${encodeURIComponent(id)}/start`, { method: "POST" });
+        if (res.ok) {
+            showToast(`Experiment '${id}' spustený do prevádzky`, "success");
+            await loadExperimentsView();
+        } else {
+            showToast("Chyba pri spúšťaní experimentu", "error");
+        }
+    } catch (e) {
+        showToast("Chyba spojenia: " + e.message, "error");
+    }
+}
+
+async function pauseExperiment(id) {
+    try {
+        const res = await fetch(`/admin/v1/experiments/${encodeURIComponent(id)}/pause`, { method: "POST" });
+        if (res.ok) {
+            showToast(`Experiment '${id}' bol pozastavený`, "info");
+            await loadExperimentsView();
+        } else {
+            showToast("Chyba pri pozastavovaní experimentu", "error");
+        }
+    } catch (e) {
+        showToast("Chyba spojenia: " + e.message, "error");
+    }
+}
+
+async function promoteExperiment(id, variantId) {
+    if (!confirm(`Naozaj si želáte promovať variant '${variantId}' na 100% prevádzky pre experiment '${id}'? Týmto sa experiment ukončí ako úspešný.`)) {
+        return;
+    }
+
+    try {
+        const res = await fetch(`/admin/v1/experiments/${encodeURIComponent(id)}/promote/${encodeURIComponent(variantId)}`, { method: "POST" });
+        if (res.ok) {
+            showToast(`Variant '${variantId}' promovaný na 100%!`, "success");
+            await loadExperimentsView();
+        } else {
+            showToast("Chyba pri promovaní variantu", "error");
+        }
+    } catch (e) {
+        showToast("Chyba spojenia: " + e.message, "error");
+    }
+}
+
+async function rollbackExperiment(id) {
+    if (!confirm(`Naozaj si želáte vykonať ROLLBACK experimentu '${id}' na kontrolný variant?`)) {
+        return;
+    }
+
+    try {
+        const res = await fetch(`/admin/v1/experiments/${encodeURIComponent(id)}/rollback`, { method: "POST" });
+        if (res.ok) {
+            showToast(`Experiment '${id}' vrátený na kontrolný variant (100% Control)`, "warning");
+            await loadExperimentsView();
+        } else {
+            showToast("Chyba pri rollbacku", "error");
+        }
+    } catch (e) {
+        showToast("Chyba spojenia: " + e.message, "error");
+    }
+}
+
+async function deleteExperiment(id) {
+    if (!confirm(`Naozaj chcete natrvalo zmazať experiment '${id}' a všetky jeho metriky?`)) {
+        return;
+    }
+
+    try {
+        const res = await fetch(`/admin/v1/experiments/${encodeURIComponent(id)}`, { method: "DELETE" });
+        if (res.ok) {
+            showToast(`Experiment '${id}' bol zmazaný`, "success");
+            await loadExperimentsView();
+        } else {
+            showToast("Chyba pri mazaní experimentu", "error");
+        }
+    } catch (e) {
+        showToast("Chyba spojenia: " + e.message, "error");
+    }
+}
+
+async function showExperimentReport(id) {
+    openModal("modal-experiment-report");
+    const container = document.getElementById("experiment-report-content");
+    if (!container) return;
+
+    container.innerHTML = `<p style="text-align: center; color: var(--text-secondary); padding: 20px;">Generujem štatistický report (Z-Test, CI 95%, Welch's t)...</p>`;
+
+    try {
+        const res = await fetch(`/admin/v1/experiments/${encodeURIComponent(id)}/report`);
+        if (!res.ok) {
+            container.innerHTML = `<p style="text-align: center; color: var(--accent-rose); padding: 20px;">Chyba pri načítaní reportu (${res.status})</p>`;
+            return;
+        }
+
+        const r = await res.json();
+        const sigBadge = r.isStatisticallySignificant
+            ? `<span class="badge badge-emerald">Áno (p < 0.05, Z=${r.zScore ? r.zScore.toFixed(2) : "-"})</span>`
+            : `<span class="badge badge-slate">Nie (p=${r.pValue !== null ? r.pValue.toFixed(4) : "nedostatok dát"})</span>`;
+
+        let variantsRows = "";
+        if (r.variantReports && r.variantReports.length > 0) {
+            variantsRows = r.variantReports.map(v => `
+                <tr>
+                    <td><strong>${escapeHtml(v.variantName)}</strong> <code>(${escapeHtml(v.variantId)})</code> ${v.isControl ? '<span class="badge badge-slate">Control</span>' : ""}</td>
+                    <td>${v.sampleCount.toLocaleString()}</td>
+                    <td style="color: var(--accent-emerald);">${v.successCount.toLocaleString()}</td>
+                    <td style="color: ${v.errorCount > 0 ? 'var(--accent-rose)' : 'inherit'};">${v.errorCount.toLocaleString()}</td>
+                    <td><strong>${v.successRatePercent.toFixed(2)}%</strong></td>
+                    <td>${v.avgLatencyMs.toFixed(2)} ms</td>
+                </tr>
+            `).join("");
+        }
+
+        const ciText = (r.confidenceIntervalLow !== null && r.confidenceIntervalHigh !== null)
+            ? `[${(r.confidenceIntervalLow * 100).toFixed(2)}% .. ${(r.confidenceIntervalHigh * 100).toFixed(2)}%]`
+            : "N/A";
+
+        container.innerHTML = `
+            <div style="background: rgba(255,255,255,0.02); border: 1px solid var(--border-color); border-radius: 8px; padding: 16px; margin-bottom: 16px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                    <div>
+                        <strong style="font-size: 15px;">${escapeHtml(r.experimentName)}</strong>
+                        <div style="font-size: 12px; color: var(--text-secondary);">ID: <code>${escapeHtml(r.experimentId)}</code></div>
+                    </div>
+                    <div>${sigBadge}</div>
+                </div>
+                <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; font-size: 12px;">
+                    <div><strong>Celkovo vzoriek:</strong> ${r.totalRequests.toLocaleString()}</div>
+                    <div><strong>Z-Skóre:</strong> ${r.zScore !== null ? r.zScore.toFixed(3) : "N/A"}</div>
+                    <div><strong>P-Hodnota:</strong> ${r.pValue !== null ? r.pValue.toFixed(4) : "N/A"}</div>
+                    <div><strong>95% Konfidenčný Interval:</strong> ${ciText}</div>
+                    <div><strong>Welch's t p-value (latencia):</strong> ${r.latencyPValue !== null ? r.latencyPValue.toFixed(4) : "N/A"}</div>
+                    <div><strong>Odporúčanie:</strong> <span style="color: var(--accent-primary); font-weight: 600;">${escapeHtml(r.recommendation)}</span></div>
+                </div>
+            </div>
+
+            <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
+                <thead>
+                    <tr style="border-bottom: 1px solid var(--border-color); text-align: left; color: var(--text-secondary);">
+                        <th style="padding: 8px 6px;">Variant</th>
+                        <th style="padding: 8px 6px;">Počet Žiadostí</th>
+                        <th style="padding: 8px 6px;">Úspešné</th>
+                        <th style="padding: 8px 6px;">Chyby</th>
+                        <th style="padding: 8px 6px;">Úspešnosť</th>
+                        <th style="padding: 8px 6px;">Priem. Latencia</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${variantsRows}
+                </tbody>
+            </table>
+        `;
+    } catch (e) {
+        container.innerHTML = `<p style="text-align: center; color: var(--accent-rose); padding: 20px;">Chyba: ${escapeHtml(e.message)}</p>`;
+    }
+}
+
+function openSimulateModal(id) {
+    currentSimulateExperimentId = id;
+    openModal("modal-experiment-simulate");
+    runExperimentSimulation();
+}
+
+async function runExperimentSimulation() {
+    if (!currentSimulateExperimentId) return;
+
+    const countInput = document.getElementById("sim-clients-input");
+    const count = parseInt(countInput?.value || "1000", 10);
+    const container = document.getElementById("experiment-simulate-content");
+    if (!container) return;
+
+    container.innerHTML = `<p style="text-align: center; color: var(--text-secondary); padding: 20px;">Spúšťam SHA-256 slice simuláciu pre ${count.toLocaleString()} klientov...</p>`;
+
+    try {
+        const res = await fetch(`/admin/v1/experiments/${encodeURIComponent(currentSimulateExperimentId)}/simulate`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ clientCount: count })
+        });
+
+        if (!res.ok) {
+            container.innerHTML = `<p style="text-align: center; color: var(--accent-rose); padding: 20px;">Chyba pri simulácii (${res.status})</p>`;
+            return;
+        }
+
+        const data = await res.json();
+        const rows = (data.variantDistribution || []).map(v => {
+            const actualPct = (v.actualRatio * 100).toFixed(1);
+            const expPct = (v.expectedRatio * 100).toFixed(1);
+            const delta = Math.abs(parseFloat(actualPct) - parseFloat(expPct)).toFixed(1);
+
+            return `
+                <tr style="border-bottom: 1px solid var(--border-color);">
+                    <td style="padding: 8px;"><strong>${escapeHtml(v.variantName)}</strong> <code>(${escapeHtml(v.variantId)})</code></td>
+                    <td style="padding: 8px;">${v.assignedClients.toLocaleString()}</td>
+                    <td style="padding: 8px;">${expPct}%</td>
+                    <td style="padding: 8px; color: var(--accent-emerald);"><strong>${actualPct}%</strong></td>
+                    <td style="padding: 8px; color: ${parseFloat(delta) > 3 ? 'var(--accent-amber)' : 'inherit'};">±${delta}%</td>
+                </tr>
+            `;
+        }).join("");
+
+        container.innerHTML = `
+            <div style="margin-bottom: 12px; font-size: 13px; color: var(--text-secondary);">
+                Simulácia prebehla na <strong>${data.simulatedClients.toLocaleString()}</strong> syntetických klientoch (deterministický SHA-256 hash s unikátnou soľou experimentu).
+            </div>
+            <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
+                <thead>
+                    <tr style="border-bottom: 1px solid var(--border-color); text-align: left; color: var(--text-secondary);">
+                        <th style="padding: 8px;">Variant</th>
+                        <th style="padding: 8px;">Klienti</th>
+                        <th style="padding: 8px;">Očakávané %</th>
+                        <th style="padding: 8px;">Skutočné %</th>
+                        <th style="padding: 8px;">Odchýlka</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${rows}
+                </tbody>
+            </table>
+        `;
+    } catch (e) {
+        container.innerHTML = `<p style="text-align: center; color: var(--accent-rose); padding: 20px;">Chyba: ${escapeHtml(e.message)}</p>`;
+    }
+}
+
+window.loadExperimentsView = loadExperimentsView;
+window.openNewExperimentModal = openNewExperimentModal;
+window.submitNewExperiment = submitNewExperiment;
+window.startExperiment = startExperiment;
+window.pauseExperiment = pauseExperiment;
+window.promoteExperiment = promoteExperiment;
+window.rollbackExperiment = rollbackExperiment;
+window.deleteExperiment = deleteExperiment;
+window.showExperimentReport = showExperimentReport;
+window.openSimulateModal = openSimulateModal;
+window.runExperimentSimulation = runExperimentSimulation;
+
 
 
 

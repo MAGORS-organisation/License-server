@@ -41,6 +41,8 @@ public class SymbolonDbContext : DbContext
     public DbSet<PackageSuiteEntity> PackageSuites => Set<PackageSuiteEntity>();
     public DbSet<LicenseEntitlementEntity> LicenseEntitlements => Set<LicenseEntitlementEntity>();
     public DbSet<ActiveFeatureLeaseEntity> ActiveFeatureLeases => Set<ActiveFeatureLeaseEntity>();
+    public DbSet<ExperimentEntity> Experiments => Set<ExperimentEntity>();
+    public DbSet<ExperimentMetricEntity> ExperimentMetrics => Set<ExperimentMetricEntity>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -533,6 +535,36 @@ public class SymbolonDbContext : DbContext
             b.HasIndex(a => a.ExpiresAt);
             b.HasOne(a => a.Tenant).WithMany().HasForeignKey(a => a.TenantId).OnDelete(DeleteBehavior.Cascade);
             b.HasOne(a => a.License).WithMany(l => l.ActiveFeatureLeases).HasForeignKey(a => a.LicenseId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // ExperimentEntity
+        modelBuilder.Entity<ExperimentEntity>(b =>
+        {
+            b.ToTable("experiments");
+            b.HasKey(e => e.Id);
+            b.Property(e => e.TenantId).HasMaxLength(64);
+            b.Property(e => e.Name).HasMaxLength(256).IsRequired();
+            b.Property(e => e.Description).HasMaxLength(1000);
+            b.Property(e => e.Status).HasMaxLength(32).IsRequired();
+            b.Property(e => e.Salt).HasMaxLength(64).IsRequired();
+            b.Property(e => e.PromotedVariantId).HasMaxLength(64);
+            b.Property(e => e.TargetingJson).HasMaxLength(4000).IsRequired();
+            b.Property(e => e.VariantsJson).HasMaxLength(4000).IsRequired();
+            b.Property(e => e.CircuitBreakerJson).HasMaxLength(2000).IsRequired();
+            b.HasIndex(e => e.Status);
+            b.HasIndex(e => e.TenantId);
+            b.HasOne(e => e.Tenant).WithMany().HasForeignKey(e => e.TenantId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // ExperimentMetricEntity
+        modelBuilder.Entity<ExperimentMetricEntity>(b =>
+        {
+            b.ToTable("experiment_metrics");
+            b.HasKey(m => m.Id);
+            b.Property(m => m.ExperimentId).HasMaxLength(64).IsRequired();
+            b.Property(m => m.VariantId).HasMaxLength(64).IsRequired();
+            b.HasIndex(m => new { m.ExperimentId, m.VariantId }).IsUnique();
+            b.HasOne(m => m.Experiment).WithMany(e => e.Metrics).HasForeignKey(m => m.ExperimentId).OnDelete(DeleteBehavior.Cascade);
         });
 
         if (Database.IsSqlite())

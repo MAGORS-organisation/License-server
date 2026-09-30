@@ -63,6 +63,7 @@ internal static class Program
                 "POLICY" or "OPTIONS" or "RULES" => await Commands.PolicyCommands.HandlePolicyAsync(args[1..]).ConfigureAwait(false),
                 "MACHINE" or "FINGERPRINT" or "ACTIVATION" or "ACTIVATIONS" => await Commands.MachineCommands.HandleMachineAsync(args[1..]).ConfigureAwait(false),
                 "GRANT" or "GRANTS" or "SEATGRANT" or "AIRGAP" => await Commands.GrantCommands.HandleGrantAsync(args[1..]).ConfigureAwait(false),
+                "EXPERIMENTS" or "EXPERIMENT" or "ABTEST" or "AB" => await Commands.ExperimentCommands.HandleExperimentAsync(args[1..]).ConfigureAwait(false),
                 _ => UnknownCommand(args[0])
             };
         }
@@ -886,6 +887,7 @@ internal static class Program
               policy rules get|set|test                 Options file pravidlá (FLT-23, FLT-24, FLT-25), rezervácie, zákazy a kvóty
               machine fingerprint|activate|deactivate|test-match|list Hardvérový fingerprint, fuzzy node-lock matching a aktivácie
               grant request|issue|inspect|import       Delegované air-gap sedadlá (.symgrant, .symreq, GNT-1..10)
+              experiments list|create|start|report|sim A/B testovanie a experimentačný engine (AB-1..15, Z-test, p-value)
             """);
     }
 }

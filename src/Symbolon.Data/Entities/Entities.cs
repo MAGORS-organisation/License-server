@@ -531,5 +531,40 @@ public sealed class ActiveFeatureLeaseEntity
     public LicenseEntity? License { get; set; }
 }
 
+public sealed class ExperimentEntity
+{
+    public string Id { get; set; } = string.Empty;
+    public string? TenantId { get; set; }
+    public string Name { get; set; } = string.Empty;
+    public string? Description { get; set; }
+    public string Status { get; set; } = "Draft";
+    public string Salt { get; set; } = string.Empty;
+    public int TrafficAllocation { get; set; } = 100;
+    public string TargetingJson { get; set; } = "{}";
+    public string VariantsJson { get; set; } = "[]";
+    public string CircuitBreakerJson { get; set; } = "{}";
+    public string? PromotedVariantId { get; set; }
+    public DateTimeOffset CreatedAt { get; set; }
+    public DateTimeOffset? StartedAt { get; set; }
+    public DateTimeOffset? EndedAt { get; set; }
 
+    public Tenant? Tenant { get; set; }
+    public ICollection<ExperimentMetricEntity> Metrics { get; set; } = new List<ExperimentMetricEntity>();
+}
 
+public sealed class ExperimentMetricEntity
+{
+    public string Id { get; set; } = string.Empty;
+    public string ExperimentId { get; set; } = string.Empty;
+    public string VariantId { get; set; } = string.Empty;
+    public long TotalRequests { get; set; }
+    public long SuccessfulCheckouts { get; set; }
+    public long Renewals { get; set; }
+    public long Denials { get; set; }
+    public long Errors { get; set; }
+    public double LatencyMsSum { get; set; }
+    public double LatencyMsSquareSum { get; set; }
+    public DateTimeOffset UpdatedAt { get; set; }
+
+    public ExperimentEntity? Experiment { get; set; }
+}

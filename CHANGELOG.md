@@ -10,6 +10,32 @@ a projekt striktne dodržiava [Sémantické Verziovanie (Semantic Versioning 2.0
 ## [Unreleased]
 
 ### Pridané (Added)
+- **A/B Testovanie & Experimentačný Engine v Reálnej Prevádzke (AB-1 – AB-15, Míľnik M6, §13.4)**:
+  - **Doménová vrstva (`Symbolon.Domain`)**:
+    - Dátové modely `Experiment`, `ExperimentStatus`, `ExperimentVariant`, `ExperimentOverrides`, `ExperimentTargeting`, `ExperimentCircuitBreaker`, `ExperimentEvaluationResult`, `VariantMetrics`, `ExperimentStatisticalReport`.
+    - `DeterministicBucketRouter`: Bezstavový uniformný bucketing pomocou kryptografického SHA-256 slice `[0..99]` z reťazca `LICENSE_KEY:MACHINE_ID:SALT`. Garancia Sticky Session invariantu (nulový drift variantu počas životného cyklu lízingu). Podpora cieleného smerovania (podľa tenantov, prefixov licenčných kľúčov, SDK verzií a operačných systémov), vážená proporčná alokácia a okamžitá 100% aktivácia promovaného variantu.
+    - `ExperimentStatisticalEngine`: Rigorózne štatistické testovanie v reálnom čase. Polynomiálna aproximácia chybovej funkcie `Erf` podľa Abramowitz & Stegun 7.1.26 (maximálna chyba $< 1.5 \times 10^{-7}$), kumulatívna distribučná funkcia normálneho rozdelenia `NormalCdf`, Two-Proportion Pooled Z-Test s 95% konfidenčným intervalom, Welchov t-test pre spojité metriky (latencia požiadaviek) a automatizované rozhodovacie heuristiky s bezpečnostnými odporúčaniami.
+    - `IExperimentStore`: Rozhranie pre správu experimentov, atomické zaznamenávanie metrík a generovanie štatistických reportov.
+  - **Dátová a Perzistentná vrstva (`Symbolon.Data`)**:
+    - Entitné mapovania `ExperimentEntity` a `ExperimentMetricEntity` v `SymbolonDbContext` s indexmi, SQLite konvertormi pre `DateTimeOffset` a serializáciou JSON konfigurácií.
+    - `EfExperimentStore`: Asynchrónna EF Core implementácia `IExperimentStore` s atomickými počítadlami, sledovaním latencie a ochranou pred race conditions.
+  - **Riadiaca rovina & Admin API (`Symbolon.ControlPlane`)**:
+    - Správa životného cyklu experimentov: `GET /admin/v1/experiments`, `POST /admin/v1/experiments`, `GET /admin/v1/experiments/{id}`, `PUT /admin/v1/experiments/{id}`, `DELETE /admin/v1/experiments/{id}`.
+    - Prevádzkové akcie: `POST /admin/v1/experiments/{id}/start`, `POST /admin/v1/experiments/{id}/pause`, `POST /admin/v1/experiments/{id}/promote/{variantId}`, `POST /admin/v1/experiments/{id}/rollback`.
+    - Analytika a simulácia: `GET /admin/v1/experiments/{id}/report` (Z-test, p-hodnota, Welch's t, odporúčanie), `POST /admin/v1/experiments/{id}/simulate` (syntetická distribúcia až do 100 000 klientov).
+    - Integrácia do verejných endpointov: `CheckoutAsync` a `RenewAsync` emitujú hlavičku `X-Symbolon-Experiment: <exp_id>=<variant_id>`, dynamicky aplikujú experimentálne prepisy (`LeaseTtlSeconds`, `PolicyRulesYaml`), merajú latenciu a aktivujú Canary Circuit Breaker (<100 ms automatický rollback pri zvýšenej chybovosti).
+  - **CLI Rozhranie (`Symbolon.Cli`)**:
+    - Sada príkazov `symbolon experiments list`, `symbolon experiments get <id>`, `symbolon experiments create`, `symbolon experiments start <id>`, `symbolon experiments pause <id>`, `symbolon experiments promote <id> <variantId>`, `symbolon experiments rollback <id>`, `symbolon experiments report <id>`, `symbolon experiments simulate <id> [--clients <n>]` s farebnými tabuľkami Spectre.Console.
+  - **Web Dashboard & Operátorská Konzola (`Symbolon.ControlPlane/wwwroot`)**:
+    - Nová sekcia `🧪 A/B Experimenty (AB-1)` v bočnom paneli a plynulé prepínanie pohľadov.
+    - KPI karty: Počet aktívnych experimentov, konceptov (draft), celkový objem spracovaných lízingových požiadaviek, štatistický engine a stav canary circuit breakera.
+    - Tabuľka experimentov s okamžitými akčnými tlačidlami (Spustiť, Pozastaviť, 100% Promote variantu, Rollback, Štatistický Report, Simulácia bucketingu, Zmazanie).
+    - Modálne okná: Vytvorenie nového experimentu s konfiguráciou variantov A/B a circuit breakera, Interaktívny Štatistický Report s rozpadom metrík a farebnými odznakmi signifikancie, a Monte Carlo simulátor distribúcie klientov.
+  - **Multi-Language Parity (Python SDK)**:
+    - Nový modul `symbolon.experiment` poskytujúci `calculate_bucket()`, `route_experiment()`, `calculate_two_proportion_z_test()`, `calculate_welch_t_test()`, a `generate_statistical_report()`.
+    - Dátové modely `Experiment`, `ExperimentVariant`, `ExperimentOverrides`, `ExperimentTargeting`, `ExperimentCircuitBreaker`, `ExperimentStatus`, `ExperimentEvaluationResult`.
+  - **Kompletná Testovacia Verifikácia**:
+    - Všetkých 474 .NET testov a 39 Python SDK testov (spolu 513 testov) úspešných na 100% s 0 varovaniami (`TreatWarningsAsErrors=true`).
 - **Strategická Roadmapa: A/B Testovanie a Pripravenosť na Post-Kvantovú Éru (`docs/13-roadmapa-a-rizika.md`, §13.4, §13.5)**:
   - **A/B Testovanie a Experimentálny Engine**:
     - Špecifikácia architektúry experimentov s bezstavovým deterministickým bucketingom cez Murmur3 hashing (`Bucket = Murmur3(Key + Machine + Salt) % 100`).

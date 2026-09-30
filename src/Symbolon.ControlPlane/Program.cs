@@ -86,6 +86,7 @@ builder.Services.AddSingleton<Symbolon.ControlPlane.Security.Sso.SsoEngine>();
 builder.Services.AddSingleton<Symbolon.ControlPlane.Security.KmsHierarchyManager>();
 builder.Services.AddScoped<Symbolon.Domain.Entitlements.IFeatureEntitlementStore, Symbolon.Data.Stores.EfFeatureEntitlementStore>();
 builder.Services.AddScoped<Symbolon.Domain.Entitlements.FeatureEntitlementEngine>();
+builder.Services.AddScoped<Symbolon.Domain.Experiments.IExperimentStore, Symbolon.Data.Stores.EfExperimentStore>();
 builder.Services.AddScoped<LeaseEngine>();
 
 // Rate Limiting (STRIDE T11, T12, SEC-05: Partitioned by Client IP / Admin Key)

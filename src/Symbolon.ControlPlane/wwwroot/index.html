@@ -135,6 +135,12 @@
                 </a>
             </li>
             <li class="nav-item">
+                <a class="nav-link" data-view="view-experiments">
+                    <span class="nav-icon">🧪</span>
+                    <span>A/B Experimenty (AB-1)</span>
+                </a>
+            </li>
+            <li class="nav-item">
                 <a class="nav-link" data-view="view-system">
                     <span class="nav-icon">⚡</span>
                     <span>API &amp; Diagnostika</span>
@@ -2378,6 +2384,85 @@
                 </div>
             </section>
 
+            <!-- VIEW: A/B Testovanie & Experimentačný Engine (AB-1 .. AB-15, §13.4) -->
+            <section id="view-experiments" class="view-section">
+                <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 24px;">
+                    <div>
+                        <h2 style="font-size: 20px; font-weight: 700; color: var(--text-primary); margin-bottom: 4px;">
+                            🧪 A/B Testovanie &amp; Experimentačný Engine (AB-1 – AB-15, §13.4)
+                        </h2>
+                        <p style="color: var(--text-secondary); font-size: 13px;">
+                            Stateless SHA-256 slicing [0..99], sticky session invariant, automatický circuit breaker a štatistické testovanie hypotéz (Z-Test, Welch's t-test, 95% interval spoľahlivosti).
+                        </p>
+                    </div>
+                    <div style="display: flex; gap: 8px;">
+                        <button type="button" class="btn btn-primary btn-sm" onclick="openNewExperimentModal()">+ Nový Experiment</button>
+                        <button type="button" class="btn btn-secondary btn-sm" onclick="loadExperimentsView()">🔄 Obnoviť</button>
+                    </div>
+                </div>
+
+                <!-- KPI Grid -->
+                <div class="kpi-grid" style="margin-bottom: 20px;">
+                    <div class="kpi-card">
+                        <div class="kpi-label">
+                            <span>Aktívne Experimenty</span>
+                            <span>🧪</span>
+                        </div>
+                        <div class="kpi-value" id="kpi-exp-active" style="font-size: 22px; color: var(--accent-primary);">0</div>
+                        <div class="kpi-subtext" id="kpi-exp-active-sub">0 v príprave (Draft)</div>
+                    </div>
+                    <div class="kpi-card">
+                        <div class="kpi-label">
+                            <span>Spracované Žiadosti</span>
+                            <span>📈</span>
+                        </div>
+                        <div class="kpi-value" id="kpi-exp-total-requests" style="font-size: 22px; color: var(--accent-emerald);">0</div>
+                        <div class="kpi-subtext">Lease acquire &amp; heartbeat renew</div>
+                    </div>
+                    <div class="kpi-card">
+                        <div class="kpi-label">
+                            <span>Štatistický Engine</span>
+                            <span>⚖️</span>
+                        </div>
+                        <div class="kpi-value" style="font-size: 20px; color: var(--accent-amber);">Z-Test &amp; Welch's t</div>
+                        <div class="kpi-subtext">α = 0.05, Abramowitz &amp; Stegun erf</div>
+                    </div>
+                    <div class="kpi-card">
+                        <div class="kpi-label">
+                            <span>Circuit Breaker</span>
+                            <span>🛡️</span>
+                        </div>
+                        <div class="kpi-value" style="font-size: 20px; color: var(--accent-rose);">Auto-Rollback</div>
+                        <div class="kpi-subtext">Ochrana produkcie pri zvýšenej chybovosti</div>
+                    </div>
+                </div>
+
+                <!-- Experiments Table -->
+                <div class="table-card" style="padding: 16px 20px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px;">
+                        <div class="table-title">🔬 Konfigurované Experimenty &amp; Prevádzka</div>
+                    </div>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>ID / Názov</th>
+                                <th>Stav</th>
+                                <th>Alokácia</th>
+                                <th>Varianty</th>
+                                <th>Salt</th>
+                                <th>Vytvorené / Spustené</th>
+                                <th>Akcie</th>
+                            </tr>
+                        </thead>
+                        <tbody id="experiments-table-body">
+                            <tr>
+                                <td colspan="7" style="text-align: center; color: var(--text-secondary); padding: 24px;">Načítavam experimenty...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
         </main>
     </div>
 
@@ -3039,6 +3124,112 @@
                     <button type="submit" class="btn btn-primary" id="btn-submit-return-early">Overiť Dôkaz a Vrátiť</button>
                 </div>
             </form>
+        </div>
+    </div>
+
+    <!-- Modal: Nový Experiment (AB-1) -->
+    <div class="modal-overlay" id="modal-new-experiment">
+        <div class="modal-box" style="max-width: 600px;">
+            <div class="modal-header">
+                <div class="modal-title">🧪 Vytvoriť Nový A/B Experiment</div>
+                <button class="modal-close" onclick="closeModal('modal-new-experiment')">&times;</button>
+            </div>
+            <form id="form-new-experiment" onsubmit="submitNewExperiment(event)">
+                <div class="form-group">
+                    <label class="form-label" for="exp-id">ID Experimentu</label>
+                    <input type="text" class="form-control" id="exp-id" required placeholder="napr. exp_ttl_optimization">
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="exp-name">Názov Experimentu</label>
+                    <input type="text" class="form-control" id="exp-name" required placeholder="napr. Test 60s TTL vs 600s TTL">
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="exp-desc">Popis</label>
+                    <input type="text" class="form-control" id="exp-desc" placeholder="Hypotéza: Kratší TTL znižuje ghost sedadlá o 30%">
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="exp-allocation">Alokácia Prevádzky (%)</label>
+                    <input type="number" class="form-control" id="exp-allocation" min="1" max="100" value="100" required>
+                </div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px;">
+                    <div style="background: rgba(255,255,255,0.03); padding: 10px; border-radius: 6px; border: 1px solid var(--border-color);">
+                        <strong style="color: var(--accent-primary); font-size: 13px;">Variant A (Control)</strong>
+                        <div class="form-group" style="margin-top: 6px; margin-bottom: 6px;">
+                            <label class="form-label" style="font-size: 11px;">Váha (%)</label>
+                            <input type="number" class="form-control" id="exp-var-a-weight" value="50" min="0" max="100">
+                        </div>
+                        <div class="form-group" style="margin-bottom: 0;">
+                            <label class="form-label" style="font-size: 11px;">Lease TTL (sekundy)</label>
+                            <input type="number" class="form-control" id="exp-var-a-ttl" value="600" placeholder="600">
+                        </div>
+                    </div>
+                    <div style="background: rgba(255,255,255,0.03); padding: 10px; border-radius: 6px; border: 1px solid var(--border-color);">
+                        <strong style="color: var(--accent-emerald); font-size: 13px;">Variant B (Treatment)</strong>
+                        <div class="form-group" style="margin-top: 6px; margin-bottom: 6px;">
+                            <label class="form-label" style="font-size: 11px;">Váha (%)</label>
+                            <input type="number" class="form-control" id="exp-var-b-weight" value="50" min="0" max="100">
+                        </div>
+                        <div class="form-group" style="margin-bottom: 0;">
+                            <label class="form-label" style="font-size: 11px;">Lease TTL (sekundy)</label>
+                            <input type="number" class="form-control" id="exp-var-b-ttl" value="60" placeholder="60">
+                        </div>
+                    </div>
+                </div>
+                <div style="background: rgba(239, 68, 68, 0.06); border-left: 3px solid var(--accent-rose); padding: 10px; border-radius: 0 6px 6px 0; margin-bottom: 14px;">
+                    <strong style="color: var(--text-primary); font-size: 12px;">🛡️ Circuit Breaker (Canary Safety)</strong>
+                    <div style="display: flex; gap: 10px; margin-top: 6px;">
+                        <div style="flex: 1;">
+                            <label class="form-label" style="font-size: 11px;">Max Chybovosť (%)</label>
+                            <input type="number" class="form-control" id="exp-cb-max-error" value="5" min="1" max="50">
+                        </div>
+                        <div style="flex: 1;">
+                            <label class="form-label" style="font-size: 11px;">Min Vzoriek</label>
+                            <input type="number" class="form-control" id="exp-cb-min-samples" value="50" min="10" max="1000">
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" onclick="closeModal('modal-new-experiment')">Zrušiť</button>
+                    <button type="submit" class="btn btn-primary">Vytvoriť Experiment</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal: Štatistický Report (Z-Test, CI, Welch's t-test) -->
+    <div class="modal-overlay" id="modal-experiment-report">
+        <div class="modal-box" style="max-width: 700px;">
+            <div class="modal-header">
+                <div class="modal-title">📊 Štatistický Report Experimentu</div>
+                <button class="modal-close" onclick="closeModal('modal-experiment-report')">&times;</button>
+            </div>
+            <div id="experiment-report-content" style="padding: 10px 0;">
+                <p style="color: var(--text-secondary); text-align: center;">Načítavam dáta a počítam štatistické metriky...</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="closeModal('modal-experiment-report')">Zavrieť</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Simulácia Experimentu -->
+    <div class="modal-overlay" id="modal-experiment-simulate">
+        <div class="modal-box" style="max-width: 600px;">
+            <div class="modal-header">
+                <div class="modal-title">🎲 Simulácia Bucketingu Experimentu</div>
+                <button class="modal-close" onclick="closeModal('modal-experiment-simulate')">&times;</button>
+            </div>
+            <div style="margin-bottom: 14px;">
+                <label class="form-label">Počet virtuálnych klientov:</label>
+                <div style="display: flex; gap: 8px;">
+                    <input type="number" class="form-control" id="sim-clients-input" value="1000" min="10" max="100000">
+                    <button type="button" class="btn btn-primary" onclick="runExperimentSimulation()">Spustiť</button>
+                </div>
+            </div>
+            <div id="experiment-simulate-content" style="padding: 10px 0;"></div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="closeModal('modal-experiment-simulate')">Zavrieť</button>
+            </div>
         </div>
     </div>
 

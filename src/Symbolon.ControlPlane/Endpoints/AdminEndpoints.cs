@@ -15,6 +15,7 @@ using Symbolon.Format;
 using Symbolon.Protocol;
 using Symbolon.Protocol.Reporting;
 using Symbolon.ControlPlane.Queuing;
+using Symbolon.Domain.Experiments;
 
 namespace Symbolon.ControlPlane.Endpoints;
 
@@ -98,6 +99,19 @@ public static class AdminEndpoints
         group.MapGet("/queue", GetQueueTicketsAdminAsync).WithName("GetQueueTicketsAdmin");
         group.MapPost("/queue/{ticket}/promote", PromoteQueueTicketAdminAsync).WithName("PromoteQueueTicketAdmin");
         group.MapDelete("/queue/{ticket}", CancelQueueTicketAdminAsync).WithName("CancelQueueTicketAdmin");
+
+        // A/B Testing & Experimentation Engine (AB-1 .. AB-15)
+        group.MapGet("/experiments", GetExperimentsAsync).WithName("GetExperiments");
+        group.MapGet("/experiments/{id}", GetExperimentByIdAsync).WithName("GetExperimentById");
+        group.MapPost("/experiments", CreateExperimentAsync).WithName("CreateExperiment");
+        group.MapPut("/experiments/{id}", UpdateExperimentAsync).WithName("UpdateExperiment");
+        group.MapDelete("/experiments/{id}", DeleteExperimentAsync).WithName("DeleteExperiment");
+        group.MapPost("/experiments/{id}/start", StartExperimentAsync).WithName("StartExperiment");
+        group.MapPost("/experiments/{id}/pause", PauseExperimentAsync).WithName("PauseExperiment");
+        group.MapPost("/experiments/{id}/promote/{variantId}", PromoteExperimentVariantAsync).WithName("PromoteExperimentVariant");
+        group.MapPost("/experiments/{id}/rollback", RollbackExperimentAsync).WithName("RollbackExperiment");
+        group.MapGet("/experiments/{id}/report", GetExperimentReportAsync).WithName("GetExperimentReport");
+        group.MapPost("/experiments/{id}/simulate", SimulateExperimentAsync).WithName("SimulateExperiment");
 
         group.AddEndpointFilter(async (invocationContext, next) =>
         {
@@ -1823,6 +1837,285 @@ public static class AdminEndpoints
                 detail: $"Grant '{id}' was not found or is already revoked.");
         }
         return TypedResults.NoContent();
+    }
+
+    // --- A/B Testing & Experimentation Handlers ---
+
+    private static ExperimentDto ToExperimentDto(Experiment exp) => new(
+        exp.Id,
+        exp.TenantId,
+        exp.Name,
+        exp.Description,
+        exp.Status.ToString(),
+        exp.Salt,
+        exp.TrafficAllocation,
+        exp.Targeting,
+        exp.Variants,
+        exp.CircuitBreaker,
+        exp.PromotedVariantId,
+        exp.CreatedAt,
+        exp.StartedAt,
+        exp.EndedAt);
+
+    private static async Task<IResult> GetExperimentsAsync(
+        HttpContext context,
+        IExperimentStore store,
+        CancellationToken ct)
+    {
+        string? tenantFilter = GetEffectiveTenantFilter(context);
+        var experiments = await store.GetAllAsync(tenantFilter, ct).ConfigureAwait(false);
+        return TypedResults.Ok(experiments.Select(ToExperimentDto).ToList());
+    }
+
+    private static async Task<IResult> GetExperimentByIdAsync(
+        string id,
+        HttpContext context,
+        IExperimentStore store,
+        CancellationToken ct)
+    {
+        var exp = await store.GetByIdAsync(id, ct).ConfigureAwait(false);
+        if (exp is null) return TypedResults.NotFound();
+
+        if (!IsSuperAdmin(context) && !string.IsNullOrWhiteSpace(exp.TenantId) && exp.TenantId != GetCallerTenantId(context))
+        {
+            return TypedResults.NotFound();
+        }
+
+        return TypedResults.Ok(ToExperimentDto(exp));
+    }
+
+    private static async Task<IResult> CreateExperimentAsync(
+        CreateExperimentDto dto,
+        HttpContext context,
+        IExperimentStore store,
+        CancellationToken ct)
+    {
+        string? tenantId = GetEffectiveTenantFilter(context);
+        var existing = await store.GetByIdAsync(dto.Id, ct).ConfigureAwait(false);
+        if (existing is not null)
+        {
+            return Results.Problem(
+                statusCode: StatusCodes.Status409Conflict,
+                title: "Experiment Already Exists",
+                detail: $"Experiment with id '{dto.Id}' already exists.");
+        }
+
+        var exp = new Experiment
+        {
+            Id = dto.Id,
+            TenantId = tenantId,
+            Name = dto.Name,
+            Description = dto.Description,
+            Status = ExperimentStatus.Draft,
+            TrafficAllocation = dto.TrafficAllocation,
+            Targeting = dto.Targeting ?? new ExperimentTargeting(),
+            Variants = dto.Variants ?? [],
+            CircuitBreaker = dto.CircuitBreaker ?? new ExperimentCircuitBreaker(),
+            CreatedAt = DateTimeOffset.UtcNow
+        };
+
+        await store.SaveAsync(exp, tenantId, ct).ConfigureAwait(false);
+        return TypedResults.Created($"/admin/v1/experiments/{exp.Id}", ToExperimentDto(exp));
+    }
+
+    private static async Task<IResult> UpdateExperimentAsync(
+        string id,
+        UpdateExperimentDto dto,
+        HttpContext context,
+        IExperimentStore store,
+        CancellationToken ct)
+    {
+        var exp = await store.GetByIdAsync(id, ct).ConfigureAwait(false);
+        if (exp is null) return TypedResults.NotFound();
+
+        if (!IsSuperAdmin(context) && !string.IsNullOrWhiteSpace(exp.TenantId) && exp.TenantId != GetCallerTenantId(context))
+        {
+            return TypedResults.NotFound();
+        }
+
+        exp.Name = dto.Name;
+        exp.Description = dto.Description;
+        exp.TrafficAllocation = dto.TrafficAllocation;
+        if (dto.Targeting is not null) exp.Targeting = dto.Targeting;
+        if (dto.Variants is not null)
+        {
+            exp = new Experiment
+            {
+                Id = exp.Id,
+                TenantId = exp.TenantId,
+                Name = exp.Name,
+                Description = exp.Description,
+                Status = exp.Status,
+                Salt = exp.Salt,
+                TrafficAllocation = exp.TrafficAllocation,
+                Targeting = exp.Targeting,
+                Variants = dto.Variants,
+                CircuitBreaker = dto.CircuitBreaker ?? exp.CircuitBreaker,
+                CreatedAt = exp.CreatedAt,
+                StartedAt = exp.StartedAt,
+                EndedAt = exp.EndedAt,
+                PromotedVariantId = exp.PromotedVariantId
+            };
+        }
+        else if (dto.CircuitBreaker is not null)
+        {
+            exp.CircuitBreaker = dto.CircuitBreaker;
+        }
+
+        await store.SaveAsync(exp, exp.TenantId, ct).ConfigureAwait(false);
+        return TypedResults.Ok(ToExperimentDto(exp));
+    }
+
+    private static async Task<IResult> DeleteExperimentAsync(
+        string id,
+        HttpContext context,
+        IExperimentStore store,
+        CancellationToken ct)
+    {
+        var exp = await store.GetByIdAsync(id, ct).ConfigureAwait(false);
+        if (exp is null) return TypedResults.NotFound();
+
+        if (!IsSuperAdmin(context) && !string.IsNullOrWhiteSpace(exp.TenantId) && exp.TenantId != GetCallerTenantId(context))
+        {
+            return TypedResults.NotFound();
+        }
+
+        await store.DeleteAsync(id, ct).ConfigureAwait(false);
+        return TypedResults.NoContent();
+    }
+
+    private static async Task<IResult> StartExperimentAsync(
+        string id,
+        HttpContext context,
+        IExperimentStore store,
+        TimeProvider time,
+        CancellationToken ct)
+    {
+        var exp = await store.GetByIdAsync(id, ct).ConfigureAwait(false);
+        if (exp is null) return TypedResults.NotFound();
+
+        exp.Status = ExperimentStatus.Active;
+        exp.StartedAt = time.GetUtcNow();
+        await store.SaveAsync(exp, exp.TenantId, ct).ConfigureAwait(false);
+        return TypedResults.Ok(ToExperimentDto(exp));
+    }
+
+    private static async Task<IResult> PauseExperimentAsync(
+        string id,
+        HttpContext context,
+        IExperimentStore store,
+        CancellationToken ct)
+    {
+        var exp = await store.GetByIdAsync(id, ct).ConfigureAwait(false);
+        if (exp is null) return TypedResults.NotFound();
+
+        exp.Status = ExperimentStatus.Paused;
+        await store.SaveAsync(exp, exp.TenantId, ct).ConfigureAwait(false);
+        return TypedResults.Ok(ToExperimentDto(exp));
+    }
+
+    private static async Task<IResult> PromoteExperimentVariantAsync(
+        string id,
+        string variantId,
+        HttpContext context,
+        IExperimentStore store,
+        TimeProvider time,
+        CancellationToken ct)
+    {
+        var exp = await store.GetByIdAsync(id, ct).ConfigureAwait(false);
+        if (exp is null) return TypedResults.NotFound();
+
+        if (!exp.Variants.Any(v => v.VariantId == variantId))
+        {
+            return Results.Problem(
+                statusCode: StatusCodes.Status400BadRequest,
+                title: "Invalid Variant",
+                detail: $"Variant '{variantId}' does not exist in experiment '{id}'.");
+        }
+
+        exp.Status = ExperimentStatus.Completed;
+        exp.PromotedVariantId = variantId;
+        exp.TrafficAllocation = 100;
+        exp.EndedAt = time.GetUtcNow();
+        await store.SaveAsync(exp, exp.TenantId, ct).ConfigureAwait(false);
+        return TypedResults.Ok(ToExperimentDto(exp));
+    }
+
+    private static async Task<IResult> RollbackExperimentAsync(
+        string id,
+        HttpContext context,
+        IExperimentStore store,
+        TimeProvider time,
+        CancellationToken ct)
+    {
+        var exp = await store.GetByIdAsync(id, ct).ConfigureAwait(false);
+        if (exp is null) return TypedResults.NotFound();
+
+        exp.Status = ExperimentStatus.RolledBack;
+        exp.EndedAt = time.GetUtcNow();
+        await store.SaveAsync(exp, exp.TenantId, ct).ConfigureAwait(false);
+        return TypedResults.Ok(ToExperimentDto(exp));
+    }
+
+    private static async Task<IResult> GetExperimentReportAsync(
+        string id,
+        HttpContext context,
+        IExperimentStore store,
+        CancellationToken ct)
+    {
+        var exp = await store.GetByIdAsync(id, ct).ConfigureAwait(false);
+        if (exp is null) return TypedResults.NotFound();
+
+        var metrics = await store.GetMetricsAsync(id, ct).ConfigureAwait(false);
+        var report = ExperimentStatisticalEngine.GenerateReport(exp, metrics);
+        return TypedResults.Ok(report);
+    }
+
+    private static async Task<IResult> SimulateExperimentAsync(
+        string id,
+        SimulateExperimentDto dto,
+        IExperimentStore store,
+        CancellationToken ct)
+    {
+        var exp = await store.GetByIdAsync(id, ct).ConfigureAwait(false);
+        if (exp is null) return TypedResults.NotFound();
+
+        int total = Math.Clamp(dto.ClientCount, 1, 100000);
+        int inExp = 0;
+        int baseline = 0;
+        var counts = new Dictionary<string, int>();
+
+        var clientContext = new ExperimentClientContext
+        {
+            SdkLanguage = dto.SdkLanguage,
+            OsPlatform = dto.OsPlatform
+        };
+
+        for (int i = 0; i < total; i++)
+        {
+            string licenseKey = $"SYM-SIM-{i:D6}";
+            string machineId = $"mach-sim-{i:D6}";
+
+            var res = DeterministicBucketRouter.Route(exp, dto.TenantId ?? exp.TenantId, licenseKey, machineId, clientContext);
+            if (res.IsInExperiment)
+            {
+                inExp++;
+                counts[res.VariantId] = counts.GetValueOrDefault(res.VariantId, 0) + 1;
+            }
+            else
+            {
+                baseline++;
+            }
+        }
+
+        var result = new SimulateExperimentResultDto(
+            exp.Id,
+            total,
+            inExp,
+            baseline,
+            counts);
+
+        return TypedResults.Ok(result);
     }
 }
 
