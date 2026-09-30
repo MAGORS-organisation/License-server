@@ -41,6 +41,10 @@ public sealed record JsonWebKeyDto
     [JsonPropertyName("pub")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? Pub { get; init; }
+
+    [JsonPropertyName("priv")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Priv { get; init; }
 }
 
 /// <summary>

@@ -10,6 +10,36 @@ a projekt striktne dodržiava [Sémantické Verziovanie (Semantic Versioning 2.0
 ## [Unreleased]
 
 ### Pridané (Added)
+- **Post-Quantum Era Suite & Quantum Readiness (Míľnik M7, §13.5)**:
+  - **Kryptografická vrstva (`Symbolon.Crypto`)**:
+    - **FIPS 203: ML-KEM Key Encapsulation (`IKeyEncapsulationProvider`, `MlKemKeyEncapsulationProvider`)**: Natívna podpora pre `ML-KEM-768` (AES-192 ekvivalent, 1088-bajtový šifrový text) a `ML-KEM-1024` (AES-256 ekvivalent, 1568-bajtový šifrový text). Generovanie kľúčov, import semien, decapsulation kľúčov a export/import JWK podľa RFC 9964 (`kty: AKP`, `use: enc`).
+    - **PQC Envelope Encryption (`PqcEnvelopeEncryption`)**: Autentifikované šifrovanie dát pomocou ML-KEM-768/1024 kľúčovej enkapsulácie kombinovanej s AES-256-GCM. Kompletná ochrana citlivých offline licenčných payloadov pred útokmi typu *Harvest Now, Decrypt Later (HNDL)*.
+    - **FIPS 204: ML-DSA Digitálne Podpisy (`MlDsaSignatureProvider`)**: Podpora parametrov `ML-DSA-44`, `ML-DSA-65`, a `ML-DSA-87` pre podpisovanie licenčných artefaktov (`.symlic`, `.symgrant`, `.symlease`, `.symrl`).
+    - **FIPS 205: SLH-DSA Stateless Hash-Based Podpisy (`SlhDsaSignatureProvider`)**: Bezstavové podpisové schémy (SPHINCS+) nezávislé na mriežkovej matematike slúžiace ako dlhodobý Root of Trust.
+    - **Kryptografické Bezpečnostné Profily (`PqcProfiles`, `PqcProfileValidator`)**: Implementácia profilu `hybrid-v1` (ES256 + ML-DSA-65) a striktného profilu `pqc-strict` (Zero Classical Cryptography — vyradenie RSA, ECDSA P-256 a klasického Diffie-Hellman) spĺňajúceho požiadavky **US CNSA 2.0** a európskej smernice **EU NIS 2 PQC Roadmap 2030**.
+  - **Doménová vrstva (`Symbolon.Domain`)**:
+    - `PqcReadinessScanner`: Automatizovaný audit aktívnych kryptografických kľúčov, certifikátov a licenčných dokumentov.
+    - Výpočet **PQC Readiness Indexu (0–100 %)**, kategorizácia algoritmov (Classical, Hybrid, Post-Quantum) a detekcia dlhodobých licencií s vysokým HNDL rizikom.
+    - Generovanie zoznamu akčných krokov migrácie a overenie súladu s CNSA 2.0 a NIS 2.
+  - **Riadiaca rovina & Admin API (`Symbolon.ControlPlane`)**:
+    - `GET /admin/v1/pqc/readiness`: Detailný JSON report pripravenosti na post-kvantovú éru.
+    - `POST /admin/v1/pqc/profile`: Bezvýpadkové prepínanie bezpečnostného profilu servera (`hybrid-v1` / `pqc-strict`).
+    - `POST /admin/v1/pqc/keys/generate`: Generovanie nových PQC podpisových a enkapsulačných kľúčov.
+    - `POST /admin/v1/pqc/encrypt` a `POST /admin/v1/pqc/decrypt`: Post-kvantové šifrovanie a dešifrovanie správ pomocou ML-KEM a AES-256-GCM.
+    - Registrácia `IKeyEncapsulationProvider` v DI kontajneri.
+  - **CLI Nástroje (`Symbolon.Cli`)**:
+    - Nová sada príkazov `symbolon pqc scan [--server <url>] [--out <file>] [--strict]`, `symbolon pqc profile [get|set <mód>]`, `symbolon pqc kem generate|test`, a `symbolon pqc verify <súbor>`.
+    - Vizuálny Spectre.Console výstup s farebnými tabuľkami kľúčov, licencií a indikátormi CNSA 2.0.
+  - **Web Dashboard (`Symbolon.ControlPlane/wwwroot`)**:
+    - Nová navigačná položka `⚛️ Post-Quantum Era (M7)`.
+    - PQC Readiness KPI panel (Readiness %, CNSA 2.0 Súlad, NIS 2 Roadmap 2030, Pomer PQC kľúčov).
+    - Živý prepínač kryptografického profilu (`hybrid-v1` vs `pqc-strict`) a tlačidlo pre okamžitý Quantum Scan.
+    - Tabuľka inventára kľúčov s farebnými odznakmi a audit licencií s indikátormi HNDL rizika.
+  - **Multi-Language Parity (Python SDK)**:
+    - Nový modul `symbolon.pqc` s podporou profilov `PqcProfile`, algoritmami `PqcAlgorithm` (FIPS 203/204/205), validáciou CNSA 2.0 a výpočtom PQC Readiness Indexu.
+    - 44 unit testov Python SDK so 100% úspešnosťou.
+  - **Testovacia Verifikácia**:
+    - Všetkých 507 .NET testov a 44 Python SDK testov (spolu 551 testov) prebehlo úspešne s nulovými varovaniami (`TreatWarningsAsErrors=true`).
 - **A/B Testovanie & Experimentačný Engine v Reálnej Prevádzke (AB-1 – AB-15, Míľnik M6, §13.4)**:
   - **Doménová vrstva (`Symbolon.Domain`)**:
     - Dátové modely `Experiment`, `ExperimentStatus`, `ExperimentVariant`, `ExperimentOverrides`, `ExperimentTargeting`, `ExperimentCircuitBreaker`, `ExperimentEvaluationResult`, `VariantMetrics`, `ExperimentStatisticalReport`.

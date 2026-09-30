@@ -1,5 +1,6 @@
 using System.ComponentModel.DataAnnotations;
 using System.Text.Json.Serialization;
+using Symbolon.Crypto;
 using Symbolon.Domain.Experiments;
 
 namespace Symbolon.ControlPlane.Models;
@@ -328,4 +329,25 @@ public sealed record SimulateExperimentResultDto(
     int TotalInExperiment,
     int TotalBaseline,
     IReadOnlyDictionary<string, int> VariantCounts);
+
+// ==========================================
+// Post-Quantum Cryptography & Scanner DTOs (M7, §13.5)
+// ==========================================
+public sealed record SetPqcProfileDto(
+    [Required] string Profile);
+
+public sealed record GeneratePqcKeyDto(
+    [Required] string Alg,
+    [Required] string Kid);
+
+public sealed record PqcEncryptRequestDto(
+    [Required] string RecipientKid,
+    [Required] string PlaintextBase64);
+
+public sealed record PqcDecryptRequestDto(
+    [Required] PqcEncryptedEnvelope Envelope);
+
+public sealed record PqcDecryptResponseDto(
+    string PlaintextBase64);
+
 

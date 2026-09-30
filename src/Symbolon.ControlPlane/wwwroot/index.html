@@ -141,6 +141,12 @@
                 </a>
             </li>
             <li class="nav-item">
+                <a class="nav-link" data-view="view-pqc">
+                    <span class="nav-icon">⚛️</span>
+                    <span>Post-Quantum Era (M7)</span>
+                </a>
+            </li>
+            <li class="nav-item">
                 <a class="nav-link" data-view="view-system">
                     <span class="nav-icon">⚡</span>
                     <span>API &amp; Diagnostika</span>
@@ -2457,6 +2463,124 @@
                         <tbody id="experiments-table-body">
                             <tr>
                                 <td colspan="7" style="text-align: center; color: var(--text-secondary); padding: 24px;">Načítavam experimenty...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <!-- VIEW: Post-Quantum Era Suite & Quantum Readiness Audit (M7, §13.5) -->
+            <section id="view-pqc" class="view-section">
+                <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 24px;">
+                    <div>
+                        <h2 style="font-size: 20px; font-weight: 700; color: var(--text-primary); margin-bottom: 4px;">
+                            ⚛️ Post-Quantum Era Suite &amp; Quantum Readiness Audit (M7, §13.5)
+                        </h2>
+                        <p style="font-size: 13px; color: var(--text-secondary); margin: 0;">
+                            FIPS 203 (ML-KEM), FIPS 204 (ML-DSA), FIPS 205 (SLH-DSA), US CNSA 2.0 &amp; EU NIS 2 PQC Roadmap 2030
+                        </p>
+                    </div>
+                    <div style="display: flex; gap: 10px; align-items: center;">
+                        <div style="display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-secondary);">
+                            <label for="pqc-profile-select"><strong>Profil:</strong></label>
+                            <select id="pqc-profile-select" class="form-control" style="padding: 4px 8px; font-size: 12px; width: auto;" onchange="switchPqcProfile(this.value)">
+                                <option value="hybrid-v1">hybrid-v1 (ES256 + ML-DSA-65)</option>
+                                <option value="pqc-strict">pqc-strict (Zero Classical Cryptography)</option>
+                            </select>
+                        </div>
+                        <button class="btn btn-primary" onclick="loadPqcView()">
+                            🔄 Spustiť Quantum Scan
+                        </button>
+                    </div>
+                </div>
+
+                <!-- PQC Readiness KPI Cards -->
+                <div class="kpi-grid" style="margin-bottom: 24px;">
+                    <div class="kpi-card">
+                        <div class="kpi-label">
+                            <span>PQC Readiness Index</span>
+                            <span>⚛️</span>
+                        </div>
+                        <div class="kpi-value" id="kpi-pqc-score" style="font-size: 24px; color: var(--accent-emerald);">-%</div>
+                        <div class="kpi-subtext" id="kpi-pqc-score-sub">Načítavam stav...</div>
+                    </div>
+                    <div class="kpi-card">
+                        <div class="kpi-label">
+                            <span>CNSA 2.0 Súlad</span>
+                            <span>🛡️</span>
+                        </div>
+                        <div class="kpi-value" id="kpi-pqc-cnsa" style="font-size: 20px; color: var(--accent-amber);">-</div>
+                        <div class="kpi-subtext">Commercial National Security Suite</div>
+                    </div>
+                    <div class="kpi-card">
+                        <div class="kpi-label">
+                            <span>EU NIS 2 PQC 2030</span>
+                            <span>🇪🇺</span>
+                        </div>
+                        <div class="kpi-value" id="kpi-pqc-nis2" style="font-size: 20px; color: var(--accent-primary);">-</div>
+                        <div class="kpi-subtext">Kritická infraštruktúra EÚ</div>
+                    </div>
+                    <div class="kpi-card">
+                        <div class="kpi-label">
+                            <span>Post-Quantum Kľúče</span>
+                            <span>🔑</span>
+                        </div>
+                        <div class="kpi-value" id="kpi-pqc-keys-ratio" style="font-size: 22px; color: var(--accent-emerald);">-</div>
+                        <div class="kpi-subtext" id="kpi-pqc-keys-sub">-</div>
+                    </div>
+                </div>
+
+                <!-- Remediation / Action Items Banner -->
+                <div id="pqc-actions-card" style="display: none; background: rgba(245, 158, 11, 0.08); border-left: 4px solid var(--accent-amber); padding: 14px 18px; border-radius: 0 8px 8px 0; margin-bottom: 24px;">
+                    <div style="font-weight: 600; color: var(--text-primary); margin-bottom: 6px;">⚠️ Odporúčané Kroky Migrácie na Post-Quantum:</div>
+                    <ul id="pqc-actions-list" style="margin: 0; padding-left: 18px; font-size: 13px; color: var(--text-secondary); line-height: 1.6;"></ul>
+                </div>
+
+                <!-- Table 1: Cryptographic Keys -->
+                <div class="table-card" style="padding: 16px 20px; margin-bottom: 24px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px;">
+                        <div class="table-title">🔑 Inventár Kryptografických Kľúčov (Podpisy &amp; KEM)</div>
+                    </div>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Key ID (KID)</th>
+                                <th>Algoritmus</th>
+                                <th>Kategória</th>
+                                <th>Účel</th>
+                                <th>Quantum-Safe?</th>
+                                <th>CNSA 2.0?</th>
+                                <th>Odporúčanie</th>
+                            </tr>
+                        </thead>
+                        <tbody id="pqc-keys-table-body">
+                            <tr>
+                                <td colspan="7" style="text-align: center; color: var(--text-secondary); padding: 24px;">Načítavam audit kľúčov...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Table 2: License Documents Audit -->
+                <div class="table-card" style="padding: 16px 20px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px;">
+                        <div class="table-title">📜 Inšpekcia Licenčných Dokumentov a HNDL Riziká</div>
+                    </div>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>ID Licencie</th>
+                                <th>Zákazník</th>
+                                <th>Podpisový Algoritmus</th>
+                                <th>Quantum-Safe?</th>
+                                <th>Riziko (HNDL)</th>
+                                <th>Expirácia</th>
+                                <th>Odporúčanie</th>
+                            </tr>
+                        </thead>
+                        <tbody id="pqc-licenses-table-body">
+                            <tr>
+                                <td colspan="7" style="text-align: center; color: var(--text-secondary); padding: 24px;">Načítavam audit licencií...</td>
                             </tr>
                         </tbody>
                     </table>

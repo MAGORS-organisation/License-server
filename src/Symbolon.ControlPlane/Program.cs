@@ -47,6 +47,12 @@ builder.Services.AddSingleton(keyRing);
 builder.Services.AddSingleton<IKeyRing>(keyRing);
 builder.Services.AddSingleton<ISignatureProvider>(es256Key);
 
+if (MlKemKeyEncapsulationProvider.IsSupported)
+{
+    var kemKey = MlKemKeyEncapsulationProvider.GenerateKey(MLKemAlgorithm.MLKem768, "cp-kem-key");
+    builder.Services.AddSingleton<IKeyEncapsulationProvider>(kemKey);
+}
+
 // Services
 builder.Services.AddSingleton<TimeProvider>(TimeProvider.System);
 builder.Services.AddSingleton<Symbolon.ControlPlane.Observability.SymbolonMetrics>();

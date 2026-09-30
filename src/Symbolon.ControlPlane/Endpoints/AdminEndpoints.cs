@@ -15,7 +15,9 @@ using Symbolon.Format;
 using Symbolon.Protocol;
 using Symbolon.Protocol.Reporting;
 using Symbolon.ControlPlane.Queuing;
+using Symbolon.Crypto;
 using Symbolon.Domain.Experiments;
+using Symbolon.Domain.Pqc;
 
 namespace Symbolon.ControlPlane.Endpoints;
 
@@ -112,6 +114,13 @@ public static class AdminEndpoints
         group.MapPost("/experiments/{id}/rollback", RollbackExperimentAsync).WithName("RollbackExperiment");
         group.MapGet("/experiments/{id}/report", GetExperimentReportAsync).WithName("GetExperimentReport");
         group.MapPost("/experiments/{id}/simulate", SimulateExperimentAsync).WithName("SimulateExperiment");
+
+        // Post-Quantum Cryptography & Quantum Readiness Scanner (M7, §13.5)
+        group.MapGet("/pqc/readiness", GetPqcReadinessReportAsync).WithName("GetPqcReadinessReport");
+        group.MapPost("/pqc/profile", SetPqcProfileAsync).WithName("SetPqcProfile");
+        group.MapPost("/pqc/keys/generate", GeneratePqcKeyAsync).WithName("GeneratePqcKey");
+        group.MapPost("/pqc/encrypt", EncryptPqcEnvelopeAsync).WithName("EncryptPqcEnvelope");
+        group.MapPost("/pqc/decrypt", DecryptPqcEnvelopeAsync).WithName("DecryptPqcEnvelope");
 
         group.AddEndpointFilter(async (invocationContext, next) =>
         {
@@ -2116,6 +2125,126 @@ public static class AdminEndpoints
             counts);
 
         return TypedResults.Ok(result);
+    }
+
+    private static async Task<IResult> GetPqcReadinessReportAsync(
+        SymbolonDbContext db,
+        Security.KeyManager keyManager,
+        IServiceProvider sp,
+        CancellationToken ct)
+    {
+        var jwks = await keyManager.GetPublicJwksAsync(ct).ConfigureAwait(false);
+        var allKeys = new List<JsonWebKeyDto>(jwks.Keys);
+
+        var kemProvider = sp.GetService<IKeyEncapsulationProvider>();
+        if (kemProvider is not null)
+        {
+            allKeys.Add(kemProvider.ExportJwk(includePrivate: false));
+        }
+
+        var licenses = await db.Licenses
+            .Select(l => new { l.Id, Customer = l.CustomerRef ?? "N/A", l.ExpiresAt })
+            .ToListAsync(ct)
+            .ConfigureAwait(false);
+
+        var licTuples = licenses.Select(l => (l.Id, l.Customer, (string?)Alg.Es256, l.ExpiresAt)).ToList();
+
+        var report = PqcReadinessScanner.Scan(allKeys, licTuples, Security.ServerPqcProfileManager.ActiveProfile);
+        return TypedResults.Ok(report);
+    }
+
+    private static IResult SetPqcProfileAsync(
+        SetPqcProfileDto dto,
+        HttpContext context)
+    {
+        if (!IsSuperAdmin(context))
+        {
+            return Results.Problem(statusCode: StatusCodes.Status403Forbidden, title: "SuperAdmin Required");
+        }
+
+        if (!PqcProfiles.IsValidProfile(dto.Profile))
+        {
+            return Results.Problem(
+                statusCode: StatusCodes.Status400BadRequest,
+                title: "Invalid PQC Profile",
+                detail: $"Allowed: '{PqcProfiles.HybridV1}', '{PqcProfiles.PqcStrict}'");
+        }
+
+        Security.ServerPqcProfileManager.ActiveProfile = dto.Profile;
+        return TypedResults.Ok(new { activeProfile = Security.ServerPqcProfileManager.ActiveProfile });
+    }
+
+    private static async Task<IResult> GeneratePqcKeyAsync(
+        GeneratePqcKeyDto dto,
+        HttpContext context,
+        Security.KeyManager keyManager,
+        CancellationToken ct)
+    {
+        if (!IsSuperAdmin(context))
+        {
+            return Results.Problem(statusCode: StatusCodes.Status403Forbidden, title: "SuperAdmin Required");
+        }
+
+        if (!Alg.IsPostQuantum(dto.Alg))
+        {
+            return Results.Problem(
+                statusCode: StatusCodes.Status400BadRequest,
+                title: "Invalid Algorithm",
+                detail: "Algorithm must be a valid Post-Quantum algorithm (ML-DSA-65, ML-DSA-87, ML-KEM-768, ML-KEM-1024).");
+        }
+
+        if (Alg.IsKeyEncapsulation(dto.Alg))
+        {
+            if (!MlKemKeyEncapsulationProvider.IsSupported)
+            {
+                return Results.Problem(statusCode: StatusCodes.Status501NotImplemented, title: "ML-KEM Not Supported on this host");
+            }
+            var alg = dto.Alg == Alg.MlKem1024 ? MLKemAlgorithm.MLKem1024 : MLKemAlgorithm.MLKem768;
+            using var kem = MlKemKeyEncapsulationProvider.GenerateKey(alg, dto.Kid);
+            var jwk = kem.ExportJwk(includePrivate: false);
+            return TypedResults.Ok(jwk);
+        }
+        else
+        {
+            var (_, jwk) = await keyManager.RotateKeyAsync(dto.Alg, dto.Kid, ct: ct).ConfigureAwait(false);
+            return TypedResults.Ok(jwk);
+        }
+    }
+
+    private static IResult EncryptPqcEnvelopeAsync(
+        PqcEncryptRequestDto dto,
+        IServiceProvider sp)
+    {
+        var kemProvider = sp.GetService<IKeyEncapsulationProvider>();
+        if (kemProvider is null || !MlKemKeyEncapsulationProvider.IsSupported)
+        {
+            return Results.Problem(statusCode: StatusCodes.Status501NotImplemented, title: "ML-KEM Not Configured or Supported");
+        }
+
+        byte[] plaintext = Convert.FromBase64String(dto.PlaintextBase64);
+        var envelope = PqcEnvelopeEncryption.Encrypt(plaintext, kemProvider);
+        return TypedResults.Ok(envelope);
+    }
+
+    private static IResult DecryptPqcEnvelopeAsync(
+        PqcDecryptRequestDto dto,
+        IServiceProvider sp)
+    {
+        var kemProvider = sp.GetService<IKeyEncapsulationProvider>();
+        if (kemProvider is null || !MlKemKeyEncapsulationProvider.IsSupported)
+        {
+            return Results.Problem(statusCode: StatusCodes.Status501NotImplemented, title: "ML-KEM Not Configured or Supported");
+        }
+
+        try
+        {
+            byte[] decrypted = PqcEnvelopeEncryption.Decrypt(dto.Envelope, kemProvider);
+            return TypedResults.Ok(new PqcDecryptResponseDto(Convert.ToBase64String(decrypted)));
+        }
+        catch (CryptographicException)
+        {
+            return Results.Problem(statusCode: StatusCodes.Status400BadRequest, title: "Decryption Failed", detail: "Authentication tag mismatch or invalid ciphertext.");
+        }
     }
 }
 

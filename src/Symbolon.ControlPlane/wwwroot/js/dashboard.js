@@ -79,6 +79,9 @@ function initNavigation() {
                 if (targetView === "view-experiments") {
                     loadExperimentsView();
                 }
+                if (targetView === "view-pqc") {
+                    loadPqcView();
+                }
             }
         });
     });
@@ -4998,6 +5001,181 @@ window.deleteExperiment = deleteExperiment;
 window.showExperimentReport = showExperimentReport;
 window.openSimulateModal = openSimulateModal;
 window.runExperimentSimulation = runExperimentSimulation;
+
+// ==========================================
+// Phase 25: Post-Quantum Era Suite (M7, §13.5)
+// ==========================================
+async function loadPqcView() {
+    const keysTbody = document.getElementById("pqc-keys-table-body");
+    const licsTbody = document.getElementById("pqc-licenses-table-body");
+    const scoreEl = document.getElementById("kpi-pqc-score");
+    const scoreSubEl = document.getElementById("kpi-pqc-score-sub");
+    const cnsaEl = document.getElementById("kpi-pqc-cnsa");
+    const nis2El = document.getElementById("kpi-pqc-nis2");
+    const ratioEl = document.getElementById("kpi-pqc-keys-ratio");
+    const ratioSubEl = document.getElementById("kpi-pqc-keys-sub");
+    const profileSelect = document.getElementById("pqc-profile-select");
+    const actionsCard = document.getElementById("pqc-actions-card");
+    const actionsList = document.getElementById("pqc-actions-list");
+
+    if (keysTbody) keysTbody.innerHTML = `<tr><td colspan="7" style="text-align: center; color: var(--text-secondary); padding: 24px;">Načítavam audit kľúčov...</td></tr>`;
+    if (licsTbody) licsTbody.innerHTML = `<tr><td colspan="7" style="text-align: center; color: var(--text-secondary); padding: 24px;">Načítavam audit licencií...</td></tr>`;
+
+    try {
+        const res = await fetch("/admin/v1/pqc/readiness");
+        if (!res.ok) {
+            if (keysTbody) keysTbody.innerHTML = `<tr><td colspan="7" style="text-align: center; color: var(--accent-rose); padding: 24px;">Chyba pri načítaní (${res.status})</td></tr>`;
+            return;
+        }
+
+        const report = await res.json();
+
+        // Update KPIs
+        if (scoreEl) {
+            scoreEl.textContent = `${report.readinessScorePercent.toFixed(1)}%`;
+            scoreEl.style.color = report.readinessScorePercent >= 90 ? "var(--accent-emerald)" : report.readinessScorePercent >= 60 ? "var(--accent-amber)" : "var(--accent-rose)";
+        }
+        if (scoreSubEl) scoreSubEl.textContent = report.summary || "PQC Readiness Index";
+
+        if (cnsaEl) {
+            cnsaEl.textContent = report.isCnsa2Ready ? "Súlad (Full)" : "Čiastočný";
+            cnsaEl.style.color = report.isCnsa2Ready ? "var(--accent-emerald)" : "var(--accent-amber)";
+        }
+
+        if (nis2El) {
+            nis2El.textContent = report.isNis2Ready ? "Súlad" : "Riziko";
+            nis2El.style.color = report.isNis2Ready ? "var(--accent-emerald)" : "var(--accent-rose)";
+        }
+
+        if (ratioEl) {
+            ratioEl.textContent = `${report.quantumSafeKeys} / ${report.classicalKeys}`;
+        }
+        if (ratioSubEl) {
+            ratioSubEl.textContent = `${report.quantumSafeKeys} PQC kľúčov, ${report.classicalKeys} klasických`;
+        }
+
+        if (profileSelect && report.activeProfile) {
+            profileSelect.value = report.activeProfile;
+        }
+
+        // Action Items Banner
+        if (actionsCard && actionsList) {
+            if (report.actionItems && report.actionItems.length > 0) {
+                actionsList.innerHTML = report.actionItems.map(item => `<li>${escapeHtml(item)}</li>`).join("");
+                actionsCard.style.display = "block";
+            } else {
+                actionsCard.style.display = "none";
+            }
+        }
+
+        // Render Keys Table
+        if (keysTbody) {
+            if (!report.keyAudits || report.keyAudits.length === 0) {
+                keysTbody.innerHTML = `<tr><td colspan="7" style="text-align: center; color: var(--text-secondary); padding: 24px;">Žiadne kľúče sa nenašli.</td></tr>`;
+            } else {
+                keysTbody.innerHTML = report.keyAudits.map(k => {
+                    const isPqcBadge = k.isQuantumSafe
+                        ? '<span class="badge badge-emerald">Áno</span>'
+                        : '<span class="badge badge-rose">Nie</span>';
+                    const isCnsaBadge = k.isCnsa2Compliant
+                        ? '<span class="badge badge-emerald">Áno</span>'
+                        : '<span class="badge badge-amber">Nie</span>';
+
+                    let catBadge = "";
+                    const catVal = String(k.category);
+                    if (catVal === "2" || catVal === "PostQuantum") {
+                        catBadge = '<span class="badge badge-emerald">Post-Quantum</span>';
+                    } else if (catVal === "1" || catVal === "Hybrid") {
+                        catBadge = '<span class="badge badge-indigo">Hybrid</span>';
+                    } else {
+                        catBadge = '<span class="badge badge-rose">Classical</span>';
+                    }
+
+                    return `
+                        <tr>
+                            <td><code>${escapeHtml(k.keyId)}</code></td>
+                            <td><strong>${escapeHtml(k.algorithm)}</strong></td>
+                            <td>${catBadge}</td>
+                            <td>${escapeHtml(k.keyUsage || "sig")}</td>
+                            <td>${isPqcBadge}</td>
+                            <td>${isCnsaBadge}</td>
+                            <td style="font-size: 12px; color: var(--text-secondary);">${escapeHtml(k.recommendation)}</td>
+                        </tr>
+                    `;
+                }).join("");
+            }
+        }
+
+        // Render Licenses Table
+        if (licsTbody) {
+            if (!report.licenseAudits || report.licenseAudits.length === 0) {
+                licsTbody.innerHTML = `<tr><td colspan="7" style="text-align: center; color: var(--text-secondary); padding: 24px;">Žiadne aktívne licencie.</td></tr>`;
+            } else {
+                licsTbody.innerHTML = report.licenseAudits.map(l => {
+                    const isPqcBadge = l.isQuantumSafe
+                        ? '<span class="badge badge-emerald">Áno</span>'
+                        : '<span class="badge badge-amber">Klasický</span>';
+
+                    let riskBadge = "";
+                    const riskVal = String(l.riskLevel);
+                    if (riskVal === "3" || riskVal === "4" || riskVal === "High" || riskVal === "Critical") {
+                        riskBadge = '<span class="badge badge-rose">Vysoké (HNDL)</span>';
+                    } else if (riskVal === "2" || riskVal === "Medium") {
+                        riskBadge = '<span class="badge badge-amber">Stredné</span>';
+                    } else if (riskVal === "1" || riskVal === "Low") {
+                        riskBadge = '<span class="badge badge-slate">Nízke (&lt;2030)</span>';
+                    } else {
+                        riskBadge = '<span class="badge badge-emerald">Žiadne</span>';
+                    }
+
+                    const expText = l.expiresAt ? new Date(l.expiresAt).toLocaleDateString() : "Trvalá (Perpetual)";
+
+                    return `
+                        <tr>
+                            <td><code>${escapeHtml(l.licenseId)}</code></td>
+                            <td><strong>${escapeHtml(l.customer)}</strong></td>
+                            <td><code>${escapeHtml(l.signatureAlgorithm)}</code></td>
+                            <td>${isPqcBadge}</td>
+                            <td>${riskBadge}</td>
+                            <td>${expText}</td>
+                            <td style="font-size: 12px; color: var(--text-secondary);">${escapeHtml(l.recommendation)}</td>
+                        </tr>
+                    `;
+                }).join("");
+            }
+        }
+    } catch (e) {
+        if (keysTbody) keysTbody.innerHTML = `<tr><td colspan="7" style="text-align: center; color: var(--accent-rose); padding: 24px;">Chyba: ${escapeHtml(e.message)}</td></tr>`;
+    }
+}
+
+async function switchPqcProfile(profile) {
+    if (!confirm(`Naozaj si želáte prepnúť kryptografický profil servera na '${profile}'?`)) {
+        return;
+    }
+
+    try {
+        const res = await fetch("/admin/v1/pqc/profile", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ profile: profile })
+        });
+
+        if (res.ok) {
+            showToast(`Kryptografický profil zmenený na ${profile}`, "success");
+            await loadPqcView();
+        } else {
+            const err = await res.text();
+            showToast("Zlyhanie nastavenia profilu: " + err, "error");
+        }
+    } catch (e) {
+        showToast("Sieťová chyba: " + e.message, "error");
+    }
+}
+
+window.loadPqcView = loadPqcView;
+window.switchPqcProfile = switchPqcProfile;
+
 
 
 

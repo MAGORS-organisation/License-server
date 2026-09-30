@@ -19,6 +19,15 @@ from .experiment import (
     calculate_welch_t_test,
     generate_statistical_report,
 )
+from .pqc import (
+    PqcProfile,
+    PqcAlgorithm,
+    is_post_quantum,
+    is_cnsa2_compliant,
+    is_algorithm_permitted,
+    calculate_pqc_readiness,
+    PqcReadinessAudit,
+)
 
 __all__ = [
     "SymbolonClient",
@@ -50,6 +59,13 @@ __all__ = [
     "calculate_two_proportion_z_test",
     "calculate_welch_t_test",
     "generate_statistical_report",
+    "PqcProfile",
+    "PqcAlgorithm",
+    "is_post_quantum",
+    "is_cnsa2_compliant",
+    "is_algorithm_permitted",
+    "calculate_pqc_readiness",
+    "PqcReadinessAudit",
 ]
 
 __version__ = "1.0.0"
