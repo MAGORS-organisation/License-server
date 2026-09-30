@@ -1,6 +1,8 @@
 using System.Globalization;
 using Microsoft.Data.Sqlite;
 using Symbolon.Domain;
+using Symbolon.Domain.Grants;
+using Symbolon.Format;
 
 namespace Symbolon.Relay;
 
@@ -50,6 +52,26 @@ internal sealed class SqliteSeatStore : ISeatStore, IDisposable
                 seat_no INTEGER NOT NULL,
                 expires_at TEXT NOT NULL,
                 PRIMARY KEY (license_id, idempotency_key)
+            );
+
+            CREATE TABLE IF NOT EXISTS seat_grants (
+                id TEXT PRIMARY KEY,
+                license_id TEXT NOT NULL,
+                relay_id TEXT NOT NULL,
+                seats INTEGER NOT NULL,
+                seat_from INTEGER NOT NULL,
+                seat_to INTEGER NOT NULL,
+                seq INTEGER NOT NULL,
+                supersedes INTEGER,
+                not_before TEXT NOT NULL,
+                not_after TEXT NOT NULL,
+                revoked_at TEXT,
+                raw_document TEXT NOT NULL
+            );
+
+            CREATE TABLE IF NOT EXISTS relay_sequences (
+                license_id TEXT PRIMARY KEY,
+                last_seq INTEGER NOT NULL
             );
         """;
         cmd.ExecuteNonQuery();
@@ -166,6 +188,18 @@ internal sealed class SqliteSeatStore : ISeatStore, IDisposable
                               AND (lease_id IS NULL OR expires_at < @now)
                               AND is_overage = 0
                               AND (reserved_for = @resTarget OR reserved_for IS NULL)
+                              AND (
+                                  NOT EXISTS (SELECT 1 FROM seat_grants g0 WHERE g0.license_id = seats.license_id)
+                                  OR EXISTS (
+                                      SELECT 1 FROM seat_grants g
+                                      WHERE g.license_id = seats.license_id
+                                        AND seats.seat_no >= g.seat_from
+                                        AND seats.seat_no <= g.seat_to
+                                        AND g.revoked_at IS NULL
+                                        AND g.not_before <= @now
+                                        AND g.not_after >= @now
+                                  )
+                              )
                             ORDER BY (CASE WHEN reserved_for = @resTarget THEN 0 ELSE 1 END), seat_no
                             LIMIT @qty;
                         """;
@@ -179,6 +213,18 @@ internal sealed class SqliteSeatStore : ISeatStore, IDisposable
                               AND (lease_id IS NULL OR expires_at < @now)
                               AND is_overage = 0
                               AND reserved_for IS NULL
+                              AND (
+                                  NOT EXISTS (SELECT 1 FROM seat_grants g0 WHERE g0.license_id = seats.license_id)
+                                  OR EXISTS (
+                                      SELECT 1 FROM seat_grants g
+                                      WHERE g.license_id = seats.license_id
+                                        AND seats.seat_no >= g.seat_from
+                                        AND seats.seat_no <= g.seat_to
+                                        AND g.revoked_at IS NULL
+                                        AND g.not_before <= @now
+                                        AND g.not_after >= @now
+                                  )
+                              )
                             ORDER BY seat_no
                             LIMIT @qty;
                         """;
@@ -676,6 +722,197 @@ internal sealed class SqliteSeatStore : ISeatStore, IDisposable
 
                 await tx.CommitAsync(ct).ConfigureAwait(false);
             }
+        }
+        finally
+        {
+            _lock.Release();
+        }
+    }
+
+    public async Task<long> GetLastSeqAsync(string licenseId, CancellationToken ct = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(licenseId);
+
+        await _lock.WaitAsync(ct).ConfigureAwait(false);
+        try
+        {
+            using var cmd = _connection.CreateCommand();
+            cmd.CommandText = "SELECT last_seq FROM relay_sequences WHERE license_id = @licenseId;";
+            cmd.Parameters.AddWithValue("@licenseId", licenseId);
+            var val = await cmd.ExecuteScalarAsync(ct).ConfigureAwait(false);
+            return val is long seq ? seq : (val is int sInt ? sInt : 0L);
+        }
+        finally
+        {
+            _lock.Release();
+        }
+    }
+
+    public async Task ImportSeatGrantAsync(
+        SeatGrantDocumentClaims grant,
+        string rawDocument,
+        CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(grant);
+        ArgumentException.ThrowIfNullOrWhiteSpace(rawDocument);
+
+        await _lock.WaitAsync(ct).ConfigureAwait(false);
+        try
+        {
+            string licenseId = grant.Sub;
+            long seq = grant.Symgrant.Seq;
+
+            // GNT-7: Relay MUST persist last_seq and reject grants with seq <= last_seq
+            using (var checkCmd = _connection.CreateCommand())
+            {
+                checkCmd.CommandText = "SELECT last_seq FROM relay_sequences WHERE license_id = @licenseId;";
+                checkCmd.Parameters.AddWithValue("@licenseId", licenseId);
+                var val = await checkCmd.ExecuteScalarAsync(ct).ConfigureAwait(false);
+                long lastSeq = val is long l ? l : (val is int i ? i : 0L);
+
+                if (seq <= lastSeq)
+                {
+                    throw new InvalidOperationException(
+                        $"sequence-rollback-detected: seq {seq} is not strictly greater than lastSeq {lastSeq} (GNT-7)");
+                }
+            }
+
+            var tx = await _connection.BeginTransactionAsync(ct).ConfigureAwait(false);
+            await using (tx.ConfigureAwait(false))
+            {
+                // GNT-9: If grant contains supersedes, relay MUST immediately stop using grant with specified seq
+                if (grant.Symgrant.Supersedes.HasValue)
+                {
+                    using var revokeCmd = _connection.CreateCommand();
+                    revokeCmd.Transaction = (SqliteTransaction)tx;
+                    revokeCmd.CommandText = """
+                        UPDATE seat_grants
+                        SET revoked_at = @now
+                        WHERE license_id = @licenseId
+                          AND seq <= @supersedes
+                          AND revoked_at IS NULL;
+                    """;
+                    revokeCmd.Parameters.AddWithValue("@now", DateTimeOffset.UtcNow.ToString("O", CultureInfo.InvariantCulture));
+                    revokeCmd.Parameters.AddWithValue("@licenseId", licenseId);
+                    revokeCmd.Parameters.AddWithValue("@supersedes", grant.Symgrant.Supersedes.Value);
+                    await revokeCmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
+                }
+
+                // Insert into seat_grants
+                using (var grantCmd = _connection.CreateCommand())
+                {
+                    grantCmd.Transaction = (SqliteTransaction)tx;
+                    grantCmd.CommandText = """
+                        INSERT OR REPLACE INTO seat_grants (
+                            id, license_id, relay_id, seats, seat_from, seat_to, seq, supersedes,
+                            not_before, not_after, revoked_at, raw_document
+                        ) VALUES (
+                            @id, @licenseId, @relayId, @seats, @seatFrom, @seatTo, @seq, @supersedes,
+                            @notBefore, @notAfter, NULL, @rawDocument
+                        );
+                    """;
+                    grantCmd.Parameters.AddWithValue("@id", grant.Jti);
+                    grantCmd.Parameters.AddWithValue("@licenseId", licenseId);
+                    grantCmd.Parameters.AddWithValue("@relayId", grant.Aud);
+                    grantCmd.Parameters.AddWithValue("@seats", grant.Symgrant.Seats);
+                    grantCmd.Parameters.AddWithValue("@seatFrom", grant.Symgrant.SeatRange[0]);
+                    grantCmd.Parameters.AddWithValue("@seatTo", grant.Symgrant.SeatRange[1]);
+                    grantCmd.Parameters.AddWithValue("@seq", seq);
+                    grantCmd.Parameters.AddWithValue("@supersedes", grant.Symgrant.Supersedes.HasValue ? grant.Symgrant.Supersedes.Value : DBNull.Value);
+                    grantCmd.Parameters.AddWithValue("@notBefore", DateTimeOffset.FromUnixTimeSeconds(grant.Nbf).ToString("O", CultureInfo.InvariantCulture));
+                    grantCmd.Parameters.AddWithValue("@notAfter", DateTimeOffset.FromUnixTimeSeconds(grant.Exp).ToString("O", CultureInfo.InvariantCulture));
+                    grantCmd.Parameters.AddWithValue("@rawDocument", rawDocument);
+                    await grantCmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
+                }
+
+                // Update relay_sequences (GNT-7, GNT-8)
+                using (var seqCmd = _connection.CreateCommand())
+                {
+                    seqCmd.Transaction = (SqliteTransaction)tx;
+                    seqCmd.CommandText = """
+                        INSERT OR REPLACE INTO relay_sequences (license_id, last_seq)
+                        VALUES (@licenseId, @seq);
+                    """;
+                    seqCmd.Parameters.AddWithValue("@licenseId", licenseId);
+                    seqCmd.Parameters.AddWithValue("@seq", seq);
+                    await seqCmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
+                }
+
+                // Materialize seats strictly within [seatFrom, seatTo] (GNT-10)
+                int seatFrom = grant.Symgrant.SeatRange[0];
+                int seatTo = grant.Symgrant.SeatRange[1];
+
+                for (int s = seatFrom; s <= seatTo; s++)
+                {
+                    using var seatCmd = _connection.CreateCommand();
+                    seatCmd.Transaction = (SqliteTransaction)tx;
+                    seatCmd.CommandText = """
+                        INSERT OR IGNORE INTO seats (id, seat_no, license_id, expires_at, lease_seq)
+                        VALUES (@id, @seatNo, @licenseId, @expiresAt, 0);
+                    """;
+                    seatCmd.Parameters.AddWithValue("@id", $"{licenseId}_seat_{s}");
+                    seatCmd.Parameters.AddWithValue("@seatNo", s);
+                    seatCmd.Parameters.AddWithValue("@licenseId", licenseId);
+                    seatCmd.Parameters.AddWithValue("@expiresAt", DateTimeOffset.UnixEpoch.ToString("O", CultureInfo.InvariantCulture));
+                    await seatCmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
+                }
+
+                await tx.CommitAsync(ct).ConfigureAwait(false);
+            }
+        }
+        finally
+        {
+            _lock.Release();
+        }
+    }
+
+    public async Task<IReadOnlyList<SeatGrantRecord>> GetActiveGrantsAsync(
+        string licenseId,
+        DateTimeOffset now,
+        CancellationToken ct = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(licenseId);
+
+        await _lock.WaitAsync(ct).ConfigureAwait(false);
+        try
+        {
+            var list = new List<SeatGrantRecord>();
+            string nowIso = now.ToString("O", CultureInfo.InvariantCulture);
+
+            using var cmd = _connection.CreateCommand();
+            cmd.CommandText = """
+                SELECT id, license_id, relay_id, seats, seat_from, seat_to, seq, supersedes,
+                       not_before, not_after, revoked_at, raw_document
+                FROM seat_grants
+                WHERE license_id = @licenseId
+                  AND revoked_at IS NULL
+                  AND not_before <= @now
+                  AND not_after >= @now
+                ORDER BY seat_from;
+            """;
+            cmd.Parameters.AddWithValue("@licenseId", licenseId);
+            cmd.Parameters.AddWithValue("@now", nowIso);
+
+            using var reader = await cmd.ExecuteReaderAsync(ct).ConfigureAwait(false);
+            while (await reader.ReadAsync(ct).ConfigureAwait(false))
+            {
+                list.Add(new SeatGrantRecord(
+                    Id: reader.GetString(0),
+                    LicenseId: reader.GetString(1),
+                    RelayId: reader.GetString(2),
+                    Seats: reader.GetInt32(3),
+                    SeatFrom: reader.GetInt32(4),
+                    SeatTo: reader.GetInt32(5),
+                    Seq: reader.GetInt64(6),
+                    Supersedes: await reader.IsDBNullAsync(7, ct).ConfigureAwait(false) ? null : reader.GetInt64(7),
+                    NotBefore: DateTimeOffset.Parse(reader.GetString(8), CultureInfo.InvariantCulture),
+                    NotAfter: DateTimeOffset.Parse(reader.GetString(9), CultureInfo.InvariantCulture),
+                    RevokedAt: await reader.IsDBNullAsync(10, ct).ConfigureAwait(false) ? null : DateTimeOffset.Parse(reader.GetString(10), CultureInfo.InvariantCulture),
+                    Document: reader.GetString(11)
+                ));
+            }
+
+            return list;
         }
         finally
         {

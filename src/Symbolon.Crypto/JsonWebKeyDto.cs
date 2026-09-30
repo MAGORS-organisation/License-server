@@ -33,6 +33,10 @@ public sealed record JsonWebKeyDto
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? Y { get; init; }
 
+    [JsonPropertyName("d")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? D { get; init; }
+
     // AKP specific (RFC 9964)
     [JsonPropertyName("pub")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]

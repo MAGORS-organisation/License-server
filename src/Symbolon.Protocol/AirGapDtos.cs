@@ -105,3 +105,52 @@ public sealed record OfflineActivationResponseDto
     [JsonPropertyName("symlicPem")]
     public required string SymlicPem { get; init; }
 }
+
+public sealed record OfflineAirGapRequestDto
+{
+    [Required]
+    [JsonPropertyName("requestPem")]
+    public required string RequestPem { get; init; }
+}
+
+public sealed record OfflineAirGapResponseDto
+{
+    [JsonPropertyName("grantId")]
+    public required string GrantId { get; init; }
+
+    [JsonPropertyName("licenseId")]
+    public required string LicenseId { get; init; }
+
+    [JsonPropertyName("relayId")]
+    public required string RelayId { get; init; }
+
+    [JsonPropertyName("seats")]
+    public required int Seats { get; init; }
+
+    [JsonPropertyName("seatFrom")]
+    public required int SeatFrom { get; init; }
+
+    [JsonPropertyName("seatTo")]
+    public required int SeatTo { get; init; }
+
+    [JsonPropertyName("seq")]
+    public required long Seq { get; init; }
+
+    [JsonPropertyName("supersedes")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public long? Supersedes { get; init; }
+
+    [JsonPropertyName("expiresAt")]
+    public required DateTimeOffset ExpiresAt { get; init; }
+
+    [JsonPropertyName("symgrantPem")]
+    public required string SymgrantPem { get; init; }
+
+    [JsonPropertyName("symlicPem")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? SymlicPem { get; init; }
+
+    [JsonPropertyName("symrlPem")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? SymrlPem { get; init; }
+}

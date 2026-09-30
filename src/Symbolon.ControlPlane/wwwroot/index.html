@@ -392,15 +392,82 @@
 
             <!-- VIEW: Air-Gap Portal -->
             <section id="view-airgap" class="view-section">
-                <div class="charts-grid">
+                <!-- Air-Gap KPI Grid -->
+                <div class="kpi-grid">
+                    <div class="kpi-card">
+                        <div class="kpi-label">
+                            <span>Vystavené Granty</span>
+                            <span>🛰️</span>
+                        </div>
+                        <div class="kpi-value" id="kpi-ag-total" style="color: var(--accent-purple);">0</div>
+                        <div class="kpi-subtext">celkový počet offline grantov</div>
+                    </div>
+                    <div class="kpi-card">
+                        <div class="kpi-label">
+                            <span>Delegované Sedadlá</span>
+                            <span>💺</span>
+                        </div>
+                        <div class="kpi-value" id="kpi-ag-seats" style="color: var(--accent-blue);">0</div>
+                        <div class="kpi-subtext">kapacita v izolovaných sieťach</div>
+                    </div>
+                    <div class="kpi-card">
+                        <div class="kpi-label">
+                            <span>Aktívne Relay Uzly</span>
+                            <span>🏢</span>
+                        </div>
+                        <div class="kpi-value" id="kpi-ag-relays" style="color: var(--accent-emerald);">0</div>
+                        <div class="kpi-subtext">on-premise offline servery</div>
+                    </div>
+                    <div class="kpi-card">
+                        <div class="kpi-label">
+                            <span>Stav Bezpečnosti</span>
+                            <span>🛡️</span>
+                        </div>
+                        <div class="kpi-value" id="kpi-ag-security" style="color: var(--accent-emerald); font-size: 20px;">GNT-3 Disjunktné</div>
+                        <div class="kpi-subtext">audit merkle hash &amp; zero-overlap</div>
+                    </div>
+                </div>
+
+                <div class="charts-grid" style="margin-top: 16px;">
+                    <!-- Card 1: Seat Grant Issuance -->
                     <div class="chart-card">
                         <div class="chart-header">
-                            <div class="chart-title">🛰️ Delegovaný Offline Seat Grant (.symreq → .symgrant)</div>
+                            <div class="chart-title">🛰️ Delegovaný Offline Seat Grant (.symreq ➜ .symgrant)</div>
                         </div>
-                        <p style="color: var(--text-secondary); font-size: 13px; margin-bottom: 16px;">
-                            Pre on-premise relay servery v striktne izolovaných sieťach bez internetu. Na základe <code>usageDigest</code> server overí kontinuitu využitia a vygeneruje podpísaný <code>.symgrant</code> súbor na USB prenos.
+                        <p style="color: var(--text-secondary); font-size: 13px; margin-bottom: 14px;">
+                            Pre on-premise relay servery v striktne izolovaných sieťach bez internetu (GNT-1..10, FLT-32..35).
                         </p>
-                        <form id="form-airgap-grant">
+
+                        <!-- Tab toggles: Upload .symreq vs Manual -->
+                        <div style="display: flex; gap: 8px; margin-bottom: 14px; border-bottom: 1px solid var(--border-color); padding-bottom: 8px;">
+                            <button type="button" class="btn btn-sm btn-primary" id="btn-tab-ag-upload" onclick="switchAirGapTab('upload')">📁 Nahrať požiadavku (.symreq)</button>
+                            <button type="button" class="btn btn-sm btn-secondary" id="btn-tab-ag-manual" onclick="switchAirGapTab('manual')">✍️ Manuálne zadanie</button>
+                        </div>
+
+                        <!-- Sub-view 1: Upload .symreq -->
+                        <div id="ag-tab-upload">
+                            <div class="airgap-dropzone" id="ag-dropzone" onclick="document.getElementById('ag-file-input').click()">
+                                <div style="font-size: 28px; margin-bottom: 6px;">📄</div>
+                                <div style="font-weight: 600; color: var(--text-primary); margin-bottom: 4px;">Kliknite alebo presuňte podpísaný súbor .symreq sem</div>
+                                <div style="font-size: 12px; color: var(--text-secondary);">Podporuje kryptograficky overenú požiadavku generovanú cez <code>symbolon grant request</code></div>
+                                <input type="file" id="ag-file-input" accept=".symreq,.txt" style="display: none;">
+                            </div>
+
+                            <div id="ag-req-preview" style="display: none; margin-top: 12px; background: var(--bg-primary); border: 1px solid var(--border-color); border-radius: 6px; padding: 12px;">
+                                <div style="font-weight: 600; color: var(--accent-emerald); margin-bottom: 8px; font-size: 13px;">✔ Požiadavka úspešne načítaná:</div>
+                                <div style="font-size: 12px; color: var(--text-secondary); display: grid; grid-template-columns: 1fr 1fr; gap: 6px;">
+                                    <div><strong>Relay ID:</strong> <span id="ag-prev-relay" style="color: var(--text-primary);">-</span></div>
+                                    <div><strong>Licenčný Kľúč:</strong> <span id="ag-prev-license" style="color: var(--text-primary);">-</span></div>
+                                    <div><strong>Počet Sedadiel:</strong> <span id="ag-prev-seats" style="color: var(--accent-blue); font-weight: 600;">-</span></div>
+                                    <div><strong>Last Seq:</strong> <span id="ag-prev-seq" style="color: var(--text-primary);">-</span></div>
+                                    <div style="grid-column: span 2;"><strong>Usage Digest:</strong> <span id="ag-prev-digest" style="font-family: monospace; font-size: 11px; color: var(--text-muted);">-</span></div>
+                                </div>
+                                <button type="button" class="btn btn-primary" id="btn-submit-ag-req" style="margin-top: 12px; width: 100%;">Vystaviť &amp; Stiahnuť .symgrant súbor</button>
+                            </div>
+                        </div>
+
+                        <!-- Sub-view 2: Manual Entry Form -->
+                        <form id="form-airgap-grant" style="display: none;">
                             <div class="form-group">
                                 <label class="form-label" for="ag-relay-id">Relay ID</label>
                                 <input type="text" class="form-control" id="ag-relay-id" required placeholder="napr. rly_plant_kosice_01">
@@ -421,6 +488,7 @@
                         </form>
                     </div>
 
+                    <!-- Card 2: Node-Lock Activation -->
                     <div class="chart-card">
                         <div class="chart-header">
                             <div class="chart-title">💻 Offline Node-Lock Aktivácia (.symlic)</div>
@@ -443,6 +511,83 @@
                             </div>
                             <button type="submit" class="btn btn-primary" style="margin-top: 12px;">Aktivovať &amp; Stiahnuť .symlic</button>
                         </form>
+                    </div>
+                </div>
+
+                <!-- Disjunctive Seat Allocation Map Card -->
+                <div class="chart-card" style="margin-top: 16px;">
+                    <div class="chart-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
+                        <div>
+                            <div class="chart-title">🗺️ Disjunktná Mapa Alokácie Sedadiel (Disjunctive Seat Allocation Map)</div>
+                            <p style="color: var(--text-secondary); font-size: 13px; margin-top: 4px;">
+                                Matematická záruka neprekrývania kapacít (GNT-3, GNT-4, GNT-5). Sedadlá sú striktne rozdelené medzi lokálne online leases a delegované offline relay rozsahy.
+                            </p>
+                        </div>
+                        <div style="display: flex; gap: 8px; align-items: center;">
+                            <label for="ag-seatmap-license-select" style="font-size: 13px; color: var(--text-secondary);">Licencia:</label>
+                            <select id="ag-seatmap-license-select" class="form-control" style="width: auto; min-width: 220px;" onchange="onAirGapLicenseChanged()">
+                                <option value="">-- Načítavam licencie --</option>
+                            </select>
+                            <button type="button" class="btn btn-secondary btn-sm" onclick="refreshAirGapSeatMap()">🔄 Obnoviť</button>
+                        </div>
+                    </div>
+
+                    <!-- Allocation Stats Bar & Legend -->
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 14px; flex-wrap: wrap; gap: 10px; background: var(--bg-primary); padding: 10px 14px; border-radius: 6px; border: 1px solid var(--border-color);">
+                        <div style="display: flex; gap: 16px; font-size: 13px;">
+                            <span>Kapacita: <strong id="ag-stat-total" style="color: var(--text-primary);">-</strong></span>
+                            <span>Online Leases: <strong id="ag-stat-leases" style="color: #60a5fa;">0</strong></span>
+                            <span>Air-Gap Granty: <strong id="ag-stat-grants" style="color: #c084fc;">0</strong></span>
+                            <span>Voľné sedadlá: <strong id="ag-stat-free" style="color: var(--accent-emerald);">-</strong></span>
+                        </div>
+                        <div style="display: flex; gap: 12px; font-size: 12px;">
+                            <span style="display: flex; align-items: center; gap: 5px;"><span style="width: 12px; height: 12px; border-radius: 3px; background: rgba(16, 185, 129, 0.3); border: 1px solid var(--accent-emerald);"></span> Voľné sedadlo</span>
+                            <span style="display: flex; align-items: center; gap: 5px;"><span style="width: 12px; height: 12px; border-radius: 3px; background: rgba(59, 130, 246, 0.4); border: 1px solid #60a5fa;"></span> Online Lease</span>
+                            <span style="display: flex; align-items: center; gap: 5px;"><span style="width: 12px; height: 12px; border-radius: 3px; background: rgba(139, 92, 246, 0.5); border: 1px solid #c084fc;"></span> Air-Gap Delegované</span>
+                        </div>
+                    </div>
+
+                    <!-- The Seat Map Tiles Grid -->
+                    <div id="ag-seat-map-grid" class="seat-map-grid">
+                        <div style="grid-column: 1 / -1; text-align: center; color: var(--text-muted); padding: 20px;">
+                            Vyberte licenciu pre zobrazenie mapy sedadiel.
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Active Air-Gap Grants Table Card -->
+                <div class="chart-card" style="margin-top: 16px;">
+                    <div class="chart-header" style="display: flex; justify-content: space-between; align-items: center;">
+                        <div>
+                            <div class="chart-title">📋 Evidencia Air-Gap Seat Grantov (.symgrant)</div>
+                            <p style="color: var(--text-secondary); font-size: 13px; margin-top: 4px;">
+                                Zoznam všetkých vydaných kryptografických poverení pre izolované on-premise uzly.
+                            </p>
+                        </div>
+                        <button type="button" class="btn btn-secondary btn-sm" onclick="loadAirGapGrantsTable()">🔄 Obnoviť zoznam</button>
+                    </div>
+
+                    <div style="max-height: 400px; overflow-y: auto; margin-top: 12px;">
+                        <table style="width: 100%;">
+                            <thead>
+                                <tr>
+                                    <th>ID Grantu</th>
+                                    <th>Licencia</th>
+                                    <th>Relay ID</th>
+                                    <th>Rozsah Sedadiel</th>
+                                    <th>Počet</th>
+                                    <th>Seq / Supersedes</th>
+                                    <th>Stav</th>
+                                    <th>Platnosť Do</th>
+                                    <th style="text-align: right;">Akcia</th>
+                                </tr>
+                            </thead>
+                            <tbody id="ag-grants-tbody">
+                                <tr>
+                                    <td colspan="9" style="text-align: center; color: var(--text-muted); padding: 20px;">Načítavam granty...</td>
+                                </tr>
+                            </tbody>
+                        </table>
                     </div>
                 </div>
             </section>

@@ -2,7 +2,7 @@
 
 [![Platform](https://img.shields.io/badge/.NET-10.0%20LTS-512BD4?logo=dotnet)](https://dotnet.microsoft.com/)
 [![Language](https://img.shields.io/badge/C%23-14.0-239120?logo=csharp)](https://learn.microsoft.com/dotnet/csharp/)
-[![Tests](https://img.shields.io/badge/tests-372%20passed%20(+17%20Python%2C%20+12%20Wasm)-brightgreen)](#výsledky-testovania)
+[![Tests](https://img.shields.io/badge/tests-446%20passed%20(+29%20Python)-brightgreen)](#výsledky-testovania)
 [![License: AGPL-3.0](https://img.shields.io/badge/license-AGPL--3.0-blue.svg)](LICENSE)
 [![License: Apache-2.0](https://img.shields.io/badge/client%20SDK-Apache--2.0-blue.svg)](LICENSES/Apache-2.0.txt)
 [![CRA Compliant](https://img.shields.io/badge/CRA%20Compliance-EU%202024%2F2847-success)](SECURITY.md)
@@ -47,9 +47,10 @@ Rieši to, čo dnešné cloud-first platformy ponúkajú iba ako obmedzený dopl
 9. **Cyber Resilience Act (CRA) & SBOM CycloneDX v1.6**
    - Strojovo čitateľný súlad s európskym nariadením CRA na endpointoch `/v1/compliance/cra` a export SBOM `/v1/compliance/sbom`.
    - CLI príkazy `symbolon sbom` a `symbolon verify-artifact` pre overenie integrity a kontrolných súčtov binárok.
-10. **Air-Gap Offline Portál & Scenáre**
-    - Plnohodnotná podpora pre striktne izolované priemyselné závody a bezsieťové prostredia.
-    - Výmena `.symreq` → `.symgrant` cez USB alebo Web UI s povinným hash-chain uzlom `usageDigest` zabraňujúcim neoprávnenému generovaniu offline grantov bez evidencie spotreby.
+10. **Air-Gap Delegácia Kapacity, `.symreq` Požiadavky & `.symgrant` Granty (GNT-1..10, FLT-32..35)**
+    - Plnohodnotná podpora pre striktne izolované priemyselné závody a bezsieťové prostredia bez internetového pripojenia.
+    - Kryptografický protokol výmeny `.symreq` → `.symgrant` cez USB alebo Web UI s **disjunktnou alokáciou sedadiel** (`[SeatFrom..SeatTo]`), garanciou nulového prekrývania kapacít a auditným Merkle hash uzlom `usageDigest`.
+    - Interaktívna mapa alokácie sedadiel vo Web Dashboarde, správa aktívnych poverení a CLI príkazy `symbolon grant request/issue/inspect/import`.
     - Offline node-lock aktivácie viazané na hardvérový fingerprint stanice.
 11. **Viacjazyčné Klientske SDK (C#, Python, Rust, C/C++)**
     - Oficiálne klientske knižnice pod licenciou **Apache-2.0** v priečinku `sdk/` s automatickým vláknom pre heartbeat, adaptívnym jitterom ±10% a RAII / kontextovým manažérom.

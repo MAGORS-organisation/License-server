@@ -138,6 +138,7 @@ public sealed class SeatGrantEntity
     public int SeatFrom { get; set; }
     public int SeatTo { get; set; }
     public long Seq { get; set; }
+    public long? Supersedes { get; set; }
     public DateTimeOffset NotBefore { get; set; }
     public DateTimeOffset NotAfter { get; set; }
     public DateTimeOffset? RevokedAt { get; set; }
@@ -146,6 +147,14 @@ public sealed class SeatGrantEntity
     public LicenseEntity? License { get; set; }
     public RelayEntity? Relay { get; set; }
     public ICollection<SeatEntity> DelegatedSeats { get; set; } = new List<SeatEntity>();
+}
+
+public sealed class AirGapNonceEntity
+{
+    public string Nonce { get; set; } = string.Empty;
+    public string RelayId { get; set; } = string.Empty;
+    public DateTimeOffset SeenAt { get; set; }
+    public DateTimeOffset ExpiresAt { get; set; }
 }
 
 public sealed class MachineEntity

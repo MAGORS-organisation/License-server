@@ -31,6 +31,11 @@ namespace Symbolon.Format;
 [JsonSerializable(typeof(IReadOnlyList<RevocationItem>))]
 [JsonSerializable(typeof(SymleaseClaims))]
 [JsonSerializable(typeof(SymleaseBorrowPayload))]
+[JsonSerializable(typeof(SeatGrantDocumentClaims))]
+[JsonSerializable(typeof(SeatGrantPayload))]
+[JsonSerializable(typeof(OfflineExtensionClaim))]
+[JsonSerializable(typeof(AirGapRequestClaims))]
+[JsonSerializable(typeof(AirGapRequestPayload))]
 public sealed partial class SymbolonJsonContext : JsonSerializerContext
 {
 }

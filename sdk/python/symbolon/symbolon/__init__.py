@@ -4,6 +4,7 @@ from .client import SymbolonClient, SeatLease, resolve_license_servers, discover
 from .models import LeaseToken, SymbolonException, SeatAllocationDenied
 from .fingerprint import get_local_fingerprint, compute_canonical_fingerprint
 from .attestation import EnclaveType, HardwareAttestationQuote, TpmQuoteGenerator, TpmQuoteVerifier
+from .grant import SeatGrant, AirGapRequest, parse_symgrant, parse_symreq
 
 __all__ = [
     "SymbolonClient",
@@ -19,6 +20,10 @@ __all__ = [
     "TpmQuoteVerifier",
     "resolve_license_servers",
     "discover_servers",
+    "SeatGrant",
+    "AirGapRequest",
+    "parse_symgrant",
+    "parse_symreq",
 ]
 
 __version__ = "1.0.0"

@@ -73,6 +73,9 @@ function initNavigation() {
                 if (targetView === "view-machines") {
                     loadMachinesView();
                 }
+                if (targetView === "view-airgap") {
+                    loadAirGapView();
+                }
             }
         });
     });
@@ -4139,6 +4142,405 @@ window.onMachineLicenseChanged = onMachineLicenseChanged;
 window.loadSampleStoredFp = loadSampleStoredFp;
 window.loadSampleCurrentFp = loadSampleCurrentFp;
 window.runFuzzyMatchSimulation = runFuzzyMatchSimulation;
+
+// ==========================================
+// Air-Gap Seat Grant & Allocation Portal (GNT-1..10, FLT-32..35)
+// ==========================================
+let loadedAirGapRequestPem = null;
+let allActiveAirGapGrants = [];
+
+function switchAirGapTab(tab) {
+    const uploadDiv = document.getElementById("ag-tab-upload");
+    const manualForm = document.getElementById("form-airgap-grant");
+    const btnUpload = document.getElementById("btn-tab-ag-upload");
+    const btnManual = document.getElementById("btn-tab-ag-manual");
+
+    if (tab === "upload") {
+        if (uploadDiv) uploadDiv.style.display = "block";
+        if (manualForm) manualForm.style.display = "none";
+        if (btnUpload) { btnUpload.className = "btn btn-sm btn-primary"; }
+        if (btnManual) { btnManual.className = "btn btn-sm btn-secondary"; }
+    } else {
+        if (uploadDiv) uploadDiv.style.display = "none";
+        if (manualForm) manualForm.style.display = "block";
+        if (btnUpload) { btnUpload.className = "btn btn-sm btn-secondary"; }
+        if (btnManual) { btnManual.className = "btn btn-sm btn-primary"; }
+    }
+}
+
+function initAirGapHandlers() {
+    const dropzone = document.getElementById("ag-dropzone");
+    const fileInput = document.getElementById("ag-file-input");
+    const submitBtn = document.getElementById("btn-submit-ag-req");
+
+    if (dropzone && fileInput && !dropzone.dataset.initialized) {
+        dropzone.dataset.initialized = "true";
+        dropzone.addEventListener("dragover", (e) => {
+            e.preventDefault();
+            dropzone.classList.add("dragover");
+        });
+        dropzone.addEventListener("dragleave", () => {
+            dropzone.classList.remove("dragover");
+        });
+        dropzone.addEventListener("drop", (e) => {
+            e.preventDefault();
+            dropzone.classList.remove("dragover");
+            if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+                handleAirGapRequestFile(e.dataTransfer.files[0]);
+            }
+        });
+        fileInput.addEventListener("change", (e) => {
+            if (e.target.files && e.target.files.length > 0) {
+                handleAirGapRequestFile(e.target.files[0]);
+            }
+        });
+    }
+
+    if (submitBtn && !submitBtn.dataset.initialized) {
+        submitBtn.dataset.initialized = "true";
+        submitBtn.addEventListener("click", async () => {
+            if (!loadedAirGapRequestPem) {
+                showToast("Najprv nahrajte platný súbor požiadavky .symreq", "error");
+                return;
+            }
+            try {
+                submitBtn.disabled = true;
+                submitBtn.textContent = "Vystavujem .symgrant...";
+                const res = await fetch("/v1/offline/requests", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ requestPem: loadedAirGapRequestPem })
+                });
+
+                if (!res.ok) {
+                    const err = await res.text();
+                    showToast("Server odmietol požiadavku: " + err, "error");
+                    return;
+                }
+
+                const data = await res.json();
+                downloadTextFile(`grant-${data.grantId}.symgrant`, data.symgrantPem);
+                showToast(`Seat Grant #${data.grantId} úspešne vystavený! Rozsah: [${data.seatFrom}..${data.seatTo}] (${data.seats} sedadiel)`, "success");
+                
+                loadedAirGapRequestPem = null;
+                const preview = document.getElementById("ag-req-preview");
+                if (preview) preview.style.display = "none";
+                if (fileInput) fileInput.value = "";
+
+                await loadAirGapView();
+            } catch (e) {
+                showToast("Chyba pri vystavovaní grantu: " + e.message, "error");
+            } finally {
+                submitBtn.disabled = false;
+                submitBtn.textContent = "Vystaviť & Stiahnuť .symgrant súbor";
+            }
+        });
+    }
+}
+
+function handleAirGapRequestFile(file) {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+        const text = e.target.result;
+        if (!text || !text.includes("SYMBOLON GRANT REQUEST")) {
+            showToast("Súbor neobsahuje platnú hlavičku SYMBOLON GRANT REQUEST", "error");
+            return;
+        }
+
+        loadedAirGapRequestPem = text.trim();
+        parseAndPreviewAirGapRequest(loadedAirGapRequestPem);
+    };
+    reader.readAsText(file);
+}
+
+function parseAndPreviewAirGapRequest(pem) {
+    let relayId = "-";
+    let licenseKey = "-";
+    let requestedSeats = "-";
+    let lastSeq = "0";
+    let usageDigest = "-";
+
+    try {
+        const lines = pem.split(/\r?\n/).filter(l => !l.startsWith("-----") && l.trim().length > 0);
+        const base64Json = lines.join("");
+        const rawJson = atob(base64Json);
+        const jwsDoc = JSON.parse(rawJson);
+        if (jwsDoc.payload) {
+            let b64 = jwsDoc.payload.replace(/-/g, "+").replace(/_/g, "/");
+            while (b64.length % 4 !== 0) b64 += "=";
+            const payloadJson = decodeURIComponent(escape(atob(b64)));
+            const claims = JSON.parse(payloadJson);
+            relayId = claims.iss || claims.symreq?.relayId || "-";
+            licenseKey = claims.sub || claims.symreq?.licenseKey || "-";
+            requestedSeats = claims.symreq?.requestedSeats ?? "-";
+            lastSeq = claims.symreq?.lastSeq ?? "0";
+            usageDigest = claims.symreq?.usageDigest || "-";
+        }
+    } catch {
+        // Fallback
+    }
+
+    const prevRelay = document.getElementById("ag-prev-relay");
+    const prevLic = document.getElementById("ag-prev-license");
+    const prevSeats = document.getElementById("ag-prev-seats");
+    const prevSeq = document.getElementById("ag-prev-seq");
+    const prevDigest = document.getElementById("ag-prev-digest");
+    const previewBox = document.getElementById("ag-req-preview");
+
+    if (prevRelay) prevRelay.textContent = relayId;
+    if (prevLic) prevLic.textContent = licenseKey;
+    if (prevSeats) prevSeats.textContent = requestedSeats;
+    if (prevSeq) prevSeq.textContent = lastSeq;
+    if (prevDigest) prevDigest.textContent = usageDigest;
+
+    if (previewBox) previewBox.style.display = "block";
+    showToast("Požiadavka .symreq načítaná a overená", "success");
+}
+
+async function loadAirGapView() {
+    initAirGapHandlers();
+    await loadAirGapLicenses();
+    await loadAirGapGrantsTable();
+}
+
+async function loadAirGapLicenses() {
+    const select = document.getElementById("ag-seatmap-license-select");
+    if (!select) return;
+
+    try {
+        const res = await fetch("/admin/v1/licenses");
+        if (!res.ok) throw new Error("Chyba načítania licencií");
+        const licenses = await res.json();
+
+        const currentVal = select.value;
+        select.innerHTML = '<option value="">-- Vyberte licenciu --</option>';
+
+        (licenses || []).forEach(lic => {
+            const opt = document.createElement("option");
+            opt.value = lic.id;
+            opt.textContent = `${lic.customerRef || lic.id} (${lic.maxSeats} sedadiel, ${lic.state})`;
+            select.appendChild(opt);
+        });
+
+        if (currentVal && Array.from(select.options).some(o => o.value === currentVal)) {
+            select.value = currentVal;
+            await loadAirGapSeatMap(currentVal);
+        } else if (licenses && licenses.length > 0) {
+            select.value = licenses[0].id;
+            await loadAirGapSeatMap(licenses[0].id);
+        }
+    } catch (e) {
+        showToast("Chyba načítania licencií pre air-gap: " + e.message, "error");
+    }
+}
+
+async function onAirGapLicenseChanged() {
+    const select = document.getElementById("ag-seatmap-license-select");
+    if (!select || !select.value) {
+        renderEmptySeatMap("Vyberte licenciu pre zobrazenie mapy sedadiel.");
+        return;
+    }
+    await loadAirGapSeatMap(select.value);
+}
+
+async function refreshAirGapSeatMap() {
+    const select = document.getElementById("ag-seatmap-license-select");
+    if (select && select.value) {
+        await loadAirGapSeatMap(select.value);
+    }
+}
+
+function renderEmptySeatMap(msg) {
+    const grid = document.getElementById("ag-seat-map-grid");
+    if (grid) {
+        grid.innerHTML = `<div style="grid-column: 1 / -1; text-align: center; color: var(--text-muted); padding: 20px;">${escapeHtml(msg)}</div>`;
+    }
+}
+
+async function loadAirGapSeatMap(licenseId) {
+    const grid = document.getElementById("ag-seat-map-grid");
+    if (!grid) return;
+
+    grid.innerHTML = '<div style="grid-column: 1 / -1; text-align: center; color: var(--text-muted); padding: 20px;">Načítavam alokáciu sedadiel...</div>';
+
+    try {
+        const res = await fetch(`/admin/v1/licenses/${encodeURIComponent(licenseId)}/seat-allocation`);
+        if (!res.ok) throw new Error("Nepodarilo sa načítať alokáciu sedadiel");
+        const data = await res.json();
+
+        const totalSeats = data.maxSeats || 0;
+        const activeLeases = data.activeLeases || [];
+        const grants = (data.grants || []).filter(g => g.isActive);
+
+        let delegatedSeatsCount = 0;
+        grants.forEach(g => { delegatedSeatsCount += (g.seats || 0); });
+
+        const onlineLeasesCount = activeLeases.length;
+        const freeSeatsCount = Math.max(0, totalSeats - onlineLeasesCount - delegatedSeatsCount);
+
+        const statTotal = document.getElementById("ag-stat-total");
+        const statLeases = document.getElementById("ag-stat-leases");
+        const statGrants = document.getElementById("ag-stat-grants");
+        const statFree = document.getElementById("ag-stat-free");
+
+        if (statTotal) statTotal.textContent = totalSeats;
+        if (statLeases) statLeases.textContent = onlineLeasesCount;
+        if (statGrants) statGrants.textContent = delegatedSeatsCount;
+        if (statFree) statFree.textContent = freeSeatsCount;
+
+        grid.innerHTML = "";
+        for (let s = 1; s <= totalSeats; s++) {
+            const tile = document.createElement("div");
+            tile.className = "seat-tile";
+
+            const grant = grants.find(g => s >= g.seatFrom && s <= g.seatTo);
+            const lease = activeLeases.find(l => l.seatNo === s);
+
+            if (grant) {
+                tile.classList.add("seat-grant");
+                tile.title = `Air-Gap Delegované pre Relay: ${grant.relayId}\nGrant: ${grant.grantId}\nRozsah: [${grant.seatFrom}..${grant.seatTo}]\nPlatné do: ${new Date(grant.notAfter).toLocaleString()}`;
+                tile.innerHTML = `
+                    <div class="seat-num">#${s}</div>
+                    <div class="seat-label">RELAY</div>
+                `;
+            } else if (lease) {
+                tile.classList.add("seat-lease");
+                tile.title = `Online Lease: ${lease.leaseId}\nPlatné do: ${new Date(lease.expiresAt).toLocaleString()}`;
+                tile.innerHTML = `
+                    <div class="seat-num">#${s}</div>
+                    <div class="seat-label">LEASE</div>
+                `;
+            } else {
+                tile.classList.add("seat-free");
+                tile.title = `Sedadlo #${s} je voľné na pridelenie`;
+                tile.innerHTML = `
+                    <div class="seat-num">#${s}</div>
+                    <div class="seat-label">VOĽNÉ</div>
+                `;
+            }
+            grid.appendChild(tile);
+        }
+    } catch (e) {
+        renderEmptySeatMap("Chyba: " + e.message);
+    }
+}
+
+async function loadAirGapGrantsTable() {
+    const tbody = document.getElementById("ag-grants-tbody");
+    if (!tbody) return;
+
+    tbody.innerHTML = '<tr><td colspan="9" style="text-align: center; color: var(--text-muted); padding: 20px;">Načítavam evidenciu grantov...</td></tr>';
+
+    try {
+        const res = await fetch("/admin/v1/grants");
+        if (!res.ok) throw new Error("Chyba načítania grantov");
+        const grants = await res.json();
+        allActiveAirGapGrants = grants || [];
+
+        const now = new Date();
+        let totalDelegatedSeats = 0;
+        const relaySet = new Set();
+
+        allActiveAirGapGrants.forEach(g => {
+            const isAct = !g.revokedAt && new Date(g.notAfter) > now;
+            if (isAct) {
+                totalDelegatedSeats += (g.seats || 0);
+                if (g.relayId) relaySet.add(g.relayId);
+            }
+        });
+
+        const kpiTotal = document.getElementById("kpi-ag-total");
+        const kpiSeats = document.getElementById("kpi-ag-seats");
+        const kpiRelays = document.getElementById("kpi-ag-relays");
+
+        if (kpiTotal) kpiTotal.textContent = allActiveAirGapGrants.length;
+        if (kpiSeats) kpiSeats.textContent = totalDelegatedSeats;
+        if (kpiRelays) kpiRelays.textContent = relaySet.size;
+
+        if (allActiveAirGapGrants.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="9" style="text-align: center; color: var(--text-muted); padding: 20px;">Zatiaľ neboli vystavené žiadne offline seat granty.</td></tr>';
+            return;
+        }
+
+        tbody.innerHTML = "";
+        allActiveAirGapGrants.forEach(g => {
+            const tr = document.createElement("tr");
+            const isRevoked = Boolean(g.revokedAt);
+            const isExpired = !isRevoked && new Date(g.notAfter) <= now;
+
+            let statusBadge = '<span class="badge badge-success">Aktívny</span>';
+            if (isRevoked) {
+                statusBadge = '<span class="badge badge-danger">Revokovaný</span>';
+            } else if (isExpired) {
+                statusBadge = '<span class="badge badge-warning">Expirovaný</span>';
+            }
+
+            const grantShortId = g.id ? `${g.id.substring(0, 14)}...` : "-";
+            const expiresStr = g.notAfter ? new Date(g.notAfter).toLocaleString() : "-";
+            const seqStr = `${g.seq}${g.supersedes ? ` (nahradil ${g.supersedes})` : ''}`;
+
+            tr.innerHTML = `
+                <td style="font-family: monospace; font-size: 12px;" title="${escapeHtml(g.id)}">${escapeHtml(grantShortId)}</td>
+                <td style="font-family: monospace; font-size: 12px;">${escapeHtml(g.licenseId)}</td>
+                <td><strong>${escapeHtml(g.relayId)}</strong></td>
+                <td><span class="badge" style="background: rgba(139, 92, 246, 0.2); color: #c084fc; border: 1px solid rgba(139, 92, 246, 0.4);">[${g.seatFrom}..${g.seatTo}]</span></td>
+                <td><strong>${g.seats}</strong></td>
+                <td>${escapeHtml(seqStr)}</td>
+                <td>${statusBadge}</td>
+                <td style="font-size: 12px;">${escapeHtml(expiresStr)}</td>
+                <td style="text-align: right; white-space: nowrap;">
+                    <button class="btn btn-secondary btn-sm" onclick="downloadAirGapGrantPem('${escapeHtml(g.id)}')" title="Stiahnuť súbor .symgrant">⬇️ .symgrant</button>
+                    ${!isRevoked ? `<button class="btn btn-danger btn-sm" onclick="revokeAirGapGrant('${escapeHtml(g.id)}')" style="margin-left: 4px;" title="Revokovať poverenie">❌ Revokovať</button>` : ''}
+                </td>
+            `;
+            tbody.appendChild(tr);
+        });
+    } catch (e) {
+        tbody.innerHTML = `<tr><td colspan="9" style="text-align: center; color: var(--accent-rose); padding: 20px;">Chyba: ${escapeHtml(e.message)}</td></tr>`;
+    }
+}
+
+function downloadAirGapGrantPem(grantId) {
+    const grant = allActiveAirGapGrants.find(g => g.id === grantId);
+    if (!grant || !grant.document) {
+        showToast("Dokument grantu sa nenašiel", "error");
+        return;
+    }
+    downloadTextFile(`grant-${grant.id}.symgrant`, grant.document);
+    showToast(`Súbor grant-${grant.id}.symgrant stiahnutý`, "success");
+}
+
+async function revokeAirGapGrant(grantId) {
+    if (!confirm(`Naozaj si želáte revokovať air-gap seat grant '${grantId}'? Táto akcia okamžite zneplatní delegované sedadlá.`)) {
+        return;
+    }
+
+    try {
+        const res = await fetch(`/admin/v1/grants/${encodeURIComponent(grantId)}`, {
+            method: "DELETE"
+        });
+
+        if (res.ok || res.status === 204) {
+            showToast(`Grant '${grantId}' bol úspešne revokovaný.`, "success");
+            await loadAirGapGrantsTable();
+            await refreshAirGapSeatMap();
+        } else {
+            const err = await res.text();
+            showToast("Zlyhanie revokácie grantu: " + err, "error");
+        }
+    } catch (e) {
+        showToast("Sieťová chyba pri revokácii grantu: " + e.message, "error");
+    }
+}
+
+window.switchAirGapTab = switchAirGapTab;
+window.loadAirGapView = loadAirGapView;
+window.loadAirGapGrantsTable = loadAirGapGrantsTable;
+window.onAirGapLicenseChanged = onAirGapLicenseChanged;
+window.refreshAirGapSeatMap = refreshAirGapSeatMap;
+window.revokeAirGapGrant = revokeAirGapGrant;
+window.downloadAirGapGrantPem = downloadAirGapGrantPem;
+
 
 
 

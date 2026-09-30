@@ -10,6 +10,31 @@ a projekt striktne dodržiava [Sémantické Verziovanie (Semantic Versioning 2.0
 ## [Unreleased]
 
 ### Pridané (Added)
+- **Air-Gapped Capacity Transfer, Signed `.symreq` Request & Delegated Seat Grant Issuance Protocol (GNT-1 – GNT-10, FLT-32 – FLT-35, §5, §7.7)**:
+  - **Formátová a Kryptografická vrstva (`Symbolon.Format`, `Symbolon.Crypto`)**:
+    - `SeatGrantClaims`, `SeatGrantSigner`, `SeatGrantVerifier`: JWS General JSON formát `.symgrant` artefaktu s PEM obálkou `-----BEGIN SYMBOLON SEAT GRANT-----` a hybridným kryptografickým podpisom (ES256 + ML-DSA-65). Striktné overovanie invariantov: integrita a disjunkcia intervalu (`GNT-3`: `(SeatTo - SeatFrom + 1) == Seats`), časové okná (`GNT-2`), a efemérne privátne kľúče pre relay signing (`spec/05-seat-grant.md` §5.2).
+    - `AirGapRequestClaims`, `AirGapRequestSigner`, `AirGapRequestVerifier`: Digitálne podpísaný formát požiadavky `.symreq` s PEM obálkou `-----BEGIN SYMBOLON GRANT REQUEST-----` generovaný relay serverom pre USB prenos.
+    - Rozšírenie `JsonWebKeyDto` o export/import privátneho parametra `D` a `Es256SignatureProvider.ExportPrivateJwk()` pre vkladanie efemérnych podpisových kľúčov do `.symgrant` dokumentu.
+  - **Doménová a Dátová vrstva (`Symbolon.Domain`, `Symbolon.Data`)**:
+    - `DisjunctiveGrantAllocator`: Deterministický alokačný algoritmus disjunktných intervalov sedadiel `[SeatFrom..SeatTo]` zabezpečujúci nulové prekrývanie (`GNT-3`, `GNT-4`, `GNT-5`).
+    - `ISeatGrantStore` & `EfSeatGrantStore`: Perzistencia grantov (`SeatGrantEntity`) a jednorazových nonces (`AirGapNonceEntity`) s ochranou proti replay útokom a sledovaním nástupníckych sekvencií (`Supersedes`).
+  - **Relay Engine & Edge Enforcer (`Symbolon.Relay`)**:
+    - `RelaySeatGrantManager`: Monotónne overenie sekvencií (`GNT-7`), automatická revokácia nahradených grantov (`GNT-9`: supersedes), overenie Merkle audit digestu lokálnych udalostí (`FLT-33`), a registrácia efemérneho kľúča pre offline vystavovanie lease tokenov.
+    - `SqliteSeatStore`: Rozšírenie o tabuľky `seat_grants` a `relay_sequences`, garancia striktného ohraničenia checkoutov do prideleného grant intervalu (`GNT-10`) a offline endpointy (`/v1/offline/grants/import`, `/v1/offline/requests/create`, `/v1/offline/grants/{licenseId}`).
+  - **Riadiaca rovina & Admin API (`Symbolon.ControlPlane`)**:
+    - `POST /v1/offline/requests`: Vystavenie a podpísanie `.symgrant` z overenej `.symreq` požiadavky.
+    - `POST /v1/offline/grants`: Vystavenie `.symgrant` na základe parametrov s disjunktnou alokáciou a overením auditného hashu.
+    - Admin endpointy: `GET /admin/v1/grants`, `GET /admin/v1/licenses/{id}/grants`, `GET /admin/v1/licenses/{id}/seat-allocation`, `DELETE /admin/v1/grants/{id}`.
+  - **CLI Nástroje & Interaktívny Wizard (`Symbolon.Cli`)**:
+    - Príkazy `symbolon grant request`, `symbolon grant issue`, `symbolon grant inspect`, `symbolon grant import` s vizuálnymi panelmi a tabuľkami.
+    - Integrácia Air-Gap sprievodcu priamo do `symbolon setup` / `wizard` TUI.
+  - **Web Dashboard & Portál pre Izolované Siete**:
+    - Air-Gap Portál s drag & drop nahrávaním `.symreq`, okamžitou verifikáciou požiadavky a sťahovaním `.symgrant`.
+    - Interaktívna Disjunktná Mapa Alokácie Sedadiel zobrazujúca celkovú kapacitu, aktívne online leasingy, offline relay granty a voľné sedadlá.
+    - Evidencia a správa aktívnych/revokovaných grantov s možnosťou stiahnutia a okamžitej revokácie.
+  - **Multi-Language Parity (Python SDK)**:
+    - Modul `symbolon.grant` s dátovými modelmi `SeatGrant` a `AirGapRequest`, overovaním disjunkcie a funkciami `parse_symgrant` a `parse_symreq`.
+    - 29 unit testov Python SDK s overením invariantov (100% úspešnosť).
 - **Advanced Multi-Component Hardware Fingerprinting, Fuzzy Node-Lock Matching & Anti-Virtualization/Container Isolation (FPR-1 – FPR-19, LIC-33, §7.6, §8)**:
   - **Formátová a Protokolová vrstva (`Symbolon.Format`, `Symbolon.Protocol`)**:
     - `FingerprintHelper`: Zber a normalizácia 6 štandardných kľúčov (`machineId`, `board`, `cpu`, `disk`, `mac`, `host`) podľa **FPR-1**. Pseudonymizácia názvu hostu so salted SHA-256 (`PseudonymizeHost(rawHost, licenseSalt)`) chrániaca PII a zabezpečujúca GDPR súlad (**FPR-2**). Striktné filtrovanie zástupných hodnôt a placeholderov (`"unknown"`, `"none"`, zeros) podľa **FPR-3**. Kanonický formát triedených kľúčov `CODE=value\n` a výpočet súhrnného SHA-256 odtlačku (**FPR-4**).

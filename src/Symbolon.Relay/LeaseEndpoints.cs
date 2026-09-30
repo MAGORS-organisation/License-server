@@ -74,6 +74,23 @@ internal static class LeaseEndpoints
              .Produces(StatusCodes.Status204NoContent)
              .ProducesProblem(StatusCodes.Status404NotFound);
 
+        group.MapPost("/offline/grants/import", ImportGrantAsync)
+             .WithName("ImportGrant")
+             .WithSummary("Importuje delegovaný seat grant (.symgrant).")
+             .Produces(StatusCodes.Status200OK)
+             .ProducesProblem(StatusCodes.Status400BadRequest);
+
+        group.MapPost("/offline/requests/create", CreateGrantRequestAsync)
+             .WithName("CreateGrantRequest")
+             .WithSummary("Vytvorí podpísanú požiadavku na sedadlá (.symreq).")
+             .Produces<CreateGrantRequestResponseDto>(StatusCodes.Status200OK)
+             .ProducesProblem(StatusCodes.Status400BadRequest);
+
+        group.MapGet("/offline/grants/{licenseId}", GetActiveGrantsAsync)
+             .WithName("GetActiveGrants")
+             .WithSummary("Zoznam aktívnych grantov pre licenciu.")
+             .Produces(StatusCodes.Status200OK);
+
         return group;
     }
 
@@ -477,4 +494,78 @@ internal static class LeaseEndpoints
 
         return Results.NoContent();
     }
+
+    private static async Task<IResult> ImportGrantAsync(
+        [FromBody] ImportGrantRequestDto request,
+        RelaySeatGrantManager grantManager,
+        CancellationToken ct)
+    {
+        if (request is null || string.IsNullOrWhiteSpace(request.GrantPem))
+        {
+            return Results.Problem(
+                statusCode: StatusCodes.Status400BadRequest,
+                title: "Invalid Request",
+                detail: "GrantPem is required.");
+        }
+
+        var result = await grantManager.ImportGrantAsync(request.GrantPem, ct).ConfigureAwait(false);
+        if (!result.IsValid)
+        {
+            return Results.Problem(
+                statusCode: StatusCodes.Status400BadRequest,
+                title: "Grant Verification Failed",
+                detail: result.FailureReason ?? "Failed to verify grant");
+        }
+
+        return Results.Ok(new
+        {
+            imported = true,
+            grantId = result.Claims!.Jti,
+            seats = result.Claims.Symgrant.Seats,
+            seatRange = result.Claims.Symgrant.SeatRange,
+            seq = result.Claims.Symgrant.Seq
+        });
+    }
+
+    private static async Task<IResult> CreateGrantRequestAsync(
+        [FromBody] CreateGrantRequestDto request,
+        RelaySeatGrantManager grantManager,
+        CancellationToken ct)
+    {
+        if (request is null || string.IsNullOrWhiteSpace(request.LicenseKey) || string.IsNullOrWhiteSpace(request.LicenseId) || request.RequestedSeats <= 0)
+        {
+            return Results.Problem(
+                statusCode: StatusCodes.Status400BadRequest,
+                title: "Invalid Request",
+                detail: "LicenseKey, LicenseId, and positive RequestedSeats are required.");
+        }
+
+        try
+        {
+            string reqPem = await grantManager.CreateGrantRequestAsync(request.LicenseKey, request.LicenseId, request.RequestedSeats, ct).ConfigureAwait(false);
+            return Results.Ok(new CreateGrantRequestResponseDto(reqPem));
+        }
+        catch (ArgumentException ex)
+        {
+            return Results.Problem(
+                statusCode: StatusCodes.Status400BadRequest,
+                title: "Request Creation Failed",
+                detail: ex.Message);
+        }
+    }
+
+    private static async Task<IResult> GetActiveGrantsAsync(
+        string licenseId,
+        SqliteSeatStore seatStore,
+        TimeProvider timeProvider,
+        CancellationToken ct)
+    {
+        var grants = await seatStore.GetActiveGrantsAsync(licenseId, timeProvider.GetUtcNow(), ct).ConfigureAwait(false);
+        return Results.Ok(grants);
+    }
 }
+
+internal sealed record ImportGrantRequestDto(string GrantPem);
+internal sealed record CreateGrantRequestDto(string LicenseKey, string LicenseId, int RequestedSeats);
+internal sealed record CreateGrantRequestResponseDto(string RequestPem);
+

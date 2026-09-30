@@ -24,6 +24,7 @@ public static class SetupWizard
                         "🚀 Inštalácia a konfigurácia ControlPlane (Centrálny licenčný server)",
                         "🏢 Inštalácia a konfigurácia Relay (Lokálny on-premise relay server)",
                         "🔑 Rýchle vystavenie licencie a vygenerovanie kľúčov (.symlic)",
+                        "🛰️ Air-Gap prenos sedadiel a správa grantov (.symreq / .symgrant)",
                         "🩺 Diagnostika systému (System Doctor)",
                         "❌ Ukončiť sprievodcu"));
 
@@ -38,6 +39,10 @@ public static class SetupWizard
             else if (choice.StartsWith("🔑", StringComparison.Ordinal))
             {
                 await LicenseWizard.RunInteractiveAsync(appConsole).ConfigureAwait(false);
+            }
+            else if (choice.StartsWith("🛰️", StringComparison.Ordinal))
+            {
+                await RunAirGapWizardAsync(appConsole).ConfigureAwait(false);
             }
             else if (choice.StartsWith("🩺", StringComparison.Ordinal))
             {
@@ -122,5 +127,52 @@ public static class SetupWizard
         console.MarkupLine($"[green]✔[/] Systémové hodiny: {DateTimeOffset.UtcNow:u} (UTC)");
         console.MarkupLine($"[green]✔[/] Hardvérový fingerprint stanice: [cyan]{fpHex}[/] ({fp.Count} metrík)");
         console.WriteLine();
+    }
+
+    private static async Task RunAirGapWizardAsync(IAnsiConsole console)
+    {
+        console.Write(new Rule("[bold yellow]Air-Gap Delegácia Sedadiel a Správa Grantov (GNT-1..10, FLT-32..35)[/]").LeftJustified());
+        console.WriteLine();
+
+        var subChoice = console.Prompt(
+            new SelectionPrompt<string>()
+                .Title("[bold cyan]Vyberte operáciu air-gap:[/]")
+                .PageSize(10)
+                .AddChoices(
+                    "📝 1. Vytvoriť požiadavku na sedadlá pre offline relay (.symreq)",
+                    "🛰️ 2. Vystaviť grant zo .symreq požiadavky na Control Plane (.symgrant)",
+                    "🔍 3. Inšpektovať a overiť .symgrant alebo .symreq súbor",
+                    "📥 4. Importovať .symgrant do offline relayu",
+                    "⬅️ Späť do hlavného menu"));
+
+        if (subChoice.StartsWith("📝", StringComparison.Ordinal))
+        {
+            string license = console.Ask<string>("Zadajte licenčný kľúč (napr. [yellow]SYM1-DEMO-KEY[/]):");
+            string relay = console.Ask<string>("Zadajte Relay ID stanice (napr. [yellow]rly_plant_01[/]):");
+            int seats = console.Prompt(new TextPrompt<int>("Zadajte požadovaný počet sedadiel:").DefaultValue(5));
+            string outFile = console.Prompt(new TextPrompt<string>("Výstupný súbor:").DefaultValue("request.symreq"));
+
+            await Commands.GrantCommands.HandleGrantAsync(["request", "--license", license, "--relay", relay, "--seats", seats.ToString(System.Globalization.CultureInfo.InvariantCulture), "--out", outFile]).ConfigureAwait(false);
+        }
+        else if (subChoice.StartsWith("🛰️", StringComparison.Ordinal))
+        {
+            string inFile = console.Prompt(new TextPrompt<string>("Cesta k súboru požiadavky (.symreq):").DefaultValue("request.symreq"));
+            string server = console.Prompt(new TextPrompt<string>("URL Control Plane servera:").DefaultValue("http://localhost:5000"));
+            string outFile = console.Prompt(new TextPrompt<string>("Uložiť vystavený grant do:").DefaultValue("grant.symgrant"));
+
+            await Commands.GrantCommands.HandleGrantAsync(["issue", "--in", inFile, "--server", server, "--out", outFile]).ConfigureAwait(false);
+        }
+        else if (subChoice.StartsWith("🔍", StringComparison.Ordinal))
+        {
+            string file = console.Ask<string>("Cesta k .symgrant alebo .symreq súboru:");
+            await Commands.GrantCommands.HandleGrantAsync(["inspect", "--in", file]).ConfigureAwait(false);
+        }
+        else if (subChoice.StartsWith("📥", StringComparison.Ordinal))
+        {
+            string inFile = console.Prompt(new TextPrompt<string>("Cesta k súboru grantu (.symgrant):").DefaultValue("grant.symgrant"));
+            string relayUrl = console.Prompt(new TextPrompt<string>("URL lokálneho Relay servera:").DefaultValue("http://localhost:5001"));
+
+            await Commands.GrantCommands.HandleGrantAsync(["import", "--in", inFile, "--relay", relayUrl]).ConfigureAwait(false);
+        }
     }
 }

@@ -7,6 +7,7 @@ using Symbolon.ControlPlane.Models;
 using Symbolon.Data;
 using Symbolon.Data.Entities;
 using Symbolon.Domain;
+using Symbolon.Domain.Grants;
 using Symbolon.Domain.PolicyRules;
 using Symbolon.Domain.Reporting;
 using Symbolon.Domain.Security;
@@ -66,6 +67,12 @@ public static class AdminEndpoints
         group.MapPost("/licenses/{id}/users", AssignLicenseUserAsync).WithName("AssignLicenseUser");
         group.MapGet("/licenses/{id}/users", GetLicenseUsersAsync).WithName("GetLicenseUsers");
         group.MapDelete("/licenses/{id}/users/{userId}", RemoveLicenseUserAsync).WithName("RemoveLicenseUser");
+
+        // Air-Gapped Seat Grants (GNT-1..10, FLT-32..35)
+        group.MapGet("/licenses/{id}/grants", GetLicenseGrantsAdminAsync).WithName("GetLicenseGrantsAdmin");
+        group.MapGet("/licenses/{id}/seat-allocation", GetLicenseSeatAllocationAdminAsync).WithName("GetLicenseSeatAllocationAdmin");
+        group.MapGet("/grants", GetAllGrantsAdminAsync).WithName("GetAllGrantsAdmin");
+        group.MapDelete("/grants/{id}", RevokeGrantAdminAsync).WithName("RevokeGrantAdmin");
 
         // Options File & Policy Rules (FLT-23, FLT-24, FLT-25, §7.5)
         group.MapGet("/licenses/{id}/rules", GetLicenseRulesAsync).WithName("GetLicenseRules");
@@ -1728,6 +1735,93 @@ public static class AdminEndpoints
                 type: Symbolon.Protocol.ProblemTypes.QueueNotFound);
         }
 
+        return TypedResults.NoContent();
+    }
+
+    private static async Task<IResult> GetLicenseGrantsAdminAsync(
+        string id,
+        ISeatGrantStore grantStore,
+        CancellationToken ct)
+    {
+        var grants = await grantStore.GetGrantsForLicenseAsync(id, ct).ConfigureAwait(false);
+        return Results.Ok(grants);
+    }
+
+    private static async Task<IResult> GetLicenseSeatAllocationAdminAsync(
+        string id,
+        SymbolonDbContext db,
+        ISeatGrantStore grantStore,
+        TimeProvider time,
+        CancellationToken ct)
+    {
+        var license = await db.Licenses.FirstOrDefaultAsync(l => l.Id == id, ct).ConfigureAwait(false);
+        if (license is null)
+        {
+            return TypedResults.NotFound($"License '{id}' not found.");
+        }
+
+        var now = time.GetUtcNow();
+        var seats = await db.Seats
+            .Where(s => s.LicenseId == id)
+            .OrderBy(s => s.SeatNo)
+            .Select(s => new
+            {
+                s.SeatNo,
+                s.LeaseId,
+                IsActive = s.LeaseId != null && s.ExpiresAt > now,
+                s.ExpiresAt
+            })
+            .ToListAsync(ct).ConfigureAwait(false);
+
+        var grants = await grantStore.GetGrantsForLicenseAsync(id, ct).ConfigureAwait(false);
+
+        return Results.Ok(new
+        {
+            licenseId = license.Id,
+            customerRef = license.CustomerRef,
+            maxSeats = license.MaxSeats,
+            activeLeases = seats.Where(s => s.IsActive).Select(s => new { s.SeatNo, s.LeaseId, s.ExpiresAt }),
+            grants = grants.Select(g => new
+            {
+                GrantId = g.Id,
+                g.RelayId,
+                g.Seats,
+                g.SeatFrom,
+                g.SeatTo,
+                g.Seq,
+                g.Supersedes,
+                g.NotBefore,
+                g.NotAfter,
+                g.RevokedAt,
+                Status = g.RevokedAt != null ? "revoked" : (now > g.NotAfter ? "expired" : (now < g.NotBefore ? "pending" : "active")),
+                IsActive = g.RevokedAt == null && g.NotBefore <= now && now <= g.NotAfter,
+                SymgrantPem = g.Document
+            })
+        });
+    }
+
+    private static async Task<IResult> GetAllGrantsAdminAsync(
+        ISeatGrantStore grantStore,
+        CancellationToken ct)
+    {
+        var grants = await grantStore.GetAllGrantsAsync(ct).ConfigureAwait(false);
+        return Results.Ok(grants);
+    }
+
+    private static async Task<IResult> RevokeGrantAdminAsync(
+        string id,
+        ISeatGrantStore grantStore,
+        TimeProvider time,
+        CancellationToken ct)
+    {
+        bool revoked = await grantStore.RevokeGrantAsync(id, time.GetUtcNow(), ct).ConfigureAwait(false);
+        if (!revoked)
+        {
+            return Results.Problem(
+                statusCode: StatusCodes.Status404NotFound,
+                title: "Grant Not Found",
+                detail: $"Grant '{id}' was not found or is already revoked.");
+        }
         return TypedResults.NoContent();
     }
 }

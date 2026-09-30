@@ -7,6 +7,7 @@ using Symbolon.Data;
 using Symbolon.Data.Entities;
 using Symbolon.Data.Stores;
 using Symbolon.Domain;
+using System.Security.Cryptography;
 using System.Threading.RateLimiting;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -37,10 +38,13 @@ builder.Services.AddDbContext<SymbolonDbContext>(options =>
 
 // Crypto & Keys
 var es256Key = Es256SignatureProvider.GenerateKey("cp-es256-key");
+var pqcKey = MlDsaSignatureProvider.GenerateKey(MLDsaAlgorithm.MLDsa65, "cp-pqc-key");
 var keyRing = new SymbolonKeyRing();
 keyRing.Add(es256Key);
+keyRing.Add(pqcKey);
 
 builder.Services.AddSingleton(keyRing);
+builder.Services.AddSingleton<IKeyRing>(keyRing);
 builder.Services.AddSingleton<ISignatureProvider>(es256Key);
 
 // Services
@@ -49,6 +53,7 @@ builder.Services.AddSingleton<Symbolon.ControlPlane.Observability.SymbolonMetric
 builder.Services.AddSingleton<Symbolon.ControlPlane.Observability.SymbolonTraceBuffer>();
 builder.Services.AddScoped<Symbolon.ControlPlane.Security.KeyManager>();
 builder.Services.AddScoped<ISeatStore, EfSeatStore>();
+builder.Services.AddScoped<Symbolon.Domain.Grants.ISeatGrantStore, Symbolon.Data.Stores.EfSeatGrantStore>();
 builder.Services.AddScoped<IAuditLedger, EfAuditLedger>();
 builder.Services.AddScoped<Symbolon.Domain.Tokens.ITokenStore, Symbolon.Data.Stores.EfTokenStore>();
 builder.Services.AddScoped<Symbolon.Domain.Tokens.ITokenEngine, Symbolon.Domain.Tokens.TokenEngine>();

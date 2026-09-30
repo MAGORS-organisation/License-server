@@ -88,6 +88,12 @@ namespace Symbolon.Protocol;
 [JsonSerializable(typeof(ActivationRequestDto))]
 [JsonSerializable(typeof(ActivationResponseDto))]
 [JsonSerializable(typeof(DeactivateResponseDto))]
+[JsonSerializable(typeof(OfflineGrantRequestDto))]
+[JsonSerializable(typeof(OfflineGrantResponseDto))]
+[JsonSerializable(typeof(OfflineActivationRequestDto))]
+[JsonSerializable(typeof(OfflineActivationResponseDto))]
+[JsonSerializable(typeof(OfflineAirGapRequestDto))]
+[JsonSerializable(typeof(OfflineAirGapResponseDto))]
 public sealed partial class SymbolonProtocolJsonContext : JsonSerializerContext
 {
 }

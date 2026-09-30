@@ -17,6 +17,7 @@ public class SymbolonDbContext : DbContext
     public DbSet<LicenseEntity> Licenses => Set<LicenseEntity>();
     public DbSet<SeatEntity> Seats => Set<SeatEntity>();
     public DbSet<SeatGrantEntity> SeatGrants => Set<SeatGrantEntity>();
+    public DbSet<AirGapNonceEntity> AirGapNonces => Set<AirGapNonceEntity>();
     public DbSet<MachineEntity> Machines => Set<MachineEntity>();
     public DbSet<RelayEntity> Relays => Set<RelayEntity>();
     public DbSet<AuditEventEntity> AuditEvents => Set<AuditEventEntity>();
@@ -157,6 +158,14 @@ public class SymbolonDbContext : DbContext
              .WithMany(r => r.SeatGrants)
              .HasForeignKey(g => g.RelayId)
              .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // AirGapNonce (FLT-34)
+        modelBuilder.Entity<AirGapNonceEntity>(b =>
+        {
+            b.ToTable("air_gap_nonces");
+            b.HasKey(n => n.Nonce);
+            b.HasIndex(n => n.ExpiresAt);
         });
 
         // Machine

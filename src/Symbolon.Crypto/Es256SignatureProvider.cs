@@ -48,6 +48,23 @@ public sealed class Es256SignatureProvider : ISignatureProvider
         return new Es256SignatureProvider(ecdsa, kid, canSign: false);
     }
 
+    public static Es256SignatureProvider ImportPrivate(ReadOnlySpan<byte> x, ReadOnlySpan<byte> y, ReadOnlySpan<byte> d, string kid)
+    {
+        var parameters = new ECParameters
+        {
+            Curve = ECCurve.NamedCurves.nistP256,
+            Q = new ECPoint
+            {
+                X = x.ToArray(),
+                Y = y.ToArray()
+            },
+            D = d.ToArray()
+        };
+
+        var ecdsa = ECDsa.Create(parameters);
+        return new Es256SignatureProvider(ecdsa, kid, canSign: true);
+    }
+
     public static Es256SignatureProvider ImportJwk(JsonWebKeyDto jwk)
     {
         ArgumentNullException.ThrowIfNull(jwk);
@@ -64,6 +81,13 @@ public sealed class Es256SignatureProvider : ISignatureProvider
 
         byte[] x = Base64Url.DecodeFromChars(jwk.X);
         byte[] y = Base64Url.DecodeFromChars(jwk.Y);
+
+        if (!string.IsNullOrWhiteSpace(jwk.D))
+        {
+            byte[] d = Base64Url.DecodeFromChars(jwk.D);
+            return ImportPrivate(x, y, d, jwk.Kid);
+        }
+
         return ImportPublic(x, y, jwk.Kid);
     }
 
@@ -123,6 +147,32 @@ public sealed class Es256SignatureProvider : ISignatureProvider
             Use = "sig",
             X = Base64Url.EncodeToString(parameters.Q.X),
             Y = Base64Url.EncodeToString(parameters.Q.Y)
+        };
+    }
+
+    public JsonWebKeyDto ExportPrivateJwk()
+    {
+        if (!_canSign)
+        {
+            throw new InvalidOperationException("Key does not contain private material.");
+        }
+
+        var parameters = _key.ExportParameters(includePrivateParameters: true);
+        if (parameters.Q.X is null || parameters.Q.Y is null || parameters.D is null)
+        {
+            throw new CryptographicException("Failed to export EC private key parameters.");
+        }
+
+        return new JsonWebKeyDto
+        {
+            Kty = "EC",
+            Crv = "P-256",
+            Alg = Alg,
+            Kid = Kid,
+            Use = "sig",
+            X = Base64Url.EncodeToString(parameters.Q.X),
+            Y = Base64Url.EncodeToString(parameters.Q.Y),
+            D = Base64Url.EncodeToString(parameters.D)
         };
     }
 

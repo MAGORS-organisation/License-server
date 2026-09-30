@@ -40,6 +40,7 @@ builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddSingleton<LeaseEngine>();
 builder.Services.AddSingleton<RelayQueueManager>();
 builder.Services.AddSingleton<RelayOptionsManager>();
+builder.Services.AddSingleton<RelaySeatGrantManager>();
 builder.Services.AddSingleton<Symbolon.Domain.Borrow.IReturnChallengeStore, Symbolon.Domain.Borrow.InMemoryReturnChallengeStore>();
 
 builder.Services.AddHostedService<RelayDiscoveryResponderService>();
