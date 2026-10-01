@@ -9,21 +9,22 @@ namespace Symbolon.Data.Tests;
 
 public sealed class EfSeatStoreConcurrencyTests : IDisposable
 {
-    private readonly SqliteConnection _connection;
+    private readonly string _connectionString = $"Data Source=concurrency_{Guid.NewGuid():N};Mode=Memory;Cache=Shared";
+    private readonly SqliteConnection _keepAliveConnection;
     private readonly DbContextOptions<SymbolonDbContext> _options;
 
     public EfSeatStoreConcurrencyTests()
     {
-        _connection = new SqliteConnection("Filename=:memory:;Cache=Shared");
-        _connection.Open();
+        _keepAliveConnection = new SqliteConnection(_connectionString);
+        _keepAliveConnection.Open();
         _options = new DbContextOptionsBuilder<SymbolonDbContext>()
-            .UseSqlite(_connection)
+            .UseSqlite(_connectionString)
             .Options;
     }
 
     public void Dispose()
     {
-        _connection.Dispose();
+        _keepAliveConnection.Dispose();
     }
 
     private async Task SeedLicenseAsync(string licenseId, int seats)

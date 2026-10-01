@@ -101,6 +101,93 @@ public static class ExperimentStatisticalEngine
     }
 
     /// <summary>
+    /// Computes Chi-Square (χ²) Goodness-of-Fit test comparing observed sample counts against expected weights.
+    /// Returns ChiSquare statistic, degrees of freedom, and p-value.
+    /// Under H0: the observed sample distribution does not deviate significantly from expected distribution.
+    /// </summary>
+    public static (double ChiSquare, int DegreesOfFreedom, double PValue) CalculateChiSquareGoodnessOfFit(
+        IReadOnlyList<long> observed,
+        IReadOnlyList<double> expectedWeights)
+    {
+        ArgumentNullException.ThrowIfNull(observed);
+        ArgumentNullException.ThrowIfNull(expectedWeights);
+
+        if (observed.Count < 2 || observed.Count != expectedWeights.Count)
+        {
+            throw new ArgumentException("Observed and expected collections must have identical length >= 2.");
+        }
+
+        long totalObserved = observed.Sum();
+        if (totalObserved <= 0)
+        {
+            return (0.0, observed.Count - 1, 1.0);
+        }
+
+        double totalWeight = expectedWeights.Sum();
+        if (totalWeight <= 0)
+        {
+            throw new ArgumentException("Sum of expected weights must be strictly positive.");
+        }
+
+        double chiSquare = 0.0;
+        for (int i = 0; i < observed.Count; i++)
+        {
+            double expected = totalObserved * (expectedWeights[i] / totalWeight);
+            if (expected > 0)
+            {
+                double diff = observed[i] - expected;
+                chiSquare += (diff * diff) / expected;
+            }
+        }
+
+        int df = observed.Count - 1;
+        double pValue = CalculateChiSquarePValue(chiSquare, df);
+
+        return (chiSquare, df, pValue);
+    }
+
+    /// <summary>
+    /// Computes upper-tail p-value P(X >= chiSquare) for Chi-Square distribution with degrees of freedom df.
+    /// </summary>
+    public static double CalculateChiSquarePValue(double chiSquare, int df)
+    {
+        if (chiSquare <= 0 || df <= 0)
+        {
+            return 1.0;
+        }
+
+        if (df == 1)
+        {
+            // For df = 1, chiSquare ~ Z^2 where Z ~ N(0,1)
+            double z = Math.Sqrt(chiSquare);
+            double p = 2.0 * (1.0 - NormalCdf(z));
+            return Math.Clamp(p, 0.0, 1.0);
+        }
+
+        if (df == 2)
+        {
+            // For df = 2, chi-square is exponential with scale 2
+            double p = Math.Exp(-0.5 * chiSquare);
+            return Math.Clamp(p, 0.0, 1.0);
+        }
+
+        // Wilson-Hilferty transformation for df >= 3
+        double d = df;
+        double term = Math.Pow(chiSquare / d, 1.0 / 3.0);
+        double mean = 1.0 - (2.0 / (9.0 * d));
+        double stdDev = Math.Sqrt(2.0 / (9.0 * d));
+
+        if (stdDev <= 0)
+        {
+            return 1.0;
+        }
+
+        double zScore = (term - mean) / stdDev;
+        double pValue = 1.0 - NormalCdf(zScore);
+        return Math.Clamp(pValue, 0.0, 1.0);
+    }
+
+    /// <summary>
     /// Evaluates an experiment's metrics and generates a complete statistical report.
     /// </summary>
     public static ExperimentStatisticalReport GenerateReport(

@@ -27,6 +27,7 @@ struct symbolon_lease {
     int entitlement_count;
     char active_features[SYMBOLON_MAX_ACTIVE_FEATURES][64];
     int active_feature_count;
+    char experiment_tag[64];
 };
 
 struct symbolon_feature_lease {
@@ -178,6 +179,7 @@ SYMBOLON_API symbolon_status_t symbolon_acquire_seat(
     // Default base entitlements
     strncpy(lease->entitlements[0], "core", sizeof(lease->entitlements[0]) - 1);
     lease->entitlement_count = 1;
+    strncpy(lease->experiment_tag, "variant=baseline", sizeof(lease->experiment_tag) - 1);
 
     *out_lease = lease;
     return SYMBOLON_OK;
@@ -337,6 +339,72 @@ SYMBOLON_API symbolon_status_t symbolon_get_hardware_fingerprint(
     // Default canonical hardware fingerprint format
     strncpy(buffer, "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", buffer_len - 1);
     buffer[buffer_len - 1] = '\0';
+    return SYMBOLON_OK;
+}
+
+SYMBOLON_API symbolon_status_t symbolon_lease_get_experiment_tag(
+    const symbolon_lease_t* lease,
+    char* buffer,
+    size_t buffer_len)
+{
+    if (!lease || !buffer || buffer_len == 0) {
+        return SYMBOLON_ERR_INVALID_ARGUMENT;
+    }
+
+    strncpy(buffer, lease->experiment_tag, buffer_len - 1);
+    buffer[buffer_len - 1] = '\0';
+    return SYMBOLON_OK;
+}
+
+SYMBOLON_API symbolon_status_t symbolon_pqc_is_algorithm_quantum_safe(
+    const char* alg_name,
+    int* out_is_safe)
+{
+    if (!alg_name || !out_is_safe) {
+        return SYMBOLON_ERR_INVALID_ARGUMENT;
+    }
+
+    static const char* pqc_algs[] = {
+        "ML-DSA-44", "ML-DSA-65", "ML-DSA-87",
+        "ML-KEM-512", "ML-KEM-768", "ML-KEM-1024",
+        "SLH-DSA-SHA2-128s", "SLH-DSA-SHA2-128f", "SLH-DSA-SHAKE-128s"
+    };
+    int count = (int)(sizeof(pqc_algs) / sizeof(pqc_algs[0]));
+
+    *out_is_safe = 0;
+    for (int i = 0; i < count; i++) {
+        if (str_case_eq(alg_name, pqc_algs[i])) {
+            *out_is_safe = 1;
+            return SYMBOLON_OK;
+        }
+    }
+
+    return SYMBOLON_OK;
+}
+
+SYMBOLON_API symbolon_status_t symbolon_pqc_is_cnsa2_compliant(
+    const char* alg_name,
+    int* out_is_compliant)
+{
+    if (!alg_name || !out_is_compliant) {
+        return SYMBOLON_ERR_INVALID_ARGUMENT;
+    }
+
+    static const char* cnsa2_algs[] = {
+        "ML-DSA-65", "ML-DSA-87",
+        "ML-KEM-768", "ML-KEM-1024",
+        "SLH-DSA-SHA2-128s", "SLH-DSA-SHAKE-128s"
+    };
+    int count = (int)(sizeof(cnsa2_algs) / sizeof(cnsa2_algs[0]));
+
+    *out_is_compliant = 0;
+    for (int i = 0; i < count; i++) {
+        if (str_case_eq(alg_name, cnsa2_algs[i])) {
+            *out_is_compliant = 1;
+            return SYMBOLON_OK;
+        }
+    }
+
     return SYMBOLON_OK;
 }
 

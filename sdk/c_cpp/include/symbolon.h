@@ -177,6 +177,41 @@ SYMBOLON_API symbolon_status_t symbolon_get_hardware_fingerprint(
     size_t buffer_len);
 
 /**
+ * Retrieves the experiment routing tag (e.g. "exp-a=treatment") associated with the lease, if any.
+ *
+ * @param lease Active lease handle.
+ * @param buffer Output buffer.
+ * @param buffer_len Size of output buffer.
+ * @return SYMBOLON_OK on success.
+ */
+SYMBOLON_API symbolon_status_t symbolon_lease_get_experiment_tag(
+    const symbolon_lease_t* lease,
+    char* buffer,
+    size_t buffer_len);
+
+/**
+ * Checks whether an algorithm is quantum-safe according to NIST FIPS 203/204/205 standards.
+ *
+ * @param alg_name Algorithm name (e.g. "ML-DSA-65", "ML-KEM-768", "ES256").
+ * @param out_is_safe Output pointer (1 = quantum safe, 0 = classical / vulnerable).
+ * @return SYMBOLON_OK on success.
+ */
+SYMBOLON_API symbolon_status_t symbolon_pqc_is_algorithm_quantum_safe(
+    const char* alg_name,
+    int* out_is_safe);
+
+/**
+ * Checks whether an algorithm meets US CNSA 2.0 requirements.
+ *
+ * @param alg_name Algorithm name (e.g. "ML-DSA-65", "ML-DSA-87", "ML-KEM-768").
+ * @param out_is_compliant Output pointer (1 = CNSA 2.0 compliant, 0 = non-compliant).
+ * @return SYMBOLON_OK on success.
+ */
+SYMBOLON_API symbolon_status_t symbolon_pqc_is_cnsa2_compliant(
+    const char* alg_name,
+    int* out_is_compliant);
+
+/**
  * Destroys the client handle and frees associated resources.
  */
 SYMBOLON_API void symbolon_client_destroy(symbolon_client_t* client);
