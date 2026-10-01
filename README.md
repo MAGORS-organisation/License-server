@@ -2,7 +2,7 @@
 
 [![Platform](https://img.shields.io/badge/.NET-10.0%20LTS-512BD4?logo=dotnet)](https://dotnet.microsoft.com/)
 [![Language](https://img.shields.io/badge/C%23-14.0-239120?logo=csharp)](https://learn.microsoft.com/dotnet/csharp/)
-[![Tests](https://img.shields.io/badge/tests-446%20passed%20(+29%20Python)-brightgreen)](#výsledky-testovania)
+[![Tests](https://img.shields.io/badge/tests-511%20passed%20(+44%20Python%2C%20+12%20Wasm)-brightgreen)](#výsledky-testovania)
 [![License: AGPL-3.0](https://img.shields.io/badge/license-AGPL--3.0-blue.svg)](LICENSE)
 [![License: Apache-2.0](https://img.shields.io/badge/client%20SDK-Apache--2.0-blue.svg)](LICENSES/Apache-2.0.txt)
 [![CRA Compliant](https://img.shields.io/badge/CRA%20Compliance-EU%202024%2F2847-success)](SECURITY.md)
@@ -527,22 +527,23 @@ dotnet run --project src/Symbolon.Cli -- doctor --file license.symlic --key ./my
 Všetkých 10 testovacích projektov má 100% úspešnosť testov bez zlyhania:
 
 ```text
-Passed!  - Failed: 0, Passed:  28, Skipped: 0, Total:  28 - Symbolon.Crypto.Tests.dll
+Passed!  - Failed: 0, Passed:  49, Skipped: 0, Total:  49 - Symbolon.Crypto.Tests.dll
 Passed!  - Failed: 0, Passed:  60, Skipped: 0, Total:  60 - Symbolon.Format.Tests.dll
 Passed!  - Failed: 0, Passed:  24, Skipped: 0, Total:  24 - Symbolon.Protocol.Tests.dll
-Passed!  - Failed: 0, Passed: 113, Skipped: 0, Total: 113 - Symbolon.Domain.Tests.dll
+Passed!  - Failed: 0, Passed: 127, Skipped: 0, Total: 127 - Symbolon.Domain.Tests.dll
 Passed!  - Failed: 0, Passed:  13, Skipped: 0, Total:  13 - Symbolon.Relay.Tests.dll
 Passed!  - Failed: 0, Passed:  31, Skipped: 0, Total:  31 - Symbolon.Client.Tests.dll
-Passed!  - Failed: 0, Passed:  37, Skipped: 0, Total:  37 - Symbolon.Cli.Tests.dll
-Passed!  - Failed: 0, Passed:  20, Skipped: 0, Total:  20 - Symbolon.Data.Tests.dll
+Passed!  - Failed: 0, Passed:  54, Skipped: 0, Total:  54 - Symbolon.Cli.Tests.dll
+Passed!  - Failed: 0, Passed:  24, Skipped: 0, Total:  24 - Symbolon.Data.Tests.dll
 Passed!  - Failed: 0, Passed:   8, Skipped: 0, Total:   8 - Symbolon.Operator.Tests.dll
-Passed!  - Failed: 0, Passed: 112, Skipped: 0, Total: 112 - Symbolon.ControlPlane.Tests.dll
+Passed!  - Failed: 0, Passed: 121, Skipped: 0, Total: 121 - Symbolon.ControlPlane.Tests.dll
 
 Viacjazyčné SDK & WebAssembly testovacie sady:
-Passed!  - Failed: 0, Passed: 29, Skipped: 0, Total: 29 - Python SDK (unittest)
-Passed!  - Failed: 0, Passed: 12, Skipped: 0, Total: 12 - WebAssembly / WebCrypto SDK (node:test)
+Passed!  - Failed: 0, Passed:  44, Skipped: 0, Total:  44 - Python SDK (unittest)
+Passed!  - Failed: 0, Passed:  12, Skipped: 0, Total:  12 - WebAssembly / WebCrypto SDK (node:test)
+Passed!  - Failed: 0, Passed:   5, Skipped: 0, Total:   5 - Rust SDK (cargo test suite)
 
-Celkovo: 487 úspešných automatizovaných testov (446 .NET + 29 Python + 12 Node/Wasm), 0 zlyhaní, 0 chýb.
+Celkovo: 572 úspešných automatizovaných testov (511 .NET + 44 Python + 12 Node/Wasm + 5 Rust), 0 zlyhaní, 0 chýb.
 ```
 
 ---
