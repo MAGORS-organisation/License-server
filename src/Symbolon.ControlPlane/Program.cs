@@ -93,6 +93,7 @@ builder.Services.AddSingleton<Symbolon.ControlPlane.Security.KmsHierarchyManager
 builder.Services.AddScoped<Symbolon.Domain.Entitlements.IFeatureEntitlementStore, Symbolon.Data.Stores.EfFeatureEntitlementStore>();
 builder.Services.AddScoped<Symbolon.Domain.Entitlements.FeatureEntitlementEngine>();
 builder.Services.AddScoped<Symbolon.Domain.Experiments.IExperimentStore, Symbolon.Data.Stores.EfExperimentStore>();
+builder.Services.AddScoped<Symbolon.ControlPlane.Billing.BillingLicenseProvisioner>();
 builder.Services.AddScoped<LeaseEngine>();
 
 // Rate Limiting (STRIDE T11, T12, SEC-05: Partitioned by Client IP / Admin Key)
@@ -246,6 +247,7 @@ app.MapKmsEndpoints();
 app.MapTokenEndpoints();
 app.MapMigrationEndpoints();
 app.MapLicenseLifecycleEndpoints().RequireAuthorization().RequireRateLimiting("admin");
+app.MapBillingEndpoints();
 
 // SPA Fallback
 app.MapFallbackToFile("index.html");

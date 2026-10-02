@@ -10,6 +10,29 @@ a projekt striktne dodržiava [Sémantické Verziovanie (Semantic Versioning 2.0
 ## [Unreleased]
 
 ### Pridané (Added)
+- **Phase 1: Záťažové a výkonnostné testy k6 (§10.9)**:
+  - 6 k6 produkčných záťažových profilov v `load-tests/k6/` (`checkout-burst.js`, `heartbeat-steady.js`, `license-issuance.js`, `client-verification.js`, `soak-test.js`, `experiments-ab.js`).
+  - Natívne C# výkonnostné benchmark testy v `tests/Symbolon.ControlPlane.Tests/PerformanceBenchmarkTests.cs` preukazujúce splnenie SLA (§10.9): checkout p99 < 250ms pri 500 VU, heartbeat p99 < 50ms pri 100 rps, hybridné vydávanie >= 200 doc/s, verifikácia ES256 < 1ms a ML-DSA-65 < 3ms.
+- **Phase 2: Go Client SDK (`sdk/go/symbolon`) (§3.2)**:
+  - Kompletné pure-Go klientske SDK bez CGO závislostí.
+  - Floating lease manažér s automatickým heartbeat goroutine workerom a jitterom ±10% pre zamedzenie thundering herd.
+  - Offline grace perióda a automatické zotavenie pri výpadku siete.
+  - FPR-1..4 hardvérový fingerprinting pre Linux, macOS a Windows.
+  - Dynamické A/B experiment smerovanie a lokálna deterministická evaluácia (FNV-1a).
+  - PQC audit modul s detekciou algoritmov a CNSA 2.0 readiness.
+  - Príklad `examples/simple_checkout/main.go`, unit testy a dokumentácia v `README.md`.
+- **Phase 3: Merkle Transparency Log & Inclusion/Consistency Proofs (RFC 6962 / RFC 9162 / Rekor)**:
+  - RFC 6962 / RFC 9162 Merkle Consistency Proofs a Signed Tree Head (STH) algoritmy v `MerkleTree.cs`.
+  - Nové REST endpointy: `GET /v1/transparency/sth`, `GET /v1/transparency/consistency`, `POST /v1/transparency/verify-consistency`.
+  - Nové CLI príkazy v `symbolon transparency root|sth|inclusion|consistency|verify-consistency`.
+  - Matematické overenie konzistencie pre všetky veľkosti stromov a end-to-end testy v `TransparencyConsistencyTests.cs` a `TransparencyCliTests.cs`.
+- **Phase 4: Inbound Billing Webhook Gateway (Stripe, LemonSqueezy, Paddle)**:
+  - Doménová vrstva `Symbolon.Domain.Billing` a procesory `StripeBillingProcessor`, `LemonSqueezyBillingProcessor`, `PaddleBillingProcessor`.
+  - Kryptografická verifikácia HMAC-SHA256 podpisov s ochranou proti replay útokom a toleranciou časového driftu.
+  - Automatizovaný provisioner licencií `BillingLicenseProvisioner` s generovaním kľúčov Crockford Base32, materializáciou sedadiel a auditným záznamom.
+  - REST endpointy: `POST /v1/billing/stripe/webhook`, `POST /v1/billing/lemonsqueezy/webhook`, `POST /v1/billing/paddle/webhook`.
+  - Nové CLI príkazy v `symbolon billing test` a `symbolon billing verify-sig`.
+  - End-to-end integračné testy v `BillingWebhookTests.cs` a `BillingCliTests.cs`.
 - **Post-Quantum Era Suite & Quantum Readiness (Míľnik M7, §13.5)**:
   - **Kryptografická vrstva (`Symbolon.Crypto`)**:
     - **FIPS 203: ML-KEM Key Encapsulation (`IKeyEncapsulationProvider`, `MlKemKeyEncapsulationProvider`)**: Natívna podpora pre `ML-KEM-768` (AES-192 ekvivalent, 1088-bajtový šifrový text) a `ML-KEM-1024` (AES-256 ekvivalent, 1568-bajtový šifrový text). Generovanie kľúčov, import semien, decapsulation kľúčov a export/import JWK podľa RFC 9964 (`kty: AKP`, `use: enc`).

@@ -1,5 +1,6 @@
 using System.Numerics;
 using System.Security.Cryptography;
+using System.Text;
 
 namespace Symbolon.Domain.Transparency;
 
@@ -12,6 +13,14 @@ public sealed record MerkleInclusionProof(
     string LeafHash,
     string RootHash,
     IReadOnlyList<MerkleProofStep> Path);
+
+public sealed record SignedTreeHead(
+    int TreeSize,
+    DateTimeOffset Timestamp,
+    string RootHash,
+    string Signature,
+    string KeyId,
+    string Algorithm);
 
 public static class MerkleTree
 {
@@ -122,7 +131,7 @@ public static class MerkleTree
         byte[] current = leafHash;
 
         // The path was added top-down (root level first down to leaf level),
-        // so to verify from leaf to root, we traverse the path in reverse order!
+        // so to verify from leaf to root, we traverse the path in reverse order.
         for (int i = path.Count - 1; i >= 0; i--)
         {
             var step = path[i];
@@ -137,6 +146,146 @@ public static class MerkleTree
         }
 
         return CryptographicOperations.FixedTimeEquals(current, expectedRoot);
+    }
+
+    /// <summary>
+    /// Generates a consistency proof between an older tree of size m and a newer tree of size n (RFC 6962 §2.1.2).
+    /// </summary>
+    public static IReadOnlyList<string> GenerateConsistencyProof(IReadOnlyList<byte[]> leafHashes, int m, int n)
+    {
+        ArgumentNullException.ThrowIfNull(leafHashes);
+
+        if (m <= 0 || m > n || n > leafHashes.Count)
+        {
+            throw new ArgumentOutOfRangeException(nameof(m), "Invalid tree sizes for consistency proof.");
+        }
+
+        if (m == n)
+        {
+            return [];
+        }
+
+        var proof = new List<string>();
+        BuildSubproof(leafHashes, 0, m, n, true, proof);
+        return proof;
+    }
+
+    private static void BuildSubproof(IReadOnlyList<byte[]> leaves, int offset, int m, int n, bool b, List<string> proof)
+    {
+        if (m == n)
+        {
+            if (!b)
+            {
+                byte[] hash = ComputeSubtreeMth(leaves, offset, m);
+                proof.Add(Convert.ToHexStringLower(hash));
+            }
+            return;
+        }
+
+        int k = LargestPowerOfTwoLessThan(n);
+
+        if (m <= k)
+        {
+            BuildSubproof(leaves, offset, m, k, b, proof);
+            byte[] rightHash = ComputeSubtreeMth(leaves, offset + k, n - k);
+            proof.Add(Convert.ToHexStringLower(rightHash));
+        }
+        else
+        {
+            BuildSubproof(leaves, offset + k, m - k, n - k, false, proof);
+            byte[] leftHash = ComputeSubtreeMth(leaves, offset, k);
+            proof.Add(Convert.ToHexStringLower(leftHash));
+        }
+    }
+
+    /// <summary>
+    /// Verifies a consistency proof between an older root hash at size m and a newer root hash at size n (RFC 6962 §2.1.2 / RFC 9162 §2.1.4.2).
+    /// </summary>
+    public static bool VerifyConsistency(byte[] oldRoot, byte[] newRoot, int m, int n, IReadOnlyList<string> proof)
+    {
+        ArgumentNullException.ThrowIfNull(oldRoot);
+        ArgumentNullException.ThrowIfNull(newRoot);
+        ArgumentNullException.ThrowIfNull(proof);
+
+        if (m <= 0 || m > n) return false;
+        if (m == n)
+        {
+            return proof.Count == 0 && CryptographicOperations.FixedTimeEquals(oldRoot, newRoot);
+        }
+
+        if (proof.Count == 0) return false;
+
+        var p = proof.Select(Convert.FromHexString).ToList();
+
+        // RFC 9162 §2.1.4.2 step 2: If first is an exact power of 2, prepend first_hash
+        if (BitOperations.IsPow2(m))
+        {
+            p.Insert(0, oldRoot);
+        }
+
+        // Step 3: fn = first - 1, sn = second - 1
+        int fn = m - 1;
+        int sn = n - 1;
+
+        // Step 4: If LSB(fn) is set, right-shift fn and sn equally until LSB(fn) is not set
+        while ((fn & 1) == 1)
+        {
+            fn >>= 1;
+            sn >>= 1;
+        }
+
+        // Step 5: Set fr and sr to first value in path
+        if (p.Count == 0) return false;
+        byte[] fr = p[0];
+        byte[] sr = p[0];
+
+        // Step 6: For each subsequent value c in consistency_path
+        for (int i = 1; i < p.Count; i++)
+        {
+            byte[] c = p[i];
+
+            // 6a: If sn is 0, fail
+            if (sn == 0) return false;
+
+            // 6b: If LSB(fn) is set, or if fn == sn
+            if ((fn & 1) == 1 || fn == sn)
+            {
+                fr = HashNode(c, fr);
+                sr = HashNode(c, sr);
+
+                if ((fn & 1) == 0)
+                {
+                    while ((fn & 1) == 0 && fn != 0)
+                    {
+                        fn >>= 1;
+                        sn >>= 1;
+                    }
+                }
+            }
+            else
+            {
+                sr = HashNode(sr, c);
+            }
+
+            // 6c: Finally, right-shift both fn and sn one time
+            fn >>= 1;
+            sn >>= 1;
+        }
+
+        // Step 7: Verify fr == oldRoot, sr == newRoot, sn == 0
+        return sn == 0 &&
+               CryptographicOperations.FixedTimeEquals(fr, oldRoot) &&
+               CryptographicOperations.FixedTimeEquals(sr, newRoot);
+    }
+
+    /// <summary>
+    /// Computes the canonical payload for signing a Signed Tree Head (STH).
+    /// </summary>
+    public static byte[] ComputeTreeHeadSigningPayload(int treeSize, DateTimeOffset timestamp, string rootHash)
+    {
+        ArgumentNullException.ThrowIfNull(rootHash);
+        string header = $"SYMBOLON-STH:v1:{treeSize}:{timestamp.ToUnixTimeMilliseconds()}:{rootHash.ToUpperInvariant()}";
+        return Encoding.UTF8.GetBytes(header);
     }
 
     private static int LargestPowerOfTwoLessThan(int n)

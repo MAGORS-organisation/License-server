@@ -362,6 +362,48 @@ public sealed record VerifyTransparencyProofResponseDto(
     [property: JsonPropertyName("isValid")] bool IsValid,
     [property: JsonPropertyName("message")] string Message);
 
+public sealed record SignedTreeHeadDto(
+    [property: JsonPropertyName("treeSize")] int TreeSize,
+    [property: JsonPropertyName("timestamp")] DateTimeOffset Timestamp,
+    [property: JsonPropertyName("rootHash")] string RootHash,
+    [property: JsonPropertyName("signature")] string Signature,
+    [property: JsonPropertyName("keyId")] string KeyId,
+    [property: JsonPropertyName("algorithm")] string Algorithm);
+
+public sealed record TransparencyConsistencyResponseDto(
+    [property: JsonPropertyName("oldSize")] int OldSize,
+    [property: JsonPropertyName("newSize")] int NewSize,
+    [property: JsonPropertyName("oldRoot")] string OldRoot,
+    [property: JsonPropertyName("newRoot")] string NewRoot,
+    [property: JsonPropertyName("proof")] IReadOnlyList<string> Proof);
+
+public sealed record VerifyTransparencyConsistencyRequestDto
+{
+    [Required]
+    [JsonPropertyName("oldSize")]
+    public required int OldSize { get; init; }
+
+    [Required]
+    [JsonPropertyName("newSize")]
+    public required int NewSize { get; init; }
+
+    [Required]
+    [JsonPropertyName("oldRoot")]
+    public required string OldRoot { get; init; }
+
+    [Required]
+    [JsonPropertyName("newRoot")]
+    public required string NewRoot { get; init; }
+
+    [Required]
+    [JsonPropertyName("proof")]
+    public required IReadOnlyList<string> Proof { get; init; }
+}
+
+public sealed record VerifyTransparencyConsistencyResponseDto(
+    [property: JsonPropertyName("isConsistent")] bool IsConsistent,
+    [property: JsonPropertyName("message")] string Message);
+
 public sealed record CraComplianceReportDto(
     [property: JsonPropertyName("productName")] string ProductName,
     [property: JsonPropertyName("version")] string Version,
@@ -586,4 +628,14 @@ public sealed record DeactivateResponseDto
     [JsonPropertyName("activationId")]
     public required string ActivationId { get; init; }
 }
+
+public sealed record BillingWebhookResponseDto(
+    [property: JsonPropertyName("success")] bool Success,
+    [property: JsonPropertyName("action")] string Action,
+    [property: JsonPropertyName("licenseId")] string? LicenseId,
+    [property: JsonPropertyName("licenseKey")] string? LicenseKey,
+    [property: JsonPropertyName("message")] string Message,
+    [property: JsonPropertyName("customerId")] string? CustomerId = null,
+    [property: JsonPropertyName("subscriptionId")] string? SubscriptionId = null);
+
 

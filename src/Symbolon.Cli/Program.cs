@@ -65,6 +65,8 @@ internal static class Program
                 "GRANT" or "GRANTS" or "SEATGRANT" or "AIRGAP" => await Commands.GrantCommands.HandleGrantAsync(args[1..]).ConfigureAwait(false),
                 "EXPERIMENTS" or "EXPERIMENT" or "ABTEST" or "AB" => await Commands.ExperimentCommands.HandleExperimentAsync(args[1..]).ConfigureAwait(false),
                 "PQC" or "POSTQUANTUM" or "QUANTUM" => await Commands.PqcCommands.HandlePqcAsync(args[1..]).ConfigureAwait(false),
+                "TRANSPARENCY" or "MERKLE" => await Commands.TransparencyCommands.HandleTransparencyAsync(args[1..]).ConfigureAwait(false),
+                "BILLING" or "STRIPE" or "PADDLE" or "LEMON" => await Commands.BillingCommands.HandleBillingAsync(args[1..]).ConfigureAwait(false),
                 _ => UnknownCommand(args[0])
             };
         }
@@ -890,6 +892,8 @@ internal static class Program
               grant request|issue|inspect|import       Delegované air-gap sedadlá (.symgrant, .symreq, GNT-1..10)
               experiments list|create|start|report|sim A/B testovanie a experimentačný engine (AB-1..15, Z-test, p-value)
               pqc scan|profile|kem|verify              Post-Quantum Era suite, FIPS 203 ML-KEM, FIPS 204 ML-DSA, CNSA 2.0 readiness
+              transparency root|sth|inclusion|consistency Merkle Transparency Log (RFC 6962, Sigstore Rekor, append-only proofs)
+              billing webhook|test|verify-sig          Inbound billing gateway (Stripe, LemonSqueezy, Paddle webhook sync)
             """);
     }
 }

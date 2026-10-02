@@ -94,6 +94,17 @@ namespace Symbolon.Protocol;
 [JsonSerializable(typeof(OfflineActivationResponseDto))]
 [JsonSerializable(typeof(OfflineAirGapRequestDto))]
 [JsonSerializable(typeof(OfflineAirGapResponseDto))]
+[JsonSerializable(typeof(TransparencyRootResponseDto))]
+[JsonSerializable(typeof(TransparencyInclusionResponseDto))]
+[JsonSerializable(typeof(TransparencyProofStepDto))]
+[JsonSerializable(typeof(List<TransparencyProofStepDto>))]
+[JsonSerializable(typeof(VerifyTransparencyProofRequestDto))]
+[JsonSerializable(typeof(VerifyTransparencyProofResponseDto))]
+[JsonSerializable(typeof(SignedTreeHeadDto))]
+[JsonSerializable(typeof(TransparencyConsistencyResponseDto))]
+[JsonSerializable(typeof(VerifyTransparencyConsistencyRequestDto))]
+[JsonSerializable(typeof(VerifyTransparencyConsistencyResponseDto))]
+[JsonSerializable(typeof(BillingWebhookResponseDto))]
 public sealed partial class SymbolonProtocolJsonContext : JsonSerializerContext
 {
 }

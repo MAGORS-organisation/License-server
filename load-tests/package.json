@@ -1,0 +1,23 @@
+{
+  "name": "symbolon-load-tests",
+  "version": "1.0.0",
+  "description": "Production k6 load and performance testing suite for the Symbolon Enterprise License Server (§10.9)",
+  "scripts": {
+    "test:burst": "k6 run k6/checkout-burst.js",
+    "test:heartbeat": "k6 run k6/heartbeat-steady.js",
+    "test:issuance": "k6 run k6/license-issuance.js",
+    "test:verification": "k6 run k6/client-verification.js",
+    "test:soak": "k6 run k6/soak-test.js",
+    "test:experiments": "k6 run k6/experiments-ab.js"
+  },
+  "keywords": [
+    "symbolon",
+    "k6",
+    "load-testing",
+    "performance",
+    "floating-licenses",
+    "concurrency"
+  ],
+  "author": "Symbolon Authors <dev@symbolon.org>",
+  "license": "Apache-2.0"
+}

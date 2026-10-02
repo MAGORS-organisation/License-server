@@ -82,6 +82,9 @@ public sealed class KeyManager : IDisposable
             {
                 provider = Es256SignatureProvider.GenerateKey(activeKeyEntity.Kid);
                 ActiveProviders[activeKeyEntity.Kid] = provider;
+                var jwk = provider.ExportPublicJwk();
+                activeKeyEntity.PublicJwkJson = JsonSerializer.Serialize(jwk, SymbolonJsonContext.Default.JsonWebKeyDto);
+                await _db.SaveChangesAsync(ct).ConfigureAwait(false);
             }
 
             return provider;
