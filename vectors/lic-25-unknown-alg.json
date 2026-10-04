@@ -1,0 +1,28 @@
+{
+  "VectorId": "lic-25-unknown-alg",
+  "Requirement": "LIC-25",
+  "Description": "Unknown algorithm in requiredAlgs for long-lived document evaluated under Strictness.Auto",
+  "Keys": [
+    {
+      "Kid": "prd-acme-2026-ec",
+      "Alg": "ES256",
+      "PublicJwk": {
+        "kty": "EC",
+        "alg": "ES256",
+        "kid": "prd-acme-2026-ec",
+        "use": "sig",
+        "crv": "P-256",
+        "x": "8ekl7SNAbrp31-g_qpusvTAvlE2u5ORU3IKe3m8n1m8",
+        "y": "jL1jctHoSB4lW2XWQMPO2W5zCab7joSvP9KBgzpRyLw"
+      }
+    }
+  ],
+  "DocumentPem": "-----BEGIN SYMBOLON LICENSE-----\neyJwYXlsb2FkIjoiZXlKcGMzTWlPaUpvZEhSd2N6b3ZMMnhwWTJWdWMyVnpMbUZq\nYldVdVpYaGhiWEJzWlNJc0luTjFZaUk2SW14cFkxOHdNVXBST0ZwTE5FNDVWakpZ\nTmswd0lpd2lZWFZrSWpvaVlXTnRaUzFqWVdRaUxDSnFkR2tpT2lKc1psOHdNVXBS\nT0ZwTE5WUXpVRGRSTVZJMElpd2lhV0YwSWpveE56a3hNRGs0TWpZMExDSnVZbVlp\nT2pFM09URXdPVGd5TmpRc0ltVjRjQ0k2TVRnMU5ERTNNREkyTkN3aWMzbHRiR2xq\nSWpwN0luWWlPakVzSW5CeWIyWnBiR1VpT2lKd2NXTXRjM1J5YVdOMElpd2ljbVZ4\nZFdseVpXUkJiR2R6SWpwYklrVlRNalUySWl3aVJrRk1RMDlPTFRVeE1pMVZUa3RP\nVDFkT0lsMHNJbXhwWTJWdWMyVWlPbnNpYTJWNUlqb2lVMWxOTFRSTE4xRlVMVGxO\nTWxoQkxVSTRXa2d6TFZBMlVsZFpMVU14U2poT0lpd2liVzlrWld3aU9pSm1iRzlo\nZEdsdVp5SXNJbk4wWVhSbElqb2lZV04wYVhabEluMHNJbXhwYldsMGN5STZleUp0\nWVhoVFpXRjBjeUk2TVRBc0luTmxZWFJWYm1sMElqb2liV0ZqYUdsdVpTSjlMQ0ps\nYm5ScGRHeGxiV1Z1ZEhNaU9sdGRmWDAiLCJzaWduYXR1cmVzIjpbeyJwcm90ZWN0\nZWQiOiJleUpoYkdjaU9pSkZVekkxTmlJc0ltdHBaQ0k2SW5CeVpDMWhZMjFsTFRJ\nd01qWXRaV01pTENKMGVYQWlPaUp6ZVcxc2FXTmNkVEF3TWtKcWQzTWlMQ0pqY21s\nMElqcGJJbk41Yld4cFl5SmRMQ0p6ZVcxc2FXTWlPaUl4SW4wIiwic2lnbmF0dXJl\nIjoiX3U1RklzdVVISjVhbEJlemdLYUh2QXV1RkdjNjlIajBMVGtNN2ZzTEdtaGxm\naGJoZUtFTXJzZTdTanVNVTJscDg4NnFnN1NnQmFZa2tvRnJEZkJJU2cifV19\n-----END SYMBOLON LICENSE-----\n",
+  "HighWaterMarkIat": null,
+  "RevokedKids": null,
+  "Expected": {
+    "IsValid": false,
+    "FailureReason": "unsupported-required-alg:FALCON-512-UNKNOWN",
+    "VerifiedAlgs": null
+  }
+}

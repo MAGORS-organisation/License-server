@@ -1,0 +1,39 @@
+{
+  "VectorId": "lic-23-downgrade-attack",
+  "Requirement": "LIC-23",
+  "Description": "Downgrade attack vector: ML-DSA signature stripped when requiredAlgs demands both ES256 and ML-DSA-65",
+  "Keys": [
+    {
+      "Kid": "prd-acme-2026-ec",
+      "Alg": "ES256",
+      "PublicJwk": {
+        "kty": "EC",
+        "alg": "ES256",
+        "kid": "prd-acme-2026-ec",
+        "use": "sig",
+        "crv": "P-256",
+        "x": "8ekl7SNAbrp31-g_qpusvTAvlE2u5ORU3IKe3m8n1m8",
+        "y": "jL1jctHoSB4lW2XWQMPO2W5zCab7joSvP9KBgzpRyLw"
+      }
+    },
+    {
+      "Kid": "prd-acme-2026-pq",
+      "Alg": "ML-DSA-65",
+      "PublicJwk": {
+        "kty": "AKP",
+        "alg": "ML-DSA-65",
+        "kid": "prd-acme-2026-pq",
+        "use": "sig",
+        "pub": "fax2HC-dYPZXku1ihtd1xwz3mDzU1swSxtCImGgxIa7ezMojeU-_8H1le1XKGAiuTqsyZluo0M6C_dBc_xAW29aDl8XTyF02PT1nK6l4UrwIs6pFYD13ARxU7DaNVHcXs2Wo-MeiWi-1hK_SWV6v4jYWZ2qjDsnmoWimniHEjLl6WCbMaKQigUhqWFj4Ue3W7HGbJquJWWsFDJoc8MI7kCiUOLtkW5Lb8Ia9sJ4PfYqYsO1ex6DeFc6hAaYNdqaybakG55bU5E1pkOHVTSaTFqi5LAwhgNYt_-1TRTnX9ba30_eo3nc5rgVISLD-wrtvqRmSxEsnWTuvFio25xXedyRDq8wUfV4hJpMTueb3y_TwoN-06Kwyhpk6XQa1DM8Lu2-y_UNPAJs4dxXnbmXyRIcavhdYIKWygdXVuoOjZMYF4apMlsHns1us0RIm0hxkLMj03-et5O1toFuHPwzxoD0q-t4MNWddro6bC4JWArMr-Cko428ez_eTCPFv7FIDlaG-OmNdc0A-_aswVFlUzly7aA-mUVTb-CpJgnYFZaJ45SgzxEGBZfT5hKlYNviOhebvNgjUnG7IkPBRSs3MIqnszzekxu-hZvh7gliaCDV5ZsRItuwHHdEDn-ProRw2DBgyInMp6miHYo7Wfeyn433ZzuqjJT5ddJiWrQuCHLHfHBmUGQ5i6HiC6-ooqWZaijtaJm2X3oziY37GO_PuUnjGVpMlTWAiBcWTmPWkBsjb102wHxKIfLMUh297_tMGu7rEPSyySOcFZqYc0RQbEGg297j28NwenwuW2pvqWJ-cJ0UOSCMOjmjobtAN82nfXFpzRBqJEkaM4KEsLJz_M9Vq-uyJW-jc5IU-AXRVce_WeNxCoILH8MddOqyGza-9NRfCVZ3OwXJ9SInhuXD5EhB5rG_1yFbwPd6swjK5cb1akR5S3L0L0Ss3HbGaJWpqTzcVRBJkrHIT55M0Wy5pcLN0tbR169MUMcbVr2deH_MrtduezX7lz0o_xlDKRM5eZed6L0g6Of9pxBeCz4mxySaw00iFI_-yLYsYLaCy0qjz4tkigCbxoVR8YOBquCVKDAaGDi3v5Jp-cQs3Km3V_bF2_qR6ecYwS_2DLYQTbZTmKbHWEDK3w6uR0zFQA4McTSuBBmhYaibggkitKU0PL1Vj-Q8zfzelTsVa7fUyX7ygksO7E2Jsb3ly04bZTULDTWo7BsiYW5b6WZwtAdcb0buCdF8bVQubKRcpqvdYDBtnhoamZyGAtPTxdQdNZvYx_6_Rtzfq7J6Ursgz05rygFwXwJJGZainrg1wR4GGAuseh2Ov-d7dppnSbgTvagCoa8bO6blk872JbJDsb_HYF9ClmPFXLmn-RjApm4io1X0Jv_kGRsnb_cqfmILLfEA-19LzKgatOe7XIZwwPNFAYJ9CY_0WMLo9aEl_dqWdDK32H-DConwDu5SoW0BVEFtpjhjz18MTZH2kQU1qREQfqEI4Z7K_tTt8wCQPvXp4ClwZi5FeXqzNQVzQ4RgrUy9YG9tciHel0rhnNiB1jOkdQGEoHOZeItybmLeJmpqRm5QbmGLtO_vq3FFVKi3SFQPUV2QqBgZGrVCeX_9UsrARhop2RCybTlruL3MSgFwvtWd7uDSiO6i-cFHvtLmZz1CI6-RD62TcSzv91ULl8Q-LDnNHgHwyUPfNMlthoTGj9a1wotvPr7EpyWIpJjNKMt1-NiFrVwbdvEnS__zsg-u2eApkcdBWnlv0d84C8tK-vXgFz_RDnhJl8rzTYByolKN8s8pFvM7a2WzQ25NPUjrRfo_tbbl9iKQeuFzgrkLzvB2THWdlmQLKk6LSZRrnzlzVsbpBSzOlwKZEnuCO3Fp9xvl4dOMSTslUy61FoKhxBy6iWYwkYKt0fdAU_StkOt49vq3EpaBonnWZ9J8TQ88GKtQbxxsBXRgnZnIofR9JK3fVV5yRazq7fKYxhQIkJLAHWEbcMd0gZOJ4I6YN1go33dOtI17aWC7e8Le-icbyCRDpCA1xNZkF7YI4RjoRsf-3FFD9TzocrBCChKEaQx5kPvIu01uv6_icV72EhxEhUhItR4EbQeNRSX6xWJbPj6F3_HwTBhmh1oHBvyAf38zC2-vx1k-XzRzKQ9dmCT-uo-J_2DIgjXgeZubc20R2ZwnVWqOwsD0eXCZI8mHl0qWZ69YIcPIRCEtbdTLvXrmm4__MR-c0E9-VBO6ts0_te_ohYwajXKFLKuTzIjdg4hiXT3uRHzXKu4LKsQL6_uz-0ehUC0kC84vYiGiAGRXhKMl8uJMouYANKZCBJ6iTf_03UNXTWROQU5kk6tpc9i25Bn_eK6s9xKFPptNvRC-wr0vAYc1Fd81qQbVE3MXBTr-G4Y3hw8iq95Y9Gvd9IcL0kBMJUf3SN5fTZKd8QdUkIBhcZVPSRla--2fvMkTbCJWtNRKaFDIOAGynhBbCcvF7JWEKoT2wWq8N0QWZsQkFCgbfQ1kcfrzxPmd-bE7ForYfe5C4qhtMJIeNOGCd41RTQsjGByvSAN-hI-BK-UBYReJJDeuRwesISh4STo81-GuNb4Pb2R7admnMZdIn27UMEFk"
+      }
+    }
+  ],
+  "DocumentPem": "-----BEGIN SYMBOLON LICENSE-----\neyJwYXlsb2FkIjoiZXlKcGMzTWlPaUpvZEhSd2N6b3ZMMnhwWTJWdWMyVnpMbUZq\nYldVdVpYaGhiWEJzWlNJc0luTjFZaUk2SW14cFkxOHdNVXBST0ZwTE5FNDVWakpZ\nTmswd0lpd2lZWFZrSWpvaVlXTnRaUzFqWVdRaUxDSnFkR2tpT2lKc1psOHdNVXBS\nT0ZwTE5WUXpVRGRSTVZJMElpd2lhV0YwSWpveE56a3hNRGs0TWpZMExDSnVZbVlp\nT2pFM09URXdPVGd5TmpRc0ltVjRjQ0k2TVRjNU16WTVNREkyTkN3aWMzbHRiR2xq\nSWpwN0luWWlPakVzSW5CeWIyWnBiR1VpT2lKb2VXSnlhV1F0ZGpFaUxDSnlaWEYx\nYVhKbFpFRnNaM01pT2xzaVJWTXlOVFlpTENKTlRDMUVVMEV0TmpVaVhTd2liR2xq\nWlc1elpTSTZleUpyWlhraU9pSlRXVTB0TkVzM1VWUXRPVTB5V0VFdFFqaGFTRE10\nVURaU1Yxa3RRekZLT0U0aUxDSnRiMlJsYkNJNkltWnNiMkYwYVc1bklpd2ljM1Jo\nZEdVaU9pSmhZM1JwZG1VaUxDSmpkWE4wYjIxbGNpSTZleUp5WldZaU9pSkRWVk5V\nTFRRM01URWlMQ0p1WVcxbElqb2lRVU5OUlNCRGIzSndJbjE5TENKc2FXMXBkSE1p\nT25zaWJXRjRVMlZoZEhNaU9qRXdMQ0p6WldGMFZXNXBkQ0k2SW0xaFkyaHBibVVp\nZlN3aVpXNTBhWFJzWlcxbGJuUnpJanBiWFgxOSIsInNpZ25hdHVyZXMiOlt7InBy\nb3RlY3RlZCI6ImV5SmhiR2NpT2lKRlV6STFOaUlzSW10cFpDSTZJbkJ5WkMxaFky\nMWxMVEl3TWpZdFpXTWlMQ0owZVhBaU9pSnplVzFzYVdOY2RUQXdNa0pxZDNNaUxD\nSmpjbWwwSWpwYkluTjViV3hwWXlKZExDSnplVzFzYVdNaU9pSXhJbjAiLCJzaWdu\nYXR1cmUiOiJtSEdLdHQ1RTNFMk5ZZkVfY2tWQkVmcEFWWm1vUWoxdzkwZUVNZGg1\nMXBLOExucE5nNGxQMnA2bGU5MmJ2VEw3MG9JMnY4S1pKbDNoQkp5TkE4UUlWQSJ9\nXX0=\n-----END SYMBOLON LICENSE-----\n",
+  "HighWaterMarkIat": null,
+  "RevokedKids": null,
+  "Expected": {
+    "IsValid": false,
+    "FailureReason": "stripped-signature:ML-DSA-65",
+    "VerifiedAlgs": null
+  }
+}

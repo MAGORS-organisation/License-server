@@ -34,13 +34,55 @@ jobs:
         run: dotnet build Symbolon.slnx --configuration Release --no-restore
 
       - name: Run Automated Test Suite
-        run: dotnet test Symbolon.slnx --configuration Release --no-build --verbosity normal
+        run: dotnet test Symbolon.slnx --configuration Release --no-build --verbosity normal --logger "trx;LogFileName=test-results.trx"
+
+      - name: Assert PQC Test Execution (§10.10)
+        if: matrix.os == 'ubuntu-latest'
+        run: bash scripts/assert-pqc-tests-ran.sh
 
       - name: Generate and Validate CycloneDX SBOM
         run: dotnet run --project src/Symbolon.Cli/Symbolon.Cli.csproj -- sbom --out cyclonedx-sbom.json
 
       - name: Verify Artifact Checksum
         run: dotnet run --project src/Symbolon.Cli/Symbolon.Cli.csproj -- verify-artifact cyclonedx-sbom.json
+
+  go-sdk-tests:
+    name: Go SDK Verification
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Go 1.22
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+
+      - name: Run Go Unit Tests
+        run: |
+          cd sdk/go/symbolon
+          go test -v ./...
+
+  java-sdk-tests:
+    name: Java SDK Verification
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+          cache: 'maven'
+
+      - name: Run Java Unit Tests
+        run: |
+          cd sdk/java/symbolon
+          mvn clean test
 
   python-sdk-tests:
     name: Python SDK Verification

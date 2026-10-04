@@ -1,0 +1,28 @@
+{
+  "VectorId": "lic-15-version-mismatch",
+  "Requirement": "LIC-15",
+  "Description": "Header symlic claim mismatch with payload symlic.v claim",
+  "Keys": [
+    {
+      "Kid": "prd-acme-2026-ec",
+      "Alg": "ES256",
+      "PublicJwk": {
+        "kty": "EC",
+        "alg": "ES256",
+        "kid": "prd-acme-2026-ec",
+        "use": "sig",
+        "crv": "P-256",
+        "x": "8ekl7SNAbrp31-g_qpusvTAvlE2u5ORU3IKe3m8n1m8",
+        "y": "jL1jctHoSB4lW2XWQMPO2W5zCab7joSvP9KBgzpRyLw"
+      }
+    }
+  ],
+  "DocumentPem": "-----BEGIN SYMBOLON LICENSE-----\neyJwYXlsb2FkIjoiZXlKcGMzTWlPaUpvZEhSd2N6b3ZMMnhwWTJWdWMyVnpMbUZq\nYldVdVpYaGhiWEJzWlNJc0luTjFZaUk2SW14cFkxOHdNVXBST0ZwTE5FNDVWakpZ\nTmswd0lpd2lZWFZrSWpvaVlXTnRaUzFqWVdRaUxDSnFkR2tpT2lKc1psOHdNVXBS\nT0ZwTE5WUXpVRGRSTVZJMElpd2lhV0YwSWpveE56a3hNRGs0TWpZMExDSnVZbVlp\nT2pFM09URXdPVGd5TmpRc0ltVjRjQ0k2TVRjNU16WTVNREkyTkN3aWMzbHRiR2xq\nSWpwN0luWWlPakVzSW5CeWIyWnBiR1VpT2lKb2VXSnlhV1F0ZGpFaUxDSnlaWEYx\nYVhKbFpFRnNaM01pT2xzaVJWTXlOVFlpTENKTlRDMUVVMEV0TmpVaVhTd2liR2xq\nWlc1elpTSTZleUpyWlhraU9pSlRXVTB0TkVzM1VWUXRPVTB5V0VFdFFqaGFTRE10\nVURaU1Yxa3RRekZLT0U0aUxDSnRiMlJsYkNJNkltWnNiMkYwYVc1bklpd2ljM1Jo\nZEdVaU9pSmhZM1JwZG1VaUxDSmpkWE4wYjIxbGNpSTZleUp5WldZaU9pSkRWVk5V\nTFRRM01URWlMQ0p1WVcxbElqb2lRVU5OUlNCRGIzSndJbjE5TENKc2FXMXBkSE1p\nT25zaWJXRjRVMlZoZEhNaU9qRXdMQ0p6WldGMFZXNXBkQ0k2SW0xaFkyaHBibVVp\nZlN3aVpXNTBhWFJzWlcxbGJuUnpJanBiWFgxOSIsInNpZ25hdHVyZXMiOlt7InBy\nb3RlY3RlZCI6ImV5SmhiR2NpT2lKRlV6STFOaUlzSW10cFpDSTZJbkJ5WkMxaFky\nMWxMVEl3TWpZdFpXTWlMQ0owZVhBaU9pSnplVzFzYVdOY2RUQXdNa0pxZDNNaUxD\nSmpjbWwwSWpwYkluTjViV3hwWXlKZExDSnplVzFzYVdNaU9pSXlJbjAiLCJzaWdu\nYXR1cmUiOiJZczhNdXRBX1h6UURaZnRaUVlpOHlGZV9JczN2Ul9wc21pQUhOZzB2\nbkw4bUswZGNTWW10cjYtQVZhQUs2OHdrV3hhVzQ0RlFaZWp0T3FUM04zZ1o0QSJ9\nXX0=\n-----END SYMBOLON LICENSE-----\n",
+  "HighWaterMarkIat": null,
+  "RevokedKids": null,
+  "Expected": {
+    "IsValid": false,
+    "FailureReason": "symlic-version-mismatch",
+    "VerifiedAlgs": null
+  }
+}

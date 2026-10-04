@@ -10,6 +10,27 @@ a projekt striktne dodržiava [Sémantické Verziovanie (Semantic Versioning 2.0
 ## [Unreleased]
 
 ### Pridané (Added)
+- **Phase 5: Java Client SDK (`sdk/java/symbolon`) (§3.2)**:
+  - Kompletné pure-Java 17+ klientske SDK pre enterprise ekosystém (Spring Boot, Quarkus, Micronaut, CAD/CAM Java desktop aplikácie).
+  - `SymbolonClient`: floating lease acquire, background scheduled daemon thread s jittered heartbeat slučkou (±10%), automatický grace period retry a graceful JVM shutdown hook pre uvoľnenie sedadla.
+  - Hardvérový fingerprinting FPR-1..4 (Host, OS, CPU Arch, MachineId) s deterministickým zoradením a SHA-256 hashom.
+  - Deterministický A/B experiment routing (`ExperimentEngine`) s MurmurHash3/SHA-256 little-endian bucketingom a sticky-session invariantom.
+  - PQC audit modul (`PqcVerifier`) pre FIPS 203/204/205 a CNSA 2.0 / EU NIS 2 compliance.
+  - Vzorový Maven projekt `pom.xml`, unit testy (`SymbolonClientTest`, `FingerprintTest`, `ExperimentEngineTest`, `PqcVerifierTest`), `SimpleCheckoutExample.java` a dokumentácia.
+- **Phase 6: Normatívne Testovacie Vektory Zhody (`vectors/`) (spec/README.md)**:
+  - Kompletná sada 6 referenčných normatívnych vektorov pre formát `symlic/1`:
+    - `lic-21-valid-hybrid.json`: platný hybridný dokument s podpismi ES256 + ML-DSA-65.
+    - `lic-23-downgrade-attack.json`: obrana pred downgrade útokom (odstránený ML-DSA podpis pri vyžadovaní `requiredAlgs`).
+    - `lic-25-unknown-alg.json`: odmietnutie neznámeho algoritmu v dlhovekej licencii.
+    - `lic-15-version-mismatch.json`: formátová nekompatibilita hlavičky a tela dokumentu.
+    - `lic-30-clock-rollback.json`: obrana voči posunu systémového času do minulosti a replay útokom.
+    - `lic-31-revoked-kid.json`: odmietnutie licencie podpísanej revokovaným kľúčom.
+  - Automatizovaný testovací suite `VectorConformanceTests.cs` v `Symbolon.Format.Tests` overujúci 100% zhodu referenčnej implementácie s vektormi.
+  - Technická dokumentácia v `vectors/README.md`.
+- **Phase 7: CI/CD PQC Gating & Quality Pipeline (§10.10)**:
+  - Shell skript `scripts/assert-pqc-tests-ran.sh` a PowerShell ekvivalent `scripts/assert-pqc-tests-ran.ps1` zabraňujúci tichému preskakovaniu PQC testov (FIPS 203/204/205) v CI runneroch.
+  - Aktualizácia GitHub Actions workflow `.github/workflows/ci.yml` s pridaním jobov pre Go SDK testy (`go test ./...`), Java SDK testy (`mvn clean test`) a PQC assertion gating.
+  - Konfiguračný súbor `stryker-config.json` pre mutačné testovanie so Stryker.NET s prahom 80%.
 - **Phase 1: Záťažové a výkonnostné testy k6 (§10.9)**:
   - 6 k6 produkčných záťažových profilov v `load-tests/k6/` (`checkout-burst.js`, `heartbeat-steady.js`, `license-issuance.js`, `client-verification.js`, `soak-test.js`, `experiments-ab.js`).
   - Natívne C# výkonnostné benchmark testy v `tests/Symbolon.ControlPlane.Tests/PerformanceBenchmarkTests.cs` preukazujúce splnenie SLA (§10.9): checkout p99 < 250ms pri 500 VU, heartbeat p99 < 50ms pri 100 rps, hybridné vydávanie >= 200 doc/s, verifikácia ES256 < 1ms a ML-DSA-65 < 3ms.
