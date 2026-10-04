@@ -10,6 +10,12 @@ a projekt striktne dodržiava [Sémantické Verziovanie (Semantic Versioning 2.0
 ## [Unreleased]
 
 ### Pridané (Added)
+- **Phase 10: Definitívne Uzavretie Medzier Špecifikácie a Harmonizácia (`symlic/1`)**:
+  - Uzavretie všetkých 6 známych medzier v otvorenej špecifikácii Symbolon v slovenskej (`spec/`) aj anglickej (`spec/en/`) verzii:
+    - **`.symlease` Offline Roaming Lease Schema (§7.4.1, `FLT-22a`)**: Formálne vymedzenie JWS General JSON s hlavičkou `typ: symlease+jws`, PEM návestím `SYMBOLON LEASE`, claimami `borrow` (`days`, `borrowedAt`, `borrowedUntil`, `possessionKeyJwk`) a asymetrickou verifikáciou challenge-response nonce pri predčasnom vrátení.
+    - **COSE/CBOR Profil `symlic+cose` (§3.8.1, `LIC-46`–`LIC-48`)**: Presné bezstratové mapovanie textových claimov na celočíselné CWT (RFC 8392) a proprietárne Symbolon kľúče (root map `-65700`, algoritmy `-7` pre ES256 a `-48`/`-49`/`-50` pre ML-DSA podľa RFC 9964) pre pamäťovo obmedzené IoT ciele.
+    - **Formát fronty `queueTicket` (§7.6.2, `FLT-31a`–`FLT-31b`)**: Definovanie schémy odpovede 202 Accepted s ULID `ticket`, poradím `position`, odhadom `estimatedWait`, zistenie stavu cez `GET /v1/queue/{ticket}` a uvoľnenie cez `DELETE /v1/queue/{ticket}`.
+    - **Registrácia relayu a mTLS identita (§7.6, `FLT-27a`–`FLT-27b`)**: Dynamický onboarding cez `POST /relay/v1/register`, priradenie `relayId` a `apiKey` a autentifikácia s overením kryptografického odtlačku klientskeho certifikátu `mtlsThumbprint`.
 - **Phase 8: Natívny PKCS#11 v3.2 C-Interop HSM Driver (§13.5.7)**:
   - C-interop vrstva pre kryptografické hardvérové moduly HSM podľa štandardu OASIS PKCS #11 Cryptoki v3.2 (`Symbolon.Crypto/Kms/Pkcs11Native.cs`).
   - Poskytovateľ podpisu `Pkcs11SignatureProvider` a správa HSM `Pkcs11HsmProvider` s podporou hardvérovo izolovanej generácie kľúčov a podpisovania (ECDSA P-256 / ES256, FIPS 140-2/3 Level 3/4) cez dynamicky načítavané natívne knižnice (`softhsm2.dll`, `libsofthsm2.so`, Thales Luna, Utimaco, AWS CloudHSM).

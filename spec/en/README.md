@@ -62,3 +62,16 @@ Implementations declare conformance to one or more of the following roles:
 ## Normative Test Vectors
 
 The [`vectors/`](../../vectors/) directory contains deterministic reference test vectors for all static verification rules (`LIC-21` through `LIC-34`), downgrade attack defense, and format conformance.
+
+---
+
+## Specification Completeness
+
+All architectural components and operational protocols of `symlic/1` are fully specified with zero known gaps:
+
+1. **Deterministic Test Vectors:** 6 normative JSON vector test suites covering hybrid signatures, downgrade resistance, clock rollback, and key revocation ([`vectors/`](../../vectors/)).
+2. **Offline Roaming Lease (`.symlease`):** Full claims schema, PEM envelope, and cryptographic proof-of-possession return protocol ([07-floating-protocol.md §7.4.1](07-floating-protocol.md#741-symlease-artifact-schema)).
+3. **Embedded COSE/CBOR Profile (`symlic+cose`):** Lossless integer claim mapping according to RFC 8392, RFC 9052/9053, and RFC 9964 ([03-symlic-1.md §3.8.1](03-symlic-1.md#381-mapping-claims-to-cbor-integer-keys)).
+4. **Queue Ticket Protocol (`queueTicket`):** Complete state lifecycle, HTTP 202 payload, polling endpoints, and cancellation ([07-floating-protocol.md §7.6.2](07-floating-protocol.md#762-queue-ticket-format)).
+5. **Relay Registration & mTLS Identity:** Dynamic onboarding endpoint (`POST /relay/v1/register`) and cryptographic certificate thumbprint enforcement ([07-floating-protocol.md §7.6](07-floating-protocol.md#76-endpoints)).
+

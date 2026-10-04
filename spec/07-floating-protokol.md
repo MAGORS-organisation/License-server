@@ -172,8 +172,47 @@ kľúčom, ktorý dostal pri borrow.
 > **Zdôvodnenie (nenormatívne).** Bez `FLT-22` by ktokoľvek vedel predčasne vrátiť
 > cudzie sedadlo a odobrať kolegovi rozpracovanú prácu.
 
-> ⚠️ **Nedokončené.** Štruktúra claimov artefaktu `.symlease` a formát nonce nie sú
-> v tomto drafte špecifikované. Viď [známe medzery](README.md#známe-medzery).
+### 7.4.1 Štruktúra artefaktu `.symlease`
+
+Artefakt `.symlease` je samostatne overiteľný PEM dokument s návestím `SYMBOLON LEASE`,
+ktorého telo je JWS General JSON s hlavičkou `typ: symlease+jws`.
+
+```jsonc
+{
+  "iss": "https://licenses.acme.example",
+  "sub": "lic_01JQ8ZK4N9V2X6M0",
+  "jti": "lse_01JQ8ZK5T3P7Q1R4",
+  "iat": 1788480000,
+  "nbf": 1788480000,
+  "exp": 1789084800,
+  "seat": 7,
+  "fp": "sha256:9f2c5d…",
+  "ent": ["core", "module.cad-export"],
+  "borrow": {
+    "days": 7,
+    "borrowedAt": 1788480000,
+    "borrowedUntil": 1789084800,
+    "possessionKeyJwk": "{\"kty\":\"EC\",\"crv\":\"P-256\",\"x\":\"…\",\"y\":\"…\"}"
+  }
+}
+```
+
+| Pole | Typ | Význam |
+|---|---|---|
+| `sub` | string | ID licencie (`lic_...`) |
+| `jti` | string | Unikátne ID výpožičky zhodné s `leaseId` |
+| `exp` | NumericDate | Koniec platnosti výpožičky zhodný s `borrowedUntil` |
+| `seat` | integer | Alokované číslo sedadla |
+| `fp` | string | Hardvérový fingerprint cieľového stroja |
+| `ent` | array | Zoznam pridelených modulov a vlastností |
+| `borrow.days` | integer | Počet dní výpožičky |
+| `borrow.borrowedUntil` | NumericDate | Časová pečiatka konca roaming okna |
+| `borrow.possessionKeyJwk` | string | Verejný kľúč (JWK) pre autorizáciu predčasného vrátenia |
+
+**FLT-22a.** Pri predčasnom vrátení cez `DELETE /v1/leases/{id}` klient odošle
+objekt `{ "symlease": "<pem>", "signature": "<sig>" }`. Server overí, že podpis
+`<sig>` bol vygenerovaný súkromným kľúčom prislúchajúcim k `possessionKeyJwk`
+nad výzvou (výzva je zložená z `leaseId` a serverového času).
 
 ---
 
@@ -224,10 +263,21 @@ sedadlo pred koncom jeho `ttl`.
 | `GET` | `/v1/revocations/latest?since={seq}` | Delta revokačný zoznam |
 | `GET` | `/v1/.well-known/symbolon-keys` | JWKS (EC + `kty: AKP`) |
 | `POST` | `/v1/offline/requests` | Air-gapped: `.symreq` → `.symgrant` / `.symlic` |
+| `GET` | `/v1/queue/{ticket}` | Zistenie stavu sedadla vo fronte |
+| `DELETE` | `/v1/queue/{ticket}` | Zrušenie zaradenia do fronty |
+| `POST` | `/relay/v1/register` | Registrácia relayu a inicializácia identity |
 
 **FLT-27.** Rozhranie relay ↔ control plane (`/relay/v1`) MUSÍ byť chránené **mTLS**:
 `POST /register`, `POST /grants:request`, `POST /usage`, `GET /policy`,
 `POST /grants/{id}:extend`.
+
+**FLT-27a.** Registrácia relayu prebieha cez `POST /relay/v1/register` s telom
+`{ "name": "...", "mtlsThumbprint": "..." }` a voliteľnou hlavičkou `X-Tenant-Id`.
+Server vráti `201 Created` s prideleným identifikátorom `{ "relayId": "rly_...", "apiKey": "rlykey_..." }`.
+
+**FLT-27b.** Chránené endpointy `/relay/v1/*` MUSIA overovať identitu relayu
+porovnaním kryptografického odtlačku klientskeho certifikátu s `mtlsThumbprint`,
+alebo hlavičkou `X-Relay-Key` voči uloženému `apiKey`.
 
 ### 7.6.1 Chyby
 
@@ -247,11 +297,29 @@ sedadlo pred koncom jeho `ttl`.
 
 **FLT-30.** Pri `409 seat-pool-exhausted` MUSÍ odpoveď obsahovať hlavičku `Retry-After`.
 
-**FLT-31.** Odpoveď `202` pri zaradení do fronty MUSÍ obsahovať `queueTicket`
-a `retryAfter`.
+### 7.6.2 Formát fronty (Queue Ticket)
 
-> ⚠️ **Nedokončené.** Formát `queueTicket` nie je špecifikovaný. Viď
-> [známe medzery](README.md#známe-medzery).
+**FLT-31.** Odpoveď `202 Accepted` pri zaradení požiadavky do fronty MUSÍ obsahovať
+štruktúrované JSON telo:
+
+```jsonc
+{
+  "status": "queued",
+  "ticket": "tkt_01JQ8ZK4N9V2X6M0",
+  "position": 3,
+  "estimatedWait": "PT6M",
+  "retryAfterSeconds": 30,
+  "priority": 10
+}
+```
+
+**FLT-31a.** Pole `ticket` MUSÍ byť unikátny ULID identifikátor s prefixom `tkt_`.
+Pole `position` vyjadruje 1-based poradie v rade čakateľov.
+
+**FLT-31b.** Klient dopytuje stav čakania cez `GET /v1/queue/{ticket}`. Keď hodnota
+`status` prejde do stavu `"ready"`, klient MUSÍ do uplynutia `resurrectionWindow`
+odoslať `POST /v1/leases` s hlavičkou alebo atribútom `queueTicket` na prevzatie
+pripraveného sedadla. Klient MÔŽE svoje čakanie zrušiť cez `DELETE /v1/queue/{ticket}`.
 
 ---
 

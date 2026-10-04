@@ -137,6 +137,47 @@ sequenceDiagram
 
 > **Non-Normative Rationale.** Without `FLT-22`, an unauthorized actor could prematurely release a colleague's borrowed license, terminating their field work.
 
+### 7.4.1 `.symlease` Artifact Schema
+
+The `.symlease` artifact is a standalone verifiable PEM document with the label `SYMBOLON LEASE`, wrapping a JWS General JSON with protected header `typ: symlease+jws`.
+
+```jsonc
+{
+  "iss": "https://licenses.acme.example",
+  "sub": "lic_01JQ8ZK4N9V2X6M0",
+  "jti": "lse_01JQ8ZK5T3P7Q1R4",
+  "iat": 1788480000,
+  "nbf": 1788480000,
+  "exp": 1789084800,
+  "seat": 7,
+  "fp": "sha256:9f2c5d…",
+  "ent": ["core", "module.cad-export"],
+  "borrow": {
+    "days": 7,
+    "borrowedAt": 1788480000,
+    "borrowedUntil": 1789084800,
+    "possessionKeyJwk": "{\"kty\":\"EC\",\"crv\":\"P-256\",\"x\":\"…\",\"y\":\"…\"}"
+  }
+}
+```
+
+| Field | Type | Semantic Meaning |
+|---|---|---|
+| `sub` | string | Target license identifier (`lic_...`) |
+| `jti` | string | Unique lease ULID matching `leaseId` |
+| `exp` | NumericDate | Borrow expiration timestamp matching `borrowedUntil` |
+| `seat` | integer | Allocated seat index |
+| `fp` | string | Hardware fingerprint hash of the target machine |
+| `ent` | array | Granted feature and entitlement codes |
+| `borrow.days` | integer | Requested borrow duration in days |
+| `borrow.borrowedUntil` | NumericDate | Timestamp marking the end of the roaming window |
+| `borrow.possessionKeyJwk` | string | Public key (JWK) certifying return authorization |
+
+**FLT-22a.** For early return via `DELETE /v1/leases/{id}`, the client transmits
+`{ "symlease": "<pem>", "signature": "<sig>" }`. The node verifies that `<sig>` was generated
+by the private key corresponding to `possessionKeyJwk` over a challenge nonce (composed of
+`leaseId` and server timestamp).
+
 ---
 
 ## 7.5 Reservations and Denials
@@ -183,8 +224,19 @@ rules:
 | `GET` | `/v1/revocations/latest?since={seq}` | Delta Revocation List |
 | `GET` | `/v1/.well-known/symbolon-keys` | JWKS endpoint (classical EC + `kty: AKP` PQC) |
 | `POST` | `/v1/offline/requests` | Air-gapped processing: `.symreq` → `.symgrant` / `.symlic` |
+| `GET` | `/v1/queue/{ticket}` | Poll queued seat status and position |
+| `DELETE` | `/v1/queue/{ticket}` | Cancel queued wait request |
+| `POST` | `/relay/v1/register` | Relay registration and identity provisioning |
 
 **FLT-27.** The relay ↔ control plane interface (`/relay/v1`) MUST be protected with **mutual TLS (mTLS)**: `POST /register`, `POST /grants:request`, `POST /usage`, `GET /policy`, `POST /grants/{id}:extend`.
+
+**FLT-27a.** Relay registration is performed via `POST /relay/v1/register` with request payload
+`{ "name": "...", "mtlsThumbprint": "..." }` and optional `X-Tenant-Id` header.
+The server responds with `201 Created` containing assigned identity `{ "relayId": "rly_...", "apiKey": "rlykey_..." }`.
+
+**FLT-27b.** Protected endpoints under `/relay/v1/*` MUST verify relay identity
+either by matching client certificate SHA-256 thumbprints against registered `mtlsThumbprint`,
+or by verifying the `X-Relay-Key` header against stored `apiKey`.
 
 ### 7.6.1 Error Handling
 
@@ -203,7 +255,28 @@ rules:
 
 **FLT-30.** On `409 seat-pool-exhausted`, the response MUST include a standard `Retry-After` header.
 
-**FLT-31.** An HTTP `202 Accepted` response for queued checkouts MUST include `queueTicket` and `retryAfter`.
+### 7.6.2 Queue Ticket Format
+
+**FLT-31.** An HTTP `202 Accepted` response when queuing a checkout request MUST return
+a structured JSON payload:
+
+```jsonc
+{
+  "status": "queued",
+  "ticket": "tkt_01JQ8ZK4N9V2X6M0",
+  "position": 3,
+  "estimatedWait": "PT6M",
+  "retryAfterSeconds": 30,
+  "priority": 10
+}
+```
+
+**FLT-31a.** The `ticket` field MUST be a unique ULID identifier prefixed with `tkt_`.
+The `position` field indicates the 1-based order index in the waiting line.
+
+**FLT-31b.** The client polls queue status via `GET /v1/queue/{ticket}`. When `status` transitions
+to `"ready"`, the client MUST execute `POST /v1/leases` supplying `queueTicket` before
+`resurrectionWindow` expires in order to claim the reserved seat. The client MAY cancel its queue position via `DELETE /v1/queue/{ticket}`.
 
 ---
 

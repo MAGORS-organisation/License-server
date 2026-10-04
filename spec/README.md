@@ -129,14 +129,12 @@ Poctivý zoznam stavu otvorených otázok špecifikácie:
 
 1. ~~**Jazyk.**~~ **Vyriešené.** Oficiálny anglický preklad otvorenej špecifikácie je dostupný v [`spec/en/`](en/README.md).
 2. ~~**Testovacie vektory.**~~ **Vyriešené.** Kompletná sada 6 normatívnych testovacích vektorov je implementovaná v [`vectors/`](../vectors/) a overovaná testovacou sadou `VectorConformanceTests`.
-3. **`.symlease`** (borrow artefakt, [07](07-floating-protokol.md#74-borrow--roaming))
-   nemá vlastnú štruktúru claimov — zadanie ho popisuje len ako „samostatne overiteľný
-   artefakt s hybridným podpisom". Treba došpecifikovať.
-4. **Profil `symlic+cose`** (CBOR pre embedded ciele) je v zadaní deklarovaný ako
-   voliteľný, ale nie je zmapovaný claim po claime.
-5. **Formát fronty** (`queueTicket`) nie je špecifikovaný.
-6. **Registrácia relayu** (`POST /relay/v1/register`) a formát mTLS identity nie sú
-   pokryté — sú na hranici medzi protokolom a nasadením.
+3. ~~**`.symlease`**~~ **Vyriešené.** Štruktúra claimov artefaktu `.symlease`, schéma v PEM armore a mechanizmus proof-of-possession sú normatívne špecifikované v [07-floating-protokol.md §7.4.1](07-floating-protokol.md#741-štruktúra-artefaktu-symlease).
+4. ~~**Profil `symlic+cose`**~~ **Vyriešené.** Celočíselné CBOR/COSE mapovanie claimov podľa RFC 8392 a RFC 9964 je normatívne špecifikované v [03-symlic-1.md §3.8.1](03-symlic-1.md#381-mapovanie-claimov-do-cbor-celočíselných-kľúčov).
+5. ~~**Formát fronty (`queueTicket`)**~~ **Vyriešené.** Formát odpovede 202, stavový model a endpointy pre čakanie na sedadlo sú normatívne špecifikované v [07-floating-protokol.md §7.6.2](07-floating-protokol.md#762-formát-fronty-queue-ticket).
+6. ~~**Registrácia relayu a mTLS identita**~~ **Vyriešené.** Registračný endpoint `POST /relay/v1/register`, priradenie `relayId` a verifikácia odtlačku klientskeho certifikátu `mtlsThumbprint` sú normatívne špecifikované v [07-floating-protokol.md §7.6](07-floating-protokol.md#76-endpointy).
+
+> **Stav špecifikácie:** Všetky pôvodné medzery boli uzavreté. Špecifikácia `symlic/1` je úplná, sebestačná a plne pripravená na nezávislú implementáciu tretími stranami.
 
 ---
 

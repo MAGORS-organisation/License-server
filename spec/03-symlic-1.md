@@ -352,10 +352,33 @@ pre embedded ciele s obmedzenou pamäťou.
 **LIC-47.** Profil `symlic+cose` MUSÍ používať **rovnakú množinu claimov** ako
 `symlic+jws`. Konverzia medzi profilmi MUSÍ byť mechanická a bezstratová.
 
-**LIC-48.** COSE algoritmy pre ML-DSA MUSIA byť podľa RFC 9964 (`-48` / `-49` / `-50`).
+**LIC-48.** COSE algoritmy pre ML-DSA MUSIA byť podľa RFC 9964 (`-48` / `-49` / `-50`)
+a pre ECDSA podľa RFC 9053 (`-7` pre ES256).
 
-> ⚠️ **Nedokončené.** Mapovanie claim po claime v tomto drafte chýba. Viď
-> [známe medzery](README.md#známe-medzery).
+### 3.8.1 Mapovanie claimov do CBOR celočíselných kľúčov
+
+Pre minimalizáciu binárnej veľkosti licencie na mikrokontroléroch a embedded zariadeniach
+sa textové reťazce mapujú na štandardné CWT ([RFC 8392](https://www.rfc-editor.org/rfc/rfc8392))
+a proprietárne Symbolon celočíselné kľúče:
+
+| Úroveň | JSON reťazec | CBOR kľúč | Typ hodnoty | Štandard |
+|---|---|---|---|---|
+| Root CWT | `iss` | `1` | text string | RFC 8392 |
+| Root CWT | `sub` | `2` | text string | RFC 8392 |
+| Root CWT | `aud` | `3` | text string | RFC 8392 |
+| Root CWT | `exp` | `4` | unsigned integer (NumericDate) | RFC 8392 |
+| Root CWT | `nbf` | `5` | unsigned integer (NumericDate) | RFC 8392 |
+| Root CWT | `iat` | `6` | unsigned integer (NumericDate) | RFC 8392 |
+| Root CWT | `jti` | `7` | byte string / text string | RFC 8392 |
+| Root CWT | `symlic` | `-65700` | map | Symbolon |
+| `symlic` | `v` | `1` | unsigned integer | Symbolon |
+| `symlic` | `profile` | `2` | unsigned int (`1`: classical, `2`: hybrid, `3`: pqc) | Symbolon |
+| `symlic` | `requiredAlgs` | `3` | array of int (`-7`: ES256, `-49`: ML-DSA-65) | RFC 9964 / 9053 |
+| `symlic` | `license` | `4` | map (`1`: key, `2`: model, `3`: state, `4`: issuedAt, `5`: customer) | Symbolon |
+| `symlic` | `limits` | `5` | map (`1`: maxSeats, `2`: seatUnit, `3`: overageStrategy, `4`: maxRelays) | Symbolon |
+| `symlic` | `entitlements` | `6` | array of maps (`1`: code, `2`: value, `3`: period) | Symbolon |
+| `symlic` | `binding` | `7` | map (`1`: fingerprint, `2`: matching, `3`: components) | Symbolon |
+| `symlic` | `policy` | `8` | map (`1`: lease, `2`: clockSkewTolerance, `3`: revocation) | Symbolon |
 
 ---
 

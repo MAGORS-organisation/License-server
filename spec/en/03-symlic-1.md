@@ -171,3 +171,61 @@ Signatures MUST NOT be combined or aggregated.
 | `pq-only-v1` | `["ML-DSA-65"]` | CNSA 2.0 / Strict post-quantum mandate |
 
 **LIC-39.** Classical and post-quantum signatures MUST be produced by independent private keys. Composite key schemes are NOT permitted in `symlic/1`.
+
+---
+
+## 3.6 Keys and JWKS
+
+**LIC-40.** The `kid` parameter MUST follow the naming convention `{role}-{tenant}-{yyyy-MM}-{alg}`, e.g., `prd-acme-2026-09-pq`.
+
+**LIC-41.** Public keys MUST be published as JWKS at `GET /v1/.well-known/symbolon-keys`.
+
+**LIC-42.** Post-quantum keys in JWKS MUST use key type `kty: AKP` conforming to RFC 9964.
+
+---
+
+## 3.7 Format Versioning
+
+**LIC-43.** Adding new fields to `symlic` is always permitted and MUST NOT increment `symlic.v`.
+
+**LIC-44.** Removing fields or modifying existing field semantics MUST increment `symlic.v` and MUST change the document type header (`symlic2+jws`).
+
+**LIC-45.** A client SHOULD declare supported versions using the header `X-Symbolon-Accept: symlic/1`. The server MUST issue the highest version mutually supported.
+
+---
+
+## 3.8 Optional Profile `symlic+cose`
+
+**LIC-46.** An implementation MAY support the alternative serialization `COSE_Sign` ([RFC 9052](https://www.rfc-editor.org/rfc/rfc9457)) with header `typ: symlic+cose` for constrained and embedded memory-limited environments.
+
+**LIC-47.** The `symlic+cose` profile MUST carry an **identical set of claims** to `symlic+jws`. Transcoding between profiles MUST be strictly mechanical and lossless.
+
+**LIC-48.** COSE algorithms for ML-DSA MUST follow RFC 9964 (`-48` / `-49` / `-50`) and for ECDSA RFC 9053 (`-7` for ES256).
+
+### 3.8.1 Mapping Claims to CBOR Integer Keys
+
+To minimize binary footprint on microcontrollers and embedded targets, text claim names map to standard CWT ([RFC 8392](https://www.rfc-editor.org/rfc/rfc8392)) and proprietary Symbolon integer keys:
+
+| Scope | JSON Claim | CBOR Key | Value Type | Standard Reference |
+|---|---|---|---|---|
+| Root CWT | `iss` | `1` | text string | RFC 8392 |
+| Root CWT | `sub` | `2` | text string | RFC 8392 |
+| Root CWT | `aud` | `3` | text string | RFC 8392 |
+| Root CWT | `exp` | `4` | unsigned integer (NumericDate) | RFC 8392 |
+| Root CWT | `nbf` | `5` | unsigned integer (NumericDate) | RFC 8392 |
+| Root CWT | `iat` | `6` | unsigned integer (NumericDate) | RFC 8392 |
+| Root CWT | `jti` | `7` | byte string / text string | RFC 8392 |
+| Root CWT | `symlic` | `-65700` | map | Symbolon |
+| `symlic` | `v` | `1` | unsigned integer | Symbolon |
+| `symlic` | `profile` | `2` | unsigned int (`1`: classical, `2`: hybrid, `3`: pqc) | Symbolon |
+| `symlic` | `requiredAlgs` | `3` | array of int (`-7`: ES256, `-49`: ML-DSA-65) | RFC 9964 / 9053 |
+| `symlic` | `license` | `4` | map (`1`: key, `2`: model, `3`: state, `4`: issuedAt, `5`: customer) | Symbolon |
+| `symlic` | `limits` | `5` | map (`1`: maxSeats, `2`: seatUnit, `3`: overageStrategy, `4`: maxRelays) | Symbolon |
+| `symlic` | `entitlements` | `6` | array of maps (`1`: code, `2`: value, `3`: period) | Symbolon |
+| `symlic` | `binding` | `7` | map (`1`: fingerprint, `2`: matching, `3`: components) | Symbolon |
+| `symlic` | `policy` | `8` | map (`1`: lease, `2`: clockSkewTolerance, `3`: revocation) | Symbolon |
+
+---
+
+> [← License Key](02-license-key.md) · [Table of Contents](README.md) · [Lease Token →](04-lease-token.md)
+
