@@ -8,62 +8,137 @@ namespace Symbolon.Cli.Commands;
 
 public static class KmsCommands
 {
-    public static Task<int> HandleKmsAsync(string[] args)
+    public static async Task<int> HandleKmsAsync(string[] args)
     {
-        if (args.Length == 0 || args[0] is "-h" or "--help" or "STATUS" or "status")
+        if (args.Length == 0 || args[0] is "-h" or "--help")
         {
-            string providerName = GetArg(args, "-p") ?? GetArg(args, "--provider") ?? "envelope";
-            return HandleStatusAsync(providerName);
+            PrintKmsHelp();
+            return 0;
         }
 
-        return Task.FromResult(UnknownSubcommand(args[0]));
+        return args[0].ToUpperInvariant() switch
+        {
+            "STATUS" => await HandleStatusAsync(args[1..]).ConfigureAwait(false),
+            "TEST-SIGN" => await HandleTestSignAsync(args[1..]).ConfigureAwait(false),
+            "ENCRYPT" => HandleEnvelopeEncrypt(args[1..]),
+            "VERIFY-HIERARCHY" => HandleHierarchyVerify(),
+            _ => UnknownSubcommand(args[0])
+        };
     }
 
-    public static Task<int> HandleStatusAsync(string providerName)
+    private static void PrintKmsHelp()
     {
+        AnsiConsole.MarkupLine("[bold blue]Použitie:[/] symbolon kms <prikaz> [[volby]]");
+        AnsiConsole.MarkupLine("  [yellow]status[/]            Zobrazí stav KMS/HSM poskytovateľa a zoznam kľúčov");
+        AnsiConsole.MarkupLine("  [yellow]test-sign[/]         Otestuje hardvérové podpisovanie cez KMS/HSM");
+        AnsiConsole.MarkupLine("  [yellow]encrypt[/]           Zašifruje privátny kľúč do AES-256-GCM obálky");
+        AnsiConsole.MarkupLine("  [yellow]verify-hierarchy[/]  Overí 3-úrovňový reťazec dôvery kľúčov");
+        AnsiConsole.MarkupLine("\n[bold]Voľby pre status a test-sign:[/] --provider <azure-kv|aws-kms|pkcs11|envelope> [--library <cesta>] [--slot <id>] [--pin <pin>]");
+    }
+
+    public static async Task<int> HandleStatusAsync(string[] args)
+    {
+        string providerName = GetArg(args, "-p") ?? GetArg(args, "--provider") ?? "envelope";
+        string? libraryPath = GetArg(args, "--library");
+        ulong slotId = ulong.TryParse(GetArg(args, "--slot"), out var s) ? s : 0;
+        string? pin = GetArg(args, "--pin");
+
         AnsiConsole.MarkupLine("[bold blue]=== Symbolon Cloud KMS & Hardware Security Module (HSM) Status ===[/]");
 
-        IKmsProvider provider = providerName.ToLowerInvariant() switch
+        using IKmsProvider provider = CreateKmsProvider(providerName, libraryPath, slotId, pin);
+
+        var health = await provider.CheckHealthAsync().ConfigureAwait(false);
+        var keys = await provider.ListKeysAsync().ConfigureAwait(false);
+
+        var table = new Table().Border(TableBorder.Rounded);
+        table.AddColumn("[cyan]Parameter[/]");
+        table.AddColumn("[green]Hodnota[/]");
+
+        table.AddRow("Poskytovateľ (Provider)", $"[bold]{provider.ProviderType}[/]");
+        table.AddRow("Stav Pripojenia", health.IsHealthy ? "[green]● ONLINE / HEALTHY[/]" : "[red]● OFFLINE[/]");
+        table.AddRow("Podrobnosti", health.Details);
+        table.AddRow("Spravované Kľúče", keys.Count.ToString(System.Globalization.CultureInfo.InvariantCulture));
+
+        AnsiConsole.Write(table);
+
+        if (keys.Count > 0)
+        {
+            var keysTable = new Table().Border(TableBorder.Simple);
+            keysTable.AddColumn("Key ID");
+            keysTable.AddColumn("Algoritmus");
+            keysTable.AddColumn("Umiestnenie (Location)");
+            keysTable.AddColumn("Stav");
+
+            foreach (var k in keys)
+            {
+                keysTable.AddRow(k.KeyId, k.Algorithm, k.KeyLocation, k.State);
+            }
+            AnsiConsole.Write(keysTable);
+        }
+
+        return 0;
+    }
+
+    public static async Task<int> HandleTestSignAsync(string[] args)
+    {
+        string providerName = GetArg(args, "-p") ?? GetArg(args, "--provider") ?? "pkcs11";
+        string? libraryPath = GetArg(args, "--library");
+        ulong slotId = ulong.TryParse(GetArg(args, "--slot"), out var s) ? s : 0;
+        string? pin = GetArg(args, "--pin");
+        string keyId = GetArg(args, "--key") ?? "sym-hsm-ecdsa-01";
+
+        AnsiConsole.MarkupLine($"[bold blue]=== Test Hardvérového Podpisovania cez KMS/HSM ({providerName.ToUpperInvariant()}) ===[/]");
+
+        using IKmsProvider provider = CreateKmsProvider(providerName, libraryPath, slotId, pin);
+
+        var keys = await provider.ListKeysAsync().ConfigureAwait(false);
+        if (keys.Count == 0)
+        {
+            AnsiConsole.MarkupLine("[yellow]V tokene nie sú k dispozícii žiadne kľúče.[/]");
+            return 1;
+        }
+
+        var keyMeta = keys.FirstOrDefault(k => string.Equals(k.KeyId, keyId, StringComparison.OrdinalIgnoreCase)) ?? keys[0];
+        var signer = await provider.GetSignatureProviderAsync(keyMeta.KeyId).ConfigureAwait(false);
+
+        byte[] samplePayload = "Symbolon Enterprise Floating License Signing Payload"u8.ToArray();
+        byte[] sig = new byte[signer.SignatureSize];
+
+        signer.Sign(samplePayload, sig);
+        bool isValid = signer.Verify(samplePayload, sig);
+
+        AnsiConsole.MarkupLine($"[bold]Kľúč:[/] [green]{keyMeta.KeyId}[/] ([cyan]{signer.Alg}[/])");
+        AnsiConsole.MarkupLine($"[bold]Veľkosť podpisu:[/] [yellow]{sig.Length} bajtov[/]");
+        AnsiConsole.MarkupLine($"[bold]Verifikácia podpisu:[/] {(isValid ? "[bold green]✔ PLATNÝ (PASS)[/]" : "[bold red]✗ NEPLATNÝ (FAIL)[/]")}");
+
+        return isValid ? 0 : 1;
+    }
+
+    private static IKmsProvider CreateKmsProvider(string providerName, string? libraryPath, ulong slotId, string? pin)
+    {
+        return providerName.ToLowerInvariant() switch
         {
             "azure-kv" => new AzureKeyVaultKmsProvider("https://symbolon-prod-vault.vault.azure.net"),
             "aws-kms" => new AwsKmsProvider("eu-central-1"),
-            "pkcs11" => new MockHardwareHsmProvider(0, "Symbolon-HSM-Partition-01"),
+            "pkcs11" => CreatePkcs11Provider(libraryPath, slotId, pin),
             _ => new EncryptedEnvelopeKmsProvider("symbolon_cli_master_key_2026!", "envelope://local-cli")
         };
+    }
 
-        using (provider)
+    private static Pkcs11HsmProvider CreatePkcs11Provider(string? libraryPath, ulong slotId, string? pin)
+    {
+        var hsm = new Pkcs11HsmProvider(libraryPath, slotId, pin, "Symbolon-HSM-Partition-01");
+        // Provision baseline test keys if none exist in slot (hsm takes ownership and disposes them)
+        var ecKey = Es256SignatureProvider.GenerateKey("sym-hsm-ecdsa-01");
+        hsm.ProvisionKey(ecKey);
+
+        if (MlDsaSignatureProvider.IsSupported)
         {
-            var health = provider.CheckHealthAsync().GetAwaiter().GetResult();
-            var keys = provider.ListKeysAsync().GetAwaiter().GetResult();
-
-            var table = new Table().Border(TableBorder.Rounded);
-            table.AddColumn("[cyan]Parameter[/]");
-            table.AddColumn("[green]Hodnota[/]");
-
-            table.AddRow("Poskytovateľ (Provider)", $"[bold]{provider.ProviderType}[/]");
-            table.AddRow("Stav Pripojenia", health.IsHealthy ? "[green]● ONLINE / HEALTHY[/]" : "[red]● OFFLINE[/]");
-            table.AddRow("Podrobnosti", health.Details);
-            table.AddRow("Spravované Kľúče", keys.Count.ToString(System.Globalization.CultureInfo.InvariantCulture));
-
-            AnsiConsole.Write(table);
-
-            if (keys.Count > 0)
-            {
-                var keysTable = new Table().Border(TableBorder.Simple);
-                keysTable.AddColumn("Key ID");
-                keysTable.AddColumn("Algoritmus");
-                keysTable.AddColumn("Umiestnenie (Location)");
-                keysTable.AddColumn("Stav");
-
-                foreach (var k in keys)
-                {
-                    keysTable.AddRow(k.KeyId, k.Algorithm, k.KeyLocation, k.State);
-                }
-                AnsiConsole.Write(keysTable);
-            }
+            var pqKey = MlDsaSignatureProvider.GenerateKey(MLDsaAlgorithm.MLDsa65, "sym-hsm-mldsa-01");
+            hsm.ProvisionKey(pqKey);
         }
 
-        return Task.FromResult(0);
+        return hsm;
     }
 
     public static int HandleEnvelopeEncrypt(string[] args)

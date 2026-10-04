@@ -4,6 +4,8 @@
 **Licencia:** [CC BY 4.0](LICENSE) (`CC-BY-4.0`) — odlišná od zvyšku repozitára, viď [LICENSING.md](../LICENSING.md)
 **Stav:** návrh. Normatívne časti sú stabilné v zámere, nie vo formulácii — pred `1.0` sa môžu meniť.
 
+> 🇬🇧 **English version:** The official English translation of this specification is available in [`spec/en/`](en/README.md).
+
 Táto špecifikácia popisuje formáty artefaktov a sieťový protokol licenčného systému
 Symbolon tak, aby ich vedel implementovať ktokoľvek, nezávisle od referenčnej
 implementácie v .NET. Je zámerne oddelená od kódu aj od zadania.
@@ -12,16 +14,16 @@ implementácie v .NET. Je zámerne oddelená od kódu aj od zadania.
 
 ## Obsah
 
-| # | Dokument | Obsah |
-|---|---|---|
-| 1 | [Artefakty](01-artefakty.md) | Prehľad piatich artefaktov a prečo sú oddelené |
-| 2 | [License Key](02-license-key.md) | Formát licenčného kľúča, abeceda, kontrolný súčet, uloženie |
-| 3 | [`symlic/1` — License File](03-symlic-1.md) | JWS General JSON, claims, **pravidlá validácie**, verziovanie |
-| 4 | [Lease Token](04-lease-token.md) | Kompaktný JWS pre držanie sedadla |
-| 5 | [Seat Grant](05-seat-grant.md) | Delegovaná kapacita pre relay |
-| 6 | [Revocation List](06-revocation-list.md) | Revokácia licencií, strojov a podpisových kľúčov |
-| 7 | [Floating protokol](07-floating-protokol.md) | Životný cyklus sedadla, checkout/renew/release, borrow, rezervácie, air-gapped tok |
-| 8 | [Fingerprint a node-locking](08-fingerprint.md) | Komponenty, matching stratégie, kontajnery a VM |
+| # | Dokument | Anglicky (English) | Obsah |
+|---|---|---|---|
+| 1 | [Artefakty](01-artefakty.md) | [Artifacts](en/01-artifacts.md) | Prehľad piatich artefaktov a prečo sú oddelené |
+| 2 | [License Key](02-license-key.md) | [License Key](en/02-license-key.md) | Formát licenčného kľúča, abeceda, kontrolný súčet, uloženie |
+| 3 | [`symlic/1` — License File](03-symlic-1.md) | [`symlic/1` — License File](en/03-symlic-1.md) | JWS General JSON, claims, **pravidlá validácie**, verziovanie |
+| 4 | [Lease Token](04-lease-token.md) | [Lease Token](en/04-lease-token.md) | Kompaktný JWS pre držanie sedadla |
+| 5 | [Seat Grant](05-seat-grant.md) | [Seat Grant](en/05-seat-grant.md) | Delegovaná kapacita pre relay |
+| 6 | [Revocation List](06-revocation-list.md) | [Revocation List](en/06-revocation-list.md) | Revokácia licencií, strojov a podpisových kľúčov |
+| 7 | [Floating protokol](07-floating-protokol.md) | [Floating Protocol](en/07-floating-protocol.md) | Životný cyklus sedadla, checkout/renew/release, borrow, rezervácie, air-gapped tok |
+| 8 | [Fingerprint a node-locking](08-fingerprint.md) | [Fingerprint & Node-Locking](en/08-fingerprint.md) | Komponenty, matching stratégie, kontajnery a VM |
 
 ---
 
@@ -102,33 +104,31 @@ Táto špecifikácia **nedefinuje**:
 
 ## Testovacie vektory
 
-Adresár `vectors/` (zatiaľ neexistuje) bude obsahovať referenčné artefakty pre každú
-požiadavku, ktorá sa dá overiť staticky — vrátane FIPS 204 KAT vektorov pre ML-DSA-65
-a párov *(vstup, očakávaný verdikt)* pre pravidlá validácie
+Adresár [`vectors/`](../vectors/) obsahuje referenčné normatívne artefakty pre požiadavky,
+ktoré sa dajú overiť staticky — vrátane FIPS 204 KAT vektorov pre ML-DSA-65 a párov
+*(vstup, očakávaný verdikt)* pre pravidlá validácie
 [`LIC-21` až `LIC-34`](03-symlic-1.md#34-validácia-normatívne).
-Bez nich nie je špecifikácia overiteľná a implementácie sa rozídu.
+Referenčná implementácia ich overuje v testovacej sade `VectorConformanceTests.cs`.
 
-Prioritné vektory (bez nich sa implementácie rozídu na bezpečnostne relevantnom mieste):
+Prioritné vektory:
 
-| Vektor | Overuje |
-|---|---|
-| platný hybrid, oba podpisy | `LIC-21`, `LIC-22` |
-| odstránený ML-DSA podpis, `requiredAlgs` ho stále žiada | `LIC-23` — **downgrade útok** |
-| neznámy `alg` v `requiredAlgs`, `exp − iat` 2 roky | `LIC-25` (`auto` → odmietnuť) |
-| `symlic.v` nezhodné s hlavičkou `symlic` | `LIC-15` |
-| `iat` nižší než naposledy videný | `LIC-30` — rollback hodín |
-| podpis platný, `kid` revokovaný | `LIC-31` |
+| Vektor | Súbor | Overuje |
+|---|---|---|
+| platný hybrid, oba podpisy | `lic-21-valid-hybrid.json` | `LIC-21`, `LIC-22` |
+| odstránený ML-DSA podpis, `requiredAlgs` ho stále žiada | `lic-23-downgrade-attack.json` | `LIC-23` — **downgrade útok** |
+| neznámy `alg` v `requiredAlgs`, `exp − iat` 2 roky | `lic-25-unknown-alg.json` | `LIC-25` (`auto` → odmietnuť) |
+| `symlic.v` nezhodné s hlavičkou `symlic` | `lic-15-version-mismatch.json` | `LIC-15` |
+| `iat` nižší než naposledy videný | `lic-30-clock-rollback.json` | `LIC-30` — rollback hodín |
+| podpis platný, `kid` revokovaný | `lic-31-revoked-kid.json` | `LIC-31` |
 
 ---
 
 ## Známe medzery
 
-Poctivý zoznam toho, čo v tomto drafte chýba:
+Poctivý zoznam stavu otvorených otázok špecifikácie:
 
-1. **Jazyk.** Špecifikácia je v slovenčine. Otvorený formát, ktorý má implementovať
-   ktokoľvek, potrebuje anglickú verziu — inak je CC BY 4.0 gesto bez účinku.
-   Preklad je podmienka zverejnenia, nie „nice to have".
-2. **Testovacie vektory neexistujú.** Viď vyššie.
+1. ~~**Jazyk.**~~ **Vyriešené.** Oficiálny anglický preklad otvorenej špecifikácie je dostupný v [`spec/en/`](en/README.md).
+2. ~~**Testovacie vektory.**~~ **Vyriešené.** Kompletná sada 6 normatívnych testovacích vektorov je implementovaná v [`vectors/`](../vectors/) a overovaná testovacou sadou `VectorConformanceTests`.
 3. **`.symlease`** (borrow artefakt, [07](07-floating-protokol.md#74-borrow--roaming))
    nemá vlastnú štruktúru claimov — zadanie ho popisuje len ako „samostatne overiteľný
    artefakt s hybridným podpisom". Treba došpecifikovať.

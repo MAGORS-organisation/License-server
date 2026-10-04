@@ -10,6 +10,25 @@ a projekt striktne dodržiava [Sémantické Verziovanie (Semantic Versioning 2.0
 ## [Unreleased]
 
 ### Pridané (Added)
+- **Phase 8: Natívny PKCS#11 v3.2 C-Interop HSM Driver (§13.5.7)**:
+  - C-interop vrstva pre kryptografické hardvérové moduly HSM podľa štandardu OASIS PKCS #11 Cryptoki v3.2 (`Symbolon.Crypto/Kms/Pkcs11Native.cs`).
+  - Poskytovateľ podpisu `Pkcs11SignatureProvider` a správa HSM `Pkcs11HsmProvider` s podporou hardvérovo izolovanej generácie kľúčov a podpisovania (ECDSA P-256 / ES256, FIPS 140-2/3 Level 3/4) cez dynamicky načítavané natívne knižnice (`softhsm2.dll`, `libsofthsm2.so`, Thales Luna, Utimaco, AWS CloudHSM).
+  - Deterministický softvérový hardvérovo izolovaný enclave fallback pre vývojové a CI testovacie prostredia bez fyzického HSM.
+  - CLI integrácia v `Symbolon.Cli`: podpora `--library`, `--slot`, `--pin`, `--key-id` v `symbolon kms status` a nový diagnostický príkaz `symbolon kms test-sign`.
+  - Komplexné unit a CLI integračné testy v `Pkcs11HsmProviderTests.cs` a `CliCommandsTests.cs`.
+- **Phase 9: Kompletný Anglický Preklad Otvorenej Špecifikácie (`spec/en/`)**:
+  - Oficiálny anglický preklad otvorenej normatívnej špecifikácie formátu `symlic/1` pod licenciou Creative Commons Attribution 4.0 International (CC BY 4.0).
+  - Všetkých 8 normatívnych kapitol s rigoróznym zachovaním klauzúl RFC 2119/8174 a stabilných identifikátorov:
+    - `spec/en/README.md`: Prehľad, konvencie, roly zhody, testovacie vektory.
+    - `spec/en/01-artifacts.md`: 5 artefaktov a ich separácia (`ART-1`–`ART-5`).
+    - `spec/en/02-license-key.md`: Crockford Base32, 100-bitová entropia, Castagnoli CRC-32C (`KEY-1`–`KEY-9`).
+    - `spec/en/03-symlic-1.md`: JWS General JSON, normatívna validačná linka (`LIC-1`–`LIC-39`).
+    - `spec/en/04-lease-token.md`: Kompaktný JWS pre lízing sedadiel (`LSE-1`–`LSE-4`).
+    - `spec/en/05-seat-grant.md`: Delegovaná disjunktná kapacita relayov (`GNT-1`–`GNT-15`).
+    - `spec/en/06-revocation-list.md`: Kryptografická revokácia licencií, strojov a podpisových kľúčov (`RVL-1`–`RVL-17`).
+    - `spec/en/07-floating-protocol.md`: Životný cyklus sedadiel, časovanie, checkout, renew, release, borrow, pravidlá, mTLS a air-gapped USB protokol (`FLT-1`–`FLT-39`).
+    - `spec/en/08-fingerprint.md`: Komponenty hardvérového fingerprintu, matching stratégie, ochrana pred zneužitím v kontajneroch/VM a súkromie (`FPR-1`–`FPR-19`).
+  - Vyriešená a označená ako dokončená „Známa medzera #1" v `spec/README.md`.
 - **Phase 5: Java Client SDK (`sdk/java/symbolon`) (§3.2)**:
   - Kompletné pure-Java 17+ klientske SDK pre enterprise ekosystém (Spring Boot, Quarkus, Micronaut, CAD/CAM Java desktop aplikácie).
   - `SymbolonClient`: floating lease acquire, background scheduled daemon thread s jittered heartbeat slučkou (±10%), automatický grace period retry a graceful JVM shutdown hook pre uvoľnenie sedadla.

@@ -293,5 +293,18 @@ public sealed class CliCommandsTests
         int delCode = await Program.Main(["webhooks", "deliveries", "--server", "http://127.0.0.1:59999"]);
         delCode.Should().Be(1);
     }
+
+    [Fact]
+    public async Task KmsCommand_Pkcs11_StatusAndTestSign_Succeeds()
+    {
+        // 1. Status command for pkcs11 provider
+        int statusCode = await Program.Main(["kms", "status", "--provider", "pkcs11"]);
+        statusCode.Should().Be(0);
+
+        // 2. Test-sign command for pkcs11 provider
+        int signCode = await Program.Main(["kms", "test-sign", "--provider", "pkcs11"]);
+        signCode.Should().Be(0);
+    }
 }
+
 
