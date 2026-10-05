@@ -10,6 +10,10 @@ a projekt striktne dodržiava [Sémantické Verziovanie (Semantic Versioning 2.0
 ## [Unreleased]
 
 ### Pridané (Added)
+- **Phase 11: FIPS 205 SLH-DSA Test Suite & Kompletná PQC Gating Verifikácia (§10.10, §13.5)**:
+  - Nový testovací suite `SlhDsaSignatureProviderTests.cs` pre FIPS 205 bezstavové hash-based podpisy (SPHINCS+).
+  - Testovanie variantov `SlhDsaSha2_128s` a `SlhDsaSha2_128f`, generovanie kľúčov, podpis, verifikácia, detekcia manipulácie a export/import JWK (`kty: AKP`).
+  - Úplné pokrytie všetkých 3 PQC štandardov v CI/CD assertion skriptoch (`assert-pqc-tests-ran.ps1` a `.sh`): 4 testy pre ML-DSA (FIPS 204), 4 testy pre ML-KEM (FIPS 203) a 4 testy pre SLH-DSA (FIPS 205) — spolu 12/12 PQC testov úspešne vykonaných s 0 preskočenými.
 - **Phase 10: Definitívne Uzavretie Medzier Špecifikácie a Harmonizácia (`symlic/1`)**:
   - Uzavretie všetkých 6 známych medzier v otvorenej špecifikácii Symbolon v slovenskej (`spec/`) aj anglickej (`spec/en/`) verzii:
     - **`.symlease` Offline Roaming Lease Schema (§7.4.1, `FLT-22a`)**: Formálne vymedzenie JWS General JSON s hlavičkou `typ: symlease+jws`, PEM návestím `SYMBOLON LEASE`, claimami `borrow` (`days`, `borrowedAt`, `borrowedUntil`, `possessionKeyJwk`) a asymetrickou verifikáciou challenge-response nonce pri predčasnom vrátení.
