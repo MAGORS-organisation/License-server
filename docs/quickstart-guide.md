@@ -1,11 +1,14 @@
 # Symbolon Integration Quickstart Guide
 
-Tento ucelený sprievodca vás krok za krokom prevedie integráciou klientskeho licenčného mechanizmu do vašej aplikácie. Symbolon poskytuje oficiálne odľahčené SDK pre 4 hlavné programovacie jazyky:
+Tento ucelený sprievodca vás krok za krokom prevedie integráciou klientskeho licenčného mechanizmu do vašej aplikácie. Symbolon poskytuje oficiálne odľahčené SDK pre 7 programovacích jazykov a prostredí:
 
-- **C# / .NET 10** (`Symbolon.Client`) — plná asynchrónna podpora, `IAsyncDisposable`, automatický heartbeat.
+- **C# / .NET 10** (`Symbolon.Client`) — plná asynchrónna podpora, `IAsyncDisposable`, automatický heartbeat na pozadí.
 - **Python 3.10+** (`symbolon`) — kontextový manažér `with`, bezobslužný daemon thread pre heartbeat s ±10% jitterom.
+- **Go 1.22+** (`sdk/go/symbolon`) — pure-Go bez CGO, goroutine worker s jitterom ±10%, offline grace zotavenie.
+- **Java 17+** (`sdk/java/symbolon`) — pre Spring Boot / Quarkus / CAD desktop, `AutoCloseable`, scheduled daemon executor.
 - **Rust (2021 Edition)** (`symbolon`) — idiomatický RAII vzor s automatickým uvoľnením cez `Drop` trait.
 - **C99 a C++17** (`symbolon.h`) — čisté ANSI C API bez externých závislostí a moderný C++ RAII wrapper (`ScopedLease`).
+- **WebAssembly / TypeScript** (`sdk/wasm`) — pre Node.js a prehliadače, offline verifikácia JWS a Post-Quantum pripravenosť.
 
 Všetky klientske knižnice sú licencované pod permisívnou licenciou **Apache-2.0**, čo umožňuje ich bezpečné dynamické aj statické linkovanie do uzavretých komerčných produktov.
 
@@ -332,7 +335,142 @@ void run_application() {
 
 ---
 
-## 6. Zásady a Osvedčené Postupy (Best Practices)
+## 6. Integrácia v Go (Golang 1.22+)
+
+Klientske SDK pre Go (`sdk/go/symbolon`) je pure-Go implementácia bez nutnosti CGO.
+
+### Príklad použitia
+
+```go
+package main
+
+import (
+	"context"
+	"fmt"
+	"log"
+	"time"
+
+	"github.com/symbolon/sdk/go/symbolon"
+)
+
+func main() {
+	opts := symbolon.DefaultOptions("http://localhost:8080", "SYM-9ABC-DEF2-3456-7890")
+	opts.Product = "cad-pro"
+	opts.Features = []string{"core", "module.cad-export"}
+
+	client, err := symbolon.NewClient(opts)
+	if err != nil {
+		log.Fatalf("Chyba inicializácie: %v", err)
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	// Získanie sedadla s automatickou goroutine heartbeat slučkou (jitter ±10%)
+	lease, err := client.AcquireSeat(ctx)
+	if err != nil {
+		log.Fatalf("Nepodarilo sa získať sedadlo: %v", err)
+	}
+	defer lease.Release(context.Background())
+
+	fmt.Printf("Sedadlo #%d úspešne pridelené. Token platí do: %s\n", lease.Seat, lease.ExpiresAt)
+
+	// Aplikácia vykonáva prácu
+	time.Sleep(10 * time.Second)
+}
+```
+
+---
+
+## 7. Integrácia v Java 17+ (Enterprise / Spring Boot)
+
+Java SDK (`sdk/java/symbolon`) poskytuje bezpečné enterprise riešenie pre Spring Boot, Quarkus, Micronaut aj desktopové Java CAD/CAM nástroje s nulovými vonkajšími tranzivnými závislosťami.
+
+### Inštalácia cez Maven (`pom.xml`)
+
+```xml
+<dependency>
+    <groupId>dev.symbolon</groupId>
+    <artifactId>symbolon-client</artifactId>
+    <version>1.0.0</version>
+</dependency>
+```
+
+### Príklad použitia s `AutoCloseable` (Try-With-Resources)
+
+```java
+package com.example.app;
+
+import dev.symbolon.ClientOptions;
+import dev.symbolon.SymbolonClient;
+import dev.symbolon.models.CheckoutResponse;
+
+import java.util.List;
+
+public class Application {
+    public static void main(String[] args) {
+        ClientOptions options = ClientOptions.builder()
+                .serverUrl("http://localhost:8080")
+                .licenseKey("SYM-9ABC-DEF2-3456-7890")
+                .product("cad-pro")
+                .features(List.of("core", "module.cad-export"))
+                .heartbeatIntervalSeconds(120)
+                .build();
+
+        try (SymbolonClient client = new SymbolonClient(options)) {
+            CheckoutResponse lease = client.acquireSeat();
+            System.out.printf("Sedadlo #%d úspešne pridelené (Lease ID: %s)%n", 
+                lease.getSeat(), lease.getLeaseId());
+
+            // A/B testovací variant deterministicky vyhodnotený pre túto inštanciu
+            String variant = client.getAssignedVariant("exp_new_render_pipeline");
+            System.out.println("Aktívny experimentálny variant: " + variant);
+
+            // Výkonný kód aplikácie...
+            Thread.sleep(5000);
+            
+            // Pri opustení try bloku client.close() automaticky uvoľní sedadlo (graceful release)!
+        } catch (Exception e) {
+            System.err.println("Licenčná chyba: " + e.getMessage());
+        }
+    }
+}
+```
+
+---
+
+## 8. Integrácia vo WebAssembly / TypeScript (Node.js & Web)
+
+SDK pre WebAssembly a TypeScript (`sdk/wasm`) umožňuje offline verifikáciu licencií `symlic/1` a lízingových tokenov priamo v moderných webových prehliadačoch alebo v Node.js/Electron desktop aplikáciách.
+
+### Príklad v TypeScript / JavaScript
+
+```typescript
+import { SymbolonValidator } from './symbolon-validator.mjs';
+
+async function verifyLicense() {
+    const validator = new SymbolonValidator({
+        trustedIssuer: 'https://licenses.acme.example',
+        expectedAudience: 'cad-web-app'
+    });
+
+    const licensePem = `-----BEGIN SYMBOLON LICENSE-----
+eyJwYXlsb2FkIjoiZXlKcGMzTWlPaUpvZEhSd2N6b3Z...
+-----END SYMBOLON LICENSE-----`;
+
+    const result = await validator.verify(licensePem);
+    if (result.isValid) {
+        console.log(`Licencia overená! Max sedadiel: ${result.claims.symlic.limits.maxSeats}`);
+        console.log(`Povolene moduly:`, result.claims.symlic.entitlements.map(e => e.code));
+    } else {
+        console.error(`Neplatná licencia: ${result.error}`);
+    }
+}
+```
+
+---
+
+## 9. Zásady a Osvedčené Postupy (Best Practices)
 
 1. **Adaptívny Jitter (±10%)**:
    - Všetky oficiálne Symbolon SDK automaticky aplikujú náhodný rozptyl času obnovovania. Nikdy nevypínajte jitter pri tisíckach súbežných inštalácií, inak riskujete zahltenie servera (efekt „thundering herd“).
@@ -342,3 +480,5 @@ void run_application() {
    - Pred odoslaním požiadavky na sieť Symbolon SDK lokálne verifikuje CRC-32C kontrolný súčet Crockford Base32 kľúča. Tým sa okamžite odhalia preklepy (napr. zámena `0` za `O` alebo `1` za `I`) bez zbytočného zaťažovania sieťového spojenia.
 4. **On-Premise Relay Fallback**:
    - V podnikových sieťach konfigurujte `RelayUrl`. Ak je centrálny cloud nedostupný, SDK sa automaticky obráti na lokálny relay server v LAN sieti.
+5. **Post-Quantum Cryptography Gating**:
+   - Pri overovaní certifikátov a dlhodobých licencií využívajte hybridný profil `hybrid-v1` (ES256 + ML-DSA-65). Pri prechode na CNSA 2.0 / NIS 2 aktivujte profil `pqc-strict`.

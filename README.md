@@ -2,7 +2,7 @@
 
 [![Platform](https://img.shields.io/badge/.NET-10.0%20LTS-512BD4?logo=dotnet)](https://dotnet.microsoft.com/)
 [![Language](https://img.shields.io/badge/C%23-14.0-239120?logo=csharp)](https://learn.microsoft.com/dotnet/csharp/)
-[![Tests](https://img.shields.io/badge/tests-511%20passed%20(+44%20Python%2C%20+12%20Wasm)-brightgreen)](#výsledky-testovania)
+[![Tests](https://img.shields.io/badge/tests-542%20passed%20(+44%20Python%2C%20+12%20Wasm%2C%20+10%20Java%2C%20+8%20Go%2C%20+5%20Rust)-brightgreen)](#výsledky-testovania)
 [![License: AGPL-3.0](https://img.shields.io/badge/license-AGPL--3.0-blue.svg)](LICENSE)
 [![License: Apache-2.0](https://img.shields.io/badge/client%20SDK-Apache--2.0-blue.svg)](LICENSES/Apache-2.0.txt)
 [![CRA Compliant](https://img.shields.io/badge/CRA%20Compliance-EU%202024%2F2847-success)](SECURITY.md)
@@ -52,8 +52,8 @@ Rieši to, čo dnešné cloud-first platformy ponúkajú iba ako obmedzený dopl
     - Kryptografický protokol výmeny `.symreq` → `.symgrant` cez USB alebo Web UI s **disjunktnou alokáciou sedadiel** (`[SeatFrom..SeatTo]`), garanciou nulového prekrývania kapacít a auditným Merkle hash uzlom `usageDigest`.
     - Interaktívna mapa alokácie sedadiel vo Web Dashboarde, správa aktívnych poverení a CLI príkazy `symbolon grant request/issue/inspect/import`.
     - Offline node-lock aktivácie viazané na hardvérový fingerprint stanice.
-11. **Viacjazyčné Klientske SDK (C#, Python, Rust, C/C++)**
-    - Oficiálne klientske knižnice pod licenciou **Apache-2.0** v priečinku `sdk/` s automatickým vláknom pre heartbeat, adaptívnym jitterom ±10% a RAII / kontextovým manažérom.
+11. **Viacjazyčné Klientske SDK (C#, Python, Go, Java, Rust, C/C++, WebAssembly/TS)**
+    - Oficiálne klientske knižnice pod licenciou **Apache-2.0** v priečinku `sdk/` s automatickým vláknom/workerom pre heartbeat, adaptívnym jitterom ±10%, offline grace periódou a deterministickým A/B routingom.
     - **Hardware Enclave Attestation**: TPM 2.0 PCR quote generovanie a kryptografická verifikácia v C#, Pythone aj Ruste pre bezpečné air-gapped klientske prostredia.
 12. **Hardware Enclave Attestation (R6)**
     - Podpora overovania kryptografických citácií TPM 2.0 PCR a Confidential Computing Enclaves (Intel SGX, AMD SEV-SNP) chránená challenge-response mechanizmom proti replay útokom.
@@ -527,23 +527,25 @@ dotnet run --project src/Symbolon.Cli -- doctor --file license.symlic --key ./my
 Všetkých 10 testovacích projektov má 100% úspešnosť testov bez zlyhania:
 
 ```text
-Passed!  - Failed: 0, Passed:  49, Skipped: 0, Total:  49 - Symbolon.Crypto.Tests.dll
-Passed!  - Failed: 0, Passed:  60, Skipped: 0, Total:  60 - Symbolon.Format.Tests.dll
+Passed!  - Failed: 0, Passed:  57, Skipped: 0, Total:  57 - Symbolon.Crypto.Tests.dll
+Passed!  - Failed: 0, Passed:  61, Skipped: 0, Total:  61 - Symbolon.Format.Tests.dll
 Passed!  - Failed: 0, Passed:  24, Skipped: 0, Total:  24 - Symbolon.Protocol.Tests.dll
 Passed!  - Failed: 0, Passed: 127, Skipped: 0, Total: 127 - Symbolon.Domain.Tests.dll
 Passed!  - Failed: 0, Passed:  13, Skipped: 0, Total:  13 - Symbolon.Relay.Tests.dll
 Passed!  - Failed: 0, Passed:  31, Skipped: 0, Total:  31 - Symbolon.Client.Tests.dll
-Passed!  - Failed: 0, Passed:  54, Skipped: 0, Total:  54 - Symbolon.Cli.Tests.dll
+Passed!  - Failed: 0, Passed:  66, Skipped: 0, Total:  66 - Symbolon.Cli.Tests.dll
 Passed!  - Failed: 0, Passed:  24, Skipped: 0, Total:  24 - Symbolon.Data.Tests.dll
 Passed!  - Failed: 0, Passed:   8, Skipped: 0, Total:   8 - Symbolon.Operator.Tests.dll
-Passed!  - Failed: 0, Passed: 121, Skipped: 0, Total: 121 - Symbolon.ControlPlane.Tests.dll
+Passed!  - Failed: 0, Passed: 131, Skipped: 0, Total: 131 - Symbolon.ControlPlane.Tests.dll
 
 Viacjazyčné SDK & WebAssembly testovacie sady:
 Passed!  - Failed: 0, Passed:  44, Skipped: 0, Total:  44 - Python SDK (unittest)
 Passed!  - Failed: 0, Passed:  12, Skipped: 0, Total:  12 - WebAssembly / WebCrypto SDK (node:test)
+Passed!  - Failed: 0, Passed:  10, Skipped: 0, Total:  10 - Java SDK (JUnit 5)
+Passed!  - Failed: 0, Passed:   8, Skipped: 0, Total:   8 - Go SDK (testing)
 Passed!  - Failed: 0, Passed:   5, Skipped: 0, Total:   5 - Rust SDK (cargo test suite)
 
-Celkovo: 572 úspešných automatizovaných testov (511 .NET + 44 Python + 12 Node/Wasm + 5 Rust), 0 zlyhaní, 0 chýb.
+Celkovo: 621 úspešných automatizovaných testov (542 .NET + 44 Python + 12 Node/Wasm + 10 Java + 8 Go + 5 Rust), 0 zlyhaní, 0 chýb.
 ```
 
 ---
