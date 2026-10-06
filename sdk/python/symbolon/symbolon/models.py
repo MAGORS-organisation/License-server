@@ -33,3 +33,60 @@ class FeatureDenied(SymbolonException):
     """Raised when feature entitlement or concurrency limit is denied."""
     pass
 
+
+class TokenReservationDenied(SymbolonException):
+    """Raised when token wallet balance is insufficient or wallet is inactive."""
+    pass
+
+
+@dataclass(frozen=True)
+class ReserveTokensResponse:
+    success: bool
+    reservation_id: Optional[str]
+    reserved_amount: float
+    available_balance: float
+    overdraft_remaining: float = 0.0
+    failure_reason: Optional[str] = None
+
+
+@dataclass(frozen=True)
+class HeartbeatTokensResponse:
+    success: bool
+    total_consumed: float
+    remaining_reserved: float
+    available_balance: float
+    failure_reason: Optional[str] = None
+
+
+@dataclass(frozen=True)
+class CommitTokensResponse:
+    success: bool
+    consumed_credits: float
+    refunded_credits: float
+    new_balance: float
+    failure_reason: Optional[str] = None
+
+
+@dataclass(frozen=True)
+class RollbackTokensResponse:
+    success: bool
+    restored_credits: float
+    new_balance: float
+    failure_reason: Optional[str] = None
+
+
+@dataclass(frozen=True)
+class TokenWalletBalance:
+    wallet_id: str
+    wallet_code: str
+    wallet_name: str
+    total_credits: float
+    balance: float
+    reserved_credits: float
+    available_balance: float
+    overdraft_limit: float
+    state: str
+    is_low_balance: bool
+    expires_at: Optional[str] = None
+
+

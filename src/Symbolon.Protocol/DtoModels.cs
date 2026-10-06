@@ -638,4 +638,189 @@ public sealed record BillingWebhookResponseDto(
     [property: JsonPropertyName("customerId")] string? CustomerId = null,
     [property: JsonPropertyName("subscriptionId")] string? SubscriptionId = null);
 
+public sealed record ReserveTokensRequestDto
+{
+    [JsonPropertyName("walletId")]
+    public required string WalletId { get; init; }
+
+    [JsonPropertyName("featureCode")]
+    public required string FeatureCode { get; init; }
+
+    [JsonPropertyName("estimatedUnits")]
+    public required decimal EstimatedUnits { get; init; }
+
+    [JsonPropertyName("isDurationMinutes")]
+    public bool IsDurationMinutes { get; init; }
+
+    [JsonPropertyName("machineId")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? MachineId { get; init; }
+
+    [JsonPropertyName("clientRef")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? ClientRef { get; init; }
+
+    [JsonPropertyName("idempotencyKey")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? IdempotencyKey { get; init; }
+
+    [JsonPropertyName("reservationTtl")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public TimeSpan? ReservationTtl { get; init; }
+}
+
+public sealed record ReserveTokensResponseDto
+{
+    [JsonPropertyName("success")]
+    public required bool Success { get; init; }
+
+    [JsonPropertyName("reservationId")]
+    public string? ReservationId { get; init; }
+
+    [JsonPropertyName("reservedAmount")]
+    public decimal ReservedAmount { get; init; }
+
+    [JsonPropertyName("availableBalance")]
+    public decimal AvailableBalance { get; init; }
+
+    [JsonPropertyName("overdraftRemaining")]
+    public decimal OverdraftRemaining { get; init; }
+
+    [JsonPropertyName("failureReason")]
+    public string? FailureReason { get; init; }
+}
+
+public sealed record HeartbeatTokensRequestDto
+{
+    [JsonPropertyName("reservationId")]
+    public required string ReservationId { get; init; }
+
+    [JsonPropertyName("deltaUnits")]
+    public required decimal DeltaUnits { get; init; }
+
+    [JsonPropertyName("isDurationMinutes")]
+    public bool IsDurationMinutes { get; init; }
+
+    [JsonPropertyName("idempotencyKey")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? IdempotencyKey { get; init; }
+}
+
+public sealed record HeartbeatTokensResponseDto
+{
+    [JsonPropertyName("success")]
+    public required bool Success { get; init; }
+
+    [JsonPropertyName("totalConsumed")]
+    public decimal TotalConsumed { get; init; }
+
+    [JsonPropertyName("remainingReserved")]
+    public decimal RemainingReserved { get; init; }
+
+    [JsonPropertyName("availableBalance")]
+    public decimal AvailableBalance { get; init; }
+
+    [JsonPropertyName("failureReason")]
+    public string? FailureReason { get; init; }
+}
+
+public sealed record CommitTokensRequestDto
+{
+    [JsonPropertyName("reservationId")]
+    public required string ReservationId { get; init; }
+
+    [JsonPropertyName("actualUnits")]
+    public required decimal ActualUnits { get; init; }
+
+    [JsonPropertyName("isDurationMinutes")]
+    public bool IsDurationMinutes { get; init; }
+
+    [JsonPropertyName("idempotencyKey")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? IdempotencyKey { get; init; }
+}
+
+public sealed record CommitTokensResponseDto
+{
+    [JsonPropertyName("success")]
+    public required bool Success { get; init; }
+
+    [JsonPropertyName("consumedCredits")]
+    public decimal ConsumedCredits { get; init; }
+
+    [JsonPropertyName("refundedCredits")]
+    public decimal RefundedCredits { get; init; }
+
+    [JsonPropertyName("newBalance")]
+    public decimal NewBalance { get; init; }
+
+    [JsonPropertyName("failureReason")]
+    public string? FailureReason { get; init; }
+}
+
+public sealed record RollbackTokensRequestDto
+{
+    [JsonPropertyName("reservationId")]
+    public required string ReservationId { get; init; }
+
+    [JsonPropertyName("reason")]
+    public string Reason { get; init; } = "Operation aborted";
+
+    [JsonPropertyName("idempotencyKey")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? IdempotencyKey { get; init; }
+}
+
+public sealed record RollbackTokensResponseDto
+{
+    [JsonPropertyName("success")]
+    public required bool Success { get; init; }
+
+    [JsonPropertyName("restoredCredits")]
+    public decimal RestoredCredits { get; init; }
+
+    [JsonPropertyName("newBalance")]
+    public decimal NewBalance { get; init; }
+
+    [JsonPropertyName("failureReason")]
+    public string? FailureReason { get; init; }
+}
+
+public sealed record TokenWalletBalanceResponseDto
+{
+    [JsonPropertyName("walletId")]
+    public required string WalletId { get; init; }
+
+    [JsonPropertyName("walletCode")]
+    public required string WalletCode { get; init; }
+
+    [JsonPropertyName("walletName")]
+    public required string WalletName { get; init; }
+
+    [JsonPropertyName("totalCredits")]
+    public required decimal TotalCredits { get; init; }
+
+    [JsonPropertyName("balance")]
+    public required decimal Balance { get; init; }
+
+    [JsonPropertyName("reservedCredits")]
+    public required decimal ReservedCredits { get; init; }
+
+    [JsonPropertyName("availableBalance")]
+    public required decimal AvailableBalance { get; init; }
+
+    [JsonPropertyName("overdraftLimit")]
+    public required decimal OverdraftLimit { get; init; }
+
+    [JsonPropertyName("state")]
+    public required string State { get; init; }
+
+    [JsonPropertyName("expiresAt")]
+    public DateTimeOffset? ExpiresAt { get; init; }
+
+    [JsonPropertyName("isLowBalance")]
+    public required bool IsLowBalance { get; init; }
+}
+
+
 

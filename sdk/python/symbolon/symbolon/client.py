@@ -12,7 +12,18 @@ from contextlib import contextmanager
 from datetime import datetime, timezone
 from typing import Dict, List, Optional, Union
 
-from .models import LeaseToken, SymbolonException, SeatAllocationDenied, FeatureDenied
+from .models import (
+    LeaseToken,
+    SymbolonException,
+    SeatAllocationDenied,
+    FeatureDenied,
+    TokenReservationDenied,
+    ReserveTokensResponse,
+    HeartbeatTokensResponse,
+    CommitTokensResponse,
+    RollbackTokensResponse,
+    TokenWalletBalance,
+)
 from .fingerprint import (
     get_hardware_components,
     compute_canonical_fingerprint,
@@ -194,6 +205,79 @@ def sign_possession_challenge(nonce: str, private_key_jwk: Union[str, dict]) -> 
         raise RuntimeError("The 'cryptography' library is required to sign return challenges.")
 
 
+class TokenReservationScope:
+    """RAII context manager for metered token reservations.
+
+    If exited without an explicit commit(), automatically executes a rollback
+    to prevent credit leakage.
+    """
+
+    def __init__(
+        self,
+        client: "SymbolonClient",
+        wallet_id: str,
+        reservation_id: str,
+        feature_code: str,
+        reserved_amount: float,
+        available_balance: float,
+    ):
+        self._client = client
+        self.wallet_id = wallet_id
+        self.reservation_id = reservation_id
+        self.feature_code = feature_code
+        self.reserved_amount = reserved_amount
+        self.available_balance = available_balance
+        self._is_completed = False
+
+    @property
+    def is_completed(self) -> bool:
+        return self._is_completed
+
+    def heartbeat(self, delta_units: float, is_duration_minutes: bool = False) -> HeartbeatTokensResponse:
+        """Extends or incrementally reports consumed units during a long-running metered task."""
+        if self._is_completed:
+            raise SymbolonException(f"Token reservation '{self.reservation_id}' has already been completed.")
+        resp = self._client.heartbeat_tokens(self.reservation_id, delta_units, is_duration_minutes)
+        if resp.success:
+            self.available_balance = resp.available_balance
+        return resp
+
+    def commit(self, actual_units: float, is_duration_minutes: bool = False) -> CommitTokensResponse:
+        """Commits the actual consumed units and releases remaining credits."""
+        if self._is_completed:
+            raise SymbolonException(f"Token reservation '{self.reservation_id}' has already been completed.")
+        resp = self._client.commit_tokens(self.reservation_id, actual_units, is_duration_minutes)
+        if resp.success:
+            self._is_completed = True
+            self.available_balance = resp.new_balance
+        return resp
+
+    def rollback(self, reason: str = "Operation aborted") -> RollbackTokensResponse:
+        """Rolls back the reservation and restores all reserved credits."""
+        if self._is_completed:
+            return RollbackTokensResponse(
+                success=True,
+                restored_credits=0.0,
+                new_balance=self.available_balance,
+            )
+        resp = self._client.rollback_tokens(self.reservation_id, reason)
+        self._is_completed = True
+        if resp.success:
+            self.available_balance = resp.new_balance
+        return resp
+
+    def __enter__(self) -> "TokenReservationScope":
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb) -> None:
+        if not self._is_completed:
+            try:
+                self.rollback(reason="Scope exited without explicit commit")
+            except Exception:
+                # Suppress rollback errors during context exit to preserve exception stack
+                pass
+
+
 class SymbolonClient:
     """Official Symbolon Client SDK for Python applications."""
 
@@ -206,6 +290,7 @@ class SymbolonClient:
         jitter_factor: float = 0.10,
         timeout: float = 10.0,
         server_urls: Optional[List[str]] = None,
+        machine_id: Optional[str] = None,
     ):
         servers = list(server_urls) if server_urls else []
         if server_url:
@@ -224,6 +309,7 @@ class SymbolonClient:
         self.heartbeat_interval = heartbeat_interval
         self.jitter_factor = jitter_factor
         self.timeout = timeout
+        self.machine_id = machine_id or socket.gethostname()
 
         self._active_leases: Dict[str, threading.Event] = {}
 
@@ -574,6 +660,151 @@ class SymbolonClient:
                 return json.loads(res.read().decode("utf-8"))
         except Exception:
             return []
+
+    def reserve_tokens(
+        self,
+        wallet_id: str,
+        feature_code: str,
+        estimated_units: float,
+        is_duration_minutes: bool = False,
+        reservation_ttl_seconds: Optional[int] = None,
+        client_ref: Optional[str] = None,
+    ) -> ReserveTokensResponse:
+        """Reserves tokens from a customer wallet before starting a metered operation."""
+        data = {
+            "walletId": wallet_id,
+            "featureCode": feature_code,
+            "estimatedUnits": float(estimated_units),
+            "isDurationMinutes": is_duration_minutes,
+        }
+        if reservation_ttl_seconds is not None:
+            hours = int(reservation_ttl_seconds // 3600)
+            mins = int((reservation_ttl_seconds % 3600) // 60)
+            secs = int(reservation_ttl_seconds % 60)
+            data["reservationTtl"] = f"{hours:02d}:{mins:02d}:{secs:02d}"
+        if client_ref:
+            data["clientRef"] = client_ref
+        if hasattr(self, "machine_id") and self.machine_id:
+            data["machineId"] = self.machine_id
+
+        res = self._post_json(f"{self.server_url}/v1/tokens/reserve", data)
+        return ReserveTokensResponse(
+            success=bool(res.get("success", False)),
+            reservation_id=res.get("reservationId"),
+            reserved_amount=float(res.get("reservedAmount", 0.0)),
+            available_balance=float(res.get("availableBalance", 0.0)),
+            overdraft_remaining=float(res.get("overdraftRemaining", 0.0)),
+            failure_reason=res.get("failureReason"),
+        )
+
+    def heartbeat_tokens(
+        self,
+        reservation_id: str,
+        delta_units: float,
+        is_duration_minutes: bool = False,
+    ) -> HeartbeatTokensResponse:
+        """Sends a heartbeat to incrementally report consumption and keep reservation active."""
+        data = {
+            "reservationId": reservation_id,
+            "deltaUnits": float(delta_units),
+            "isDurationMinutes": is_duration_minutes,
+        }
+        res = self._post_json(f"{self.server_url}/v1/tokens/heartbeat", data)
+        return HeartbeatTokensResponse(
+            success=bool(res.get("success", False)),
+            total_consumed=float(res.get("totalConsumed", 0.0)),
+            remaining_reserved=float(res.get("remainingReserved", 0.0)),
+            available_balance=float(res.get("availableBalance", 0.0)),
+            failure_reason=res.get("failureReason"),
+        )
+
+    def commit_tokens(
+        self,
+        reservation_id: str,
+        actual_units: float,
+        is_duration_minutes: bool = False,
+    ) -> CommitTokensResponse:
+        """Commits actual consumption for a reservation and settles the wallet balance."""
+        data = {
+            "reservationId": reservation_id,
+            "actualUnits": float(actual_units),
+            "isDurationMinutes": is_duration_minutes,
+        }
+        res = self._post_json(f"{self.server_url}/v1/tokens/commit", data)
+        return CommitTokensResponse(
+            success=bool(res.get("success", False)),
+            consumed_credits=float(res.get("consumedCredits", 0.0)),
+            refunded_credits=float(res.get("refundedCredits", 0.0)),
+            new_balance=float(res.get("newBalance", 0.0)),
+            failure_reason=res.get("failureReason"),
+        )
+
+    def rollback_tokens(
+        self,
+        reservation_id: str,
+        reason: str = "Operation aborted",
+    ) -> RollbackTokensResponse:
+        """Rolls back an open token reservation, refunding all reserved credits."""
+        data = {
+            "reservationId": reservation_id,
+            "reason": reason,
+        }
+        res = self._post_json(f"{self.server_url}/v1/tokens/rollback", data)
+        return RollbackTokensResponse(
+            success=bool(res.get("success", False)),
+            restored_credits=float(res.get("restoredCredits", 0.0)),
+            new_balance=float(res.get("newBalance", 0.0)),
+            failure_reason=res.get("failureReason"),
+        )
+
+    def get_token_wallet_balance(self, wallet_id: str) -> TokenWalletBalance:
+        """Retrieves the real-time balance and status of a token wallet."""
+        quoted_id = urllib.parse.quote(wallet_id)
+        res = self._get_json(f"{self.server_url}/v1/tokens/wallets/{quoted_id}/balance")
+        return TokenWalletBalance(
+            wallet_id=res["walletId"],
+            wallet_code=res.get("walletCode", ""),
+            wallet_name=res.get("walletName", ""),
+            total_credits=float(res.get("totalCredits", 0.0)),
+            balance=float(res.get("balance", 0.0)),
+            reserved_credits=float(res.get("reservedCredits", 0.0)),
+            available_balance=float(res.get("availableBalance", 0.0)),
+            overdraft_limit=float(res.get("overdraftLimit", 0.0)),
+            state=res.get("state", "Active"),
+            is_low_balance=bool(res.get("isLowBalance", False)),
+            expires_at=res.get("expiresAt"),
+        )
+
+    def metered_scope(
+        self,
+        wallet_id: str,
+        feature_code: str,
+        estimated_units: float,
+        is_duration_minutes: bool = False,
+        reservation_ttl_seconds: Optional[int] = None,
+        client_ref: Optional[str] = None,
+    ) -> TokenReservationScope:
+        """Begins an auto-rollback metered reservation scope."""
+        resp = self.reserve_tokens(
+            wallet_id=wallet_id,
+            feature_code=feature_code,
+            estimated_units=estimated_units,
+            is_duration_minutes=is_duration_minutes,
+            reservation_ttl_seconds=reservation_ttl_seconds,
+            client_ref=client_ref,
+        )
+        if not resp.success or not resp.reservation_id:
+            reason = resp.failure_reason or "Insufficient credits or wallet inactive"
+            raise TokenReservationDenied(f"Token reservation failed for wallet '{wallet_id}': {reason}")
+
+        return TokenReservationScope(
+            client=self,
+            wallet_id=wallet_id,
+            reservation_id=resp.reservation_id,
+            feature_code=feature_code,
+            reserved_amount=resp.reserved_amount,
+            available_balance=resp.available_balance,
+        )
 
 
 def resolve_license_servers(input_str: Optional[str] = None, fallback_to_env: bool = True) -> List[str]:

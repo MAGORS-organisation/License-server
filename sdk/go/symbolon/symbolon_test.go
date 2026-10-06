@@ -205,3 +205,129 @@ func TestClientMockCheckoutAndRelease(t *testing.T) {
 		t.Fatalf("released lease should no longer be valid")
 	}
 }
+
+func TestClientMockTokensReserveAndCommit(t *testing.T) {
+	commitCalled := false
+	rollbackCalled := false
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/v1/tokens/reserve" && r.Method == http.MethodPost {
+			w.WriteHeader(http.StatusOK)
+			json.NewEncoder(w).Encode(ReserveTokensResponse{
+				Success:          true,
+				ReservationId:    "res_go_123",
+				ReservedAmount:   100.0,
+				AvailableBalance: 900.0,
+			})
+			return
+		}
+		if r.URL.Path == "/v1/tokens/commit" && r.Method == http.MethodPost {
+			commitCalled = true
+			w.WriteHeader(http.StatusOK)
+			json.NewEncoder(w).Encode(CommitTokensResponse{
+				Success:         true,
+				ConsumedCredits: 75.0,
+				RefundedCredits: 25.0,
+				NewBalance:      925.0,
+			})
+			return
+		}
+		if r.URL.Path == "/v1/tokens/rollback" && r.Method == http.MethodPost {
+			rollbackCalled = true
+			w.WriteHeader(http.StatusOK)
+			json.NewEncoder(w).Encode(RollbackTokensResponse{
+				Success:         true,
+				RestoredCredits: 100.0,
+				NewBalance:      1000.0,
+			})
+			return
+		}
+		w.WriteHeader(http.StatusNotFound)
+	}))
+	defer server.Close()
+
+	opts := DefaultClientOptions(server.URL, "cad-pro")
+	client := NewClient(opts)
+
+	ctx := context.Background()
+	scope, err := client.BeginMeteredScope(ctx, ReserveTokensRequest{
+		WalletId:       "wlt_1",
+		FeatureCode:    "render",
+		EstimatedUnits: 100.0,
+	})
+	if err != nil {
+		t.Fatalf("failed to begin metered scope: %v", err)
+	}
+
+	commitResp, err := scope.Commit(ctx, 75.0, false)
+	if err != nil {
+		t.Fatalf("commit failed: %v", err)
+	}
+	if !commitResp.Success || scope.AvailableBalance != 925.0 {
+		t.Fatalf("unexpected commit state: %+v", commitResp)
+	}
+
+	// Close after commit must NOT trigger rollback
+	if err := scope.Close(); err != nil {
+		t.Fatalf("scope close failed: %v", err)
+	}
+
+	if !commitCalled {
+		t.Fatalf("expected commit to be called")
+	}
+	if rollbackCalled {
+		t.Fatalf("did not expect rollback when committed explicitly")
+	}
+}
+
+func TestClientMockTokensAutoRollbackOnClose(t *testing.T) {
+	rollbackCalled := false
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/v1/tokens/reserve" && r.Method == http.MethodPost {
+			w.WriteHeader(http.StatusOK)
+			json.NewEncoder(w).Encode(ReserveTokensResponse{
+				Success:          true,
+				ReservationId:    "res_auto_rb",
+				ReservedAmount:   50.0,
+				AvailableBalance: 950.0,
+			})
+			return
+		}
+		if r.URL.Path == "/v1/tokens/rollback" && r.Method == http.MethodPost {
+			rollbackCalled = true
+			w.WriteHeader(http.StatusOK)
+			json.NewEncoder(w).Encode(RollbackTokensResponse{
+				Success:         true,
+				RestoredCredits: 50.0,
+				NewBalance:      1000.0,
+			})
+			return
+		}
+		w.WriteHeader(http.StatusNotFound)
+	}))
+	defer server.Close()
+
+	opts := DefaultClientOptions(server.URL, "cad-pro")
+	client := NewClient(opts)
+
+	ctx := context.Background()
+	scope, err := client.BeginMeteredScope(ctx, ReserveTokensRequest{
+		WalletId:       "wlt_1",
+		FeatureCode:    "ai",
+		EstimatedUnits: 50.0,
+	})
+	if err != nil {
+		t.Fatalf("failed to begin scope: %v", err)
+	}
+
+	// Closing without commit should trigger automatic rollback
+	if err := scope.Close(); err != nil {
+		t.Fatalf("scope close failed: %v", err)
+	}
+
+	if !rollbackCalled {
+		t.Fatalf("expected auto-rollback on close without commit")
+	}
+}
+

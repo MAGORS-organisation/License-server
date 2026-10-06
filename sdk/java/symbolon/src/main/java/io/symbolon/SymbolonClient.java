@@ -323,6 +323,93 @@ public class SymbolonClient implements AutoCloseable {
         }
     }
 
+    private <T> T sendGet(String url, Class<T> responseClass) {
+        try {
+            HttpRequest request = HttpRequest.newBuilder()
+                    .uri(URI.create(url))
+                    .timeout(options.timeout())
+                    .header("Accept", "application/json")
+                    .header("User-Agent", "Symbolon-Java-SDK/" + options.clientVersion())
+                    .GET()
+                    .build();
+
+            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
+            handleErrorResponse(response);
+
+            return objectMapper.readValue(response.body(), responseClass);
+        } catch (IOException | InterruptedException e) {
+            if (e instanceof InterruptedException) {
+                Thread.currentThread().interrupt();
+            }
+            throw new NetworkException("HTTP request failed to " + url, e);
+        }
+    }
+
+    /**
+     * Reserves pay-as-you-go credits from a customer wallet.
+     */
+    public ReserveTokensResponse reserveTokens(ReserveTokensRequest request) {
+        Objects.requireNonNull(request, "request cannot be null");
+        String uri = normalizeServerUrl(options.serverUrl()) + "/v1/tokens/reserve";
+        return sendPost(uri, request, ReserveTokensResponse.class);
+    }
+
+    /**
+     * Sends an incremental heartbeat for an active token reservation.
+     */
+    public HeartbeatTokensResponse heartbeatTokens(HeartbeatTokensRequest request) {
+        Objects.requireNonNull(request, "request cannot be null");
+        String uri = normalizeServerUrl(options.serverUrl()) + "/v1/tokens/heartbeat";
+        return sendPost(uri, request, HeartbeatTokensResponse.class);
+    }
+
+    /**
+     * Settles consumed credits and refunds unused reserved credits.
+     */
+    public CommitTokensResponse commitTokens(CommitTokensRequest request) {
+        Objects.requireNonNull(request, "request cannot be null");
+        String uri = normalizeServerUrl(options.serverUrl()) + "/v1/tokens/commit";
+        return sendPost(uri, request, CommitTokensResponse.class);
+    }
+
+    /**
+     * Rolls back an uncommitted reservation back to the wallet.
+     */
+    public RollbackTokensResponse rollbackTokens(RollbackTokensRequest request) {
+        Objects.requireNonNull(request, "request cannot be null");
+        String uri = normalizeServerUrl(options.serverUrl()) + "/v1/tokens/rollback";
+        return sendPost(uri, request, RollbackTokensResponse.class);
+    }
+
+    /**
+     * Fetches real-time balance and overdraft status of a wallet.
+     */
+    public TokenWalletBalance getTokenWalletBalance(String walletId) {
+        Objects.requireNonNull(walletId, "walletId cannot be null");
+        String encoded = java.net.URLEncoder.encode(walletId, StandardCharsets.UTF_8);
+        String uri = normalizeServerUrl(options.serverUrl()) + "/v1/tokens/wallets/" + encoded + "/balance";
+        return sendGet(uri, TokenWalletBalance.class);
+    }
+
+    /**
+     * Begins an auto-rollback metered reservation scope.
+     */
+    public TokenReservationScope beginMeteredScope(ReserveTokensRequest request) {
+        var resp = reserveTokens(request);
+        if (resp == null || !Boolean.TRUE.equals(resp.success()) || resp.reservationId() == null) {
+            String reason = resp != null && resp.failureReason() != null ? resp.failureReason() : "Insufficient credits or wallet inactive";
+            throw new CapacityExhaustedException("Token reservation failed: " + reason, reason);
+        }
+        return new TokenReservationScope(
+                this,
+                request.walletId(),
+                resp.reservationId(),
+                request.featureCode(),
+                resp.reservedAmount() != null ? resp.reservedAmount() : 0.0,
+                resp.availableBalance() != null ? resp.availableBalance() : 0.0
+        );
+    }
+
     private void handleErrorResponse(HttpResponse<String> response) {
         int status = response.statusCode();
         if (status >= 200 && status < 300) {

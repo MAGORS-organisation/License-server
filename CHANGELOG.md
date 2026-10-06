@@ -10,6 +10,18 @@ a projekt striktne dodržiava [Sémantické Verziovanie (Semantic Versioning 2.0
 ## [Unreleased]
 
 ### Pridané (Added)
+- **Phase 12: Klientske SDK pre Token & Metered Pay-As-You-Go Licencovanie (§4.4, §7.8)**:
+  - **Protokol a DTO vrstva (`Symbolon.Protocol`)**:
+    - Nové DTO modely pre kreditné a metered operácie: `ReserveTokensRequestDto`, `ReserveTokensResponseDto`, `HeartbeatTokensRequestDto`, `HeartbeatTokensResponseDto`, `CommitTokensRequestDto`, `CommitTokensResponseDto`, `RollbackTokensRequestDto`, `RollbackTokensResponseDto`, `TokenWalletBalanceResponseDto`.
+    - Zdrojovo generovaná serializácia v `SymbolonProtocolJsonContext` garantujúca AOT kompatibilitu.
+  - **.NET Client SDK (`Symbolon.Client`)**:
+    - Nové metódy na `SymbolonClient`: `ReserveTokensAsync`, `HeartbeatTokensAsync`, `CommitTokensAsync`, `RollbackTokensAsync`, `GetTokenWalletBalanceAsync` a `BeginMeteredScopeAsync`.
+    - Implementácia bezpečného `TokenReservationScope` s podporou `IAsyncDisposable` a `IDisposable`. Ak metered operácia nie je explicitne potvrdená (`CommitAsync`), uvoľnenie scope automaticky odošle rollback požiadavku na server na zabránenie úniku zákazníckych kreditov.
+    - Nový testovací suite `TokenClientTests.cs` (8 testov, 100% zelené).
+  - **Viacjazyčná SDK Parita**:
+    - **Python SDK (`sdk/python/symbolon`)**: Pridané `reserve_tokens`, `heartbeat_tokens`, `commit_tokens`, `rollback_tokens`, `get_token_wallet_balance`, a kontextový manažér `with client.metered_scope(...) as scope:` s automatickým rollbackom. 9 nových unit testov v `test_tokens.py` (53 úspešných testov).
+    - **Go SDK (`sdk/go/symbolon`)**: Pridané dátové štruktúry a metódy `ReserveTokens`, `HeartbeatTokens`, `CommitTokens`, `RollbackTokens`, `GetTokenWalletBalance` a RAII scope `BeginMeteredScope(ctx, req)` s automatickým `Close()` rollbackom. Nové unit testy v `symbolon_test.go` (10 úspešných testov).
+    - **Java SDK (`sdk/java/symbolon`)**: Pridané Jackson modely a metódy `reserveTokens`, `heartbeatTokens`, `commitTokens`, `rollbackTokens`, `getTokenWalletBalance` a `beginMeteredScope` s `TokenReservationScope` implementujúcim `AutoCloseable`. Nové unit testy v `SymbolonClientTest.java` (12 úspešných testov).
 - **Phase 11: FIPS 205 SLH-DSA Test Suite & Kompletná PQC Gating Verifikácia (§10.10, §13.5)**:
   - Nový testovací suite `SlhDsaSignatureProviderTests.cs` pre FIPS 205 bezstavové hash-based podpisy (SPHINCS+).
   - Testovanie variantov `SlhDsaSha2_128s` a `SlhDsaSha2_128f`, generovanie kľúčov, podpis, verifikácia, detekcia manipulácie a export/import JWK (`kty: AKP`).

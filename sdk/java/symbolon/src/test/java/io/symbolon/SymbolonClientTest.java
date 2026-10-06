@@ -170,4 +170,87 @@ class SymbolonClientTest {
             assertThrows(LicenseNotFoundException.class, () -> client.acquireSeat("SYM-INVALID-KEY"));
         }
     }
+
+    @Test
+    @DisplayName("Metered token reserve and explicit commit settles credits")
+    void testTokenReserveAndCommit() {
+        mockServer.createContext("/v1/tokens/reserve", exchange -> {
+            var resp = new io.symbolon.models.ReserveTokensResponse(true, "res_java_1", 100.0, 900.0, 100.0, null);
+            byte[] bytes = mapper.writeValueAsBytes(resp);
+            exchange.getResponseHeaders().set("Content-Type", "application/json");
+            exchange.sendResponseHeaders(200, bytes.length);
+            try (OutputStream os = exchange.getResponseBody()) {
+                os.write(bytes);
+            }
+        });
+
+        mockServer.createContext("/v1/tokens/commit", exchange -> {
+            var resp = new io.symbolon.models.CommitTokensResponse(true, 80.0, 20.0, 920.0, null);
+            byte[] bytes = mapper.writeValueAsBytes(resp);
+            exchange.getResponseHeaders().set("Content-Type", "application/json");
+            exchange.sendResponseHeaders(200, bytes.length);
+            try (OutputStream os = exchange.getResponseBody()) {
+                os.write(bytes);
+            }
+        });
+
+        ClientOptions options = ClientOptions.builder()
+                .serverUrl("http://localhost:" + mockPort)
+                .productCode("cad-app")
+                .autoReleaseOnShutdown(false)
+                .build();
+
+        try (SymbolonClient client = new SymbolonClient(options)) {
+            try (TokenReservationScope scope = client.beginMeteredScope(new io.symbolon.models.ReserveTokensRequest("wlt_1", "render", 100.0))) {
+                assertEquals("res_java_1", scope.getReservationId());
+                assertEquals(900.0, scope.getAvailableBalance());
+
+                var commitResp = scope.commit(80.0, false);
+                assertTrue(commitResp.success());
+                assertTrue(scope.isCompleted());
+                assertEquals(920.0, scope.getAvailableBalance());
+            }
+        }
+    }
+
+    @Test
+    @DisplayName("Metered token auto-rollback occurs when scope closes without commit")
+    void testTokenAutoRollbackOnClose() {
+        java.util.concurrent.atomic.AtomicBoolean rollbackCalled = new java.util.concurrent.atomic.AtomicBoolean(false);
+
+        mockServer.createContext("/v1/tokens/reserve", exchange -> {
+            var resp = new io.symbolon.models.ReserveTokensResponse(true, "res_auto_rb", 50.0, 950.0, 50.0, null);
+            byte[] bytes = mapper.writeValueAsBytes(resp);
+            exchange.getResponseHeaders().set("Content-Type", "application/json");
+            exchange.sendResponseHeaders(200, bytes.length);
+            try (OutputStream os = exchange.getResponseBody()) {
+                os.write(bytes);
+            }
+        });
+
+        mockServer.createContext("/v1/tokens/rollback", exchange -> {
+            rollbackCalled.set(true);
+            var resp = new io.symbolon.models.RollbackTokensResponse(true, 50.0, 1000.0, null);
+            byte[] bytes = mapper.writeValueAsBytes(resp);
+            exchange.getResponseHeaders().set("Content-Type", "application/json");
+            exchange.sendResponseHeaders(200, bytes.length);
+            try (OutputStream os = exchange.getResponseBody()) {
+                os.write(bytes);
+            }
+        });
+
+        ClientOptions options = ClientOptions.builder()
+                .serverUrl("http://localhost:" + mockPort)
+                .productCode("cad-app")
+                .autoReleaseOnShutdown(false)
+                .build();
+
+        try (SymbolonClient client = new SymbolonClient(options)) {
+            try (TokenReservationScope scope = client.beginMeteredScope(new io.symbolon.models.ReserveTokensRequest("wlt_1", "nlp", 50.0))) {
+                assertEquals("res_auto_rb", scope.getReservationId());
+                // Close scope without committing
+            }
+            assertTrue(rollbackCalled.get(), "expected rollback to be called on uncommitted scope close");
+        }
+    }
 }

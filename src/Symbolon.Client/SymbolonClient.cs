@@ -687,6 +687,216 @@ public sealed class SymbolonClient : IDisposable
         }
     }
 
+    /// <summary>
+    /// Reserves credits for a metered feature operation from a token wallet.
+    /// </summary>
+    public async Task<ReserveTokensResponseDto> ReserveTokensAsync(ReserveTokensRequestDto request, CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        using var activity = SymbolonTracing.ActivitySource.StartActivity("ReserveTokens");
+        activity?.SetTag("walletId", request.WalletId);
+        activity?.SetTag("featureCode", request.FeatureCode);
+
+        return await _failoverPool.ExecuteWithFailoverAsync(async (serverUri, http, token) =>
+        {
+            var targetUri = new Uri(serverUri, "v1/tokens/reserve");
+            var response = await http.PostAsJsonAsync(
+                targetUri,
+                request,
+                SymbolonProtocolJsonContext.Default.ReserveTokensRequestDto,
+                token).ConfigureAwait(false);
+
+            if ((int)response.StatusCode is 502 or 503 or 504)
+            {
+                throw new HttpRequestException($"Server node {serverUri} returned {(int)response.StatusCode}");
+            }
+
+            var result = await response.Content.ReadFromJsonAsync(
+                SymbolonProtocolJsonContext.Default.ReserveTokensResponseDto,
+                token).ConfigureAwait(false);
+
+            return result ?? new ReserveTokensResponseDto
+            {
+                Success = false,
+                FailureReason = $"Failed to parse reserve tokens response (HTTP {(int)response.StatusCode})."
+            };
+        }, ct).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Sends a heartbeat to extend or incrementally consume reserved credits during a long-running metered task.
+    /// </summary>
+    public async Task<HeartbeatTokensResponseDto> HeartbeatTokensAsync(HeartbeatTokensRequestDto request, CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        using var activity = SymbolonTracing.ActivitySource.StartActivity("HeartbeatTokens");
+        activity?.SetTag("reservationId", request.ReservationId);
+
+        return await _failoverPool.ExecuteWithFailoverAsync(async (serverUri, http, token) =>
+        {
+            var targetUri = new Uri(serverUri, "v1/tokens/heartbeat");
+            var response = await http.PostAsJsonAsync(
+                targetUri,
+                request,
+                SymbolonProtocolJsonContext.Default.HeartbeatTokensRequestDto,
+                token).ConfigureAwait(false);
+
+            if ((int)response.StatusCode is 502 or 503 or 504)
+            {
+                throw new HttpRequestException($"Server node {serverUri} returned {(int)response.StatusCode}");
+            }
+
+            var result = await response.Content.ReadFromJsonAsync(
+                SymbolonProtocolJsonContext.Default.HeartbeatTokensResponseDto,
+                token).ConfigureAwait(false);
+
+            return result ?? new HeartbeatTokensResponseDto
+            {
+                Success = false,
+                FailureReason = $"Failed to parse heartbeat tokens response (HTTP {(int)response.StatusCode})."
+            };
+        }, ct).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Commits a token reservation with the actual units consumed, refunding unused credits.
+    /// </summary>
+    public async Task<CommitTokensResponseDto> CommitTokensAsync(CommitTokensRequestDto request, CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        using var activity = SymbolonTracing.ActivitySource.StartActivity("CommitTokens");
+        activity?.SetTag("reservationId", request.ReservationId);
+
+        return await _failoverPool.ExecuteWithFailoverAsync(async (serverUri, http, token) =>
+        {
+            var targetUri = new Uri(serverUri, "v1/tokens/commit");
+            var response = await http.PostAsJsonAsync(
+                targetUri,
+                request,
+                SymbolonProtocolJsonContext.Default.CommitTokensRequestDto,
+                token).ConfigureAwait(false);
+
+            if ((int)response.StatusCode is 502 or 503 or 504)
+            {
+                throw new HttpRequestException($"Server node {serverUri} returned {(int)response.StatusCode}");
+            }
+
+            var result = await response.Content.ReadFromJsonAsync(
+                SymbolonProtocolJsonContext.Default.CommitTokensResponseDto,
+                token).ConfigureAwait(false);
+
+            return result ?? new CommitTokensResponseDto
+            {
+                Success = false,
+                FailureReason = $"Failed to parse commit tokens response (HTTP {(int)response.StatusCode})."
+            };
+        }, ct).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Rolls back an open token reservation, restoring all reserved credits.
+    /// </summary>
+    public async Task<RollbackTokensResponseDto> RollbackTokensAsync(RollbackTokensRequestDto request, CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        using var activity = SymbolonTracing.ActivitySource.StartActivity("RollbackTokens");
+        activity?.SetTag("reservationId", request.ReservationId);
+
+        return await _failoverPool.ExecuteWithFailoverAsync(async (serverUri, http, token) =>
+        {
+            var targetUri = new Uri(serverUri, "v1/tokens/rollback");
+            var response = await http.PostAsJsonAsync(
+                targetUri,
+                request,
+                SymbolonProtocolJsonContext.Default.RollbackTokensRequestDto,
+                token).ConfigureAwait(false);
+
+            if ((int)response.StatusCode is 502 or 503 or 504)
+            {
+                throw new HttpRequestException($"Server node {serverUri} returned {(int)response.StatusCode}");
+            }
+
+            var result = await response.Content.ReadFromJsonAsync(
+                SymbolonProtocolJsonContext.Default.RollbackTokensResponseDto,
+                token).ConfigureAwait(false);
+
+            return result ?? new RollbackTokensResponseDto
+            {
+                Success = false,
+                FailureReason = $"Failed to parse rollback tokens response (HTTP {(int)response.StatusCode})."
+            };
+        }, ct).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Fetches the real-time balance and overdraft status of a token wallet.
+    /// </summary>
+    public async Task<TokenWalletBalanceResponseDto?> GetTokenWalletBalanceAsync(string walletId, CancellationToken ct = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(walletId);
+        using var activity = SymbolonTracing.ActivitySource.StartActivity("GetTokenWalletBalance");
+        activity?.SetTag("walletId", walletId);
+
+        return await _failoverPool.ExecuteWithFailoverAsync(async (serverUri, http, token) =>
+        {
+            var targetUri = new Uri(serverUri, $"v1/tokens/wallets/{Uri.EscapeDataString(walletId)}/balance");
+            var response = await http.GetAsync(targetUri, token).ConfigureAwait(false);
+
+            if ((int)response.StatusCode is 502 or 503 or 504)
+            {
+                throw new HttpRequestException($"Server node {serverUri} returned {(int)response.StatusCode}");
+            }
+
+            if (!response.IsSuccessStatusCode)
+            {
+                return null;
+            }
+
+            return await response.Content.ReadFromJsonAsync(
+                SymbolonProtocolJsonContext.Default.TokenWalletBalanceResponseDto,
+                token).ConfigureAwait(false);
+        }, ct).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Begins a metered pay-as-you-go operation wrapped in an auto-rollback scope.
+    /// If not committed explicitly, disposing the scope will automatically roll back reserved credits.
+    /// </summary>
+    public async Task<TokenReservationScope> BeginMeteredScopeAsync(
+        string walletId,
+        string featureCode,
+        decimal estimatedUnits,
+        bool isDurationMinutes = false,
+        TimeSpan? reservationTtl = null,
+        string? clientRef = null,
+        CancellationToken ct = default)
+    {
+        var request = new ReserveTokensRequestDto
+        {
+            WalletId = walletId,
+            FeatureCode = featureCode,
+            EstimatedUnits = estimatedUnits,
+            IsDurationMinutes = isDurationMinutes,
+            ReservationTtl = reservationTtl,
+            ClientRef = clientRef,
+            MachineId = _options.MachineId
+        };
+
+        var response = await ReserveTokensAsync(request, ct).ConfigureAwait(false);
+        if (!response.Success || string.IsNullOrWhiteSpace(response.ReservationId))
+        {
+            throw new InvalidOperationException($"Token reservation failed for wallet '{walletId}': {response.FailureReason ?? "Insufficient credits or wallet inactive"}");
+        }
+
+        return new TokenReservationScope(
+            this,
+            walletId,
+            response.ReservationId,
+            featureCode,
+            response.ReservedAmount,
+            response.AvailableBalance);
+    }
+
     public void Dispose()
     {
         if (_ownsPool)

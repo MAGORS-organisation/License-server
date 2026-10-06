@@ -105,6 +105,15 @@ namespace Symbolon.Protocol;
 [JsonSerializable(typeof(VerifyTransparencyConsistencyRequestDto))]
 [JsonSerializable(typeof(VerifyTransparencyConsistencyResponseDto))]
 [JsonSerializable(typeof(BillingWebhookResponseDto))]
+[JsonSerializable(typeof(ReserveTokensRequestDto))]
+[JsonSerializable(typeof(ReserveTokensResponseDto))]
+[JsonSerializable(typeof(HeartbeatTokensRequestDto))]
+[JsonSerializable(typeof(HeartbeatTokensResponseDto))]
+[JsonSerializable(typeof(CommitTokensRequestDto))]
+[JsonSerializable(typeof(CommitTokensResponseDto))]
+[JsonSerializable(typeof(RollbackTokensRequestDto))]
+[JsonSerializable(typeof(RollbackTokensResponseDto))]
+[JsonSerializable(typeof(TokenWalletBalanceResponseDto))]
 public sealed partial class SymbolonProtocolJsonContext : JsonSerializerContext
 {
 }

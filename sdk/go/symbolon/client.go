@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"math/rand"
 	"net/http"
+	"net/url"
 	"sync"
 	"time"
 )
@@ -360,3 +361,248 @@ func (l *SeatLease) handleHeartbeatFailure() {
 		l.graceStarted = time.Now()
 	}
 }
+
+// TokenReservationScope manages an active metered reservation with auto-rollback semantics.
+type TokenReservationScope struct {
+	client           *SymbolonClient
+	WalletId         string
+	ReservationId    string
+	FeatureCode      string
+	ReservedAmount   float64
+	AvailableBalance float64
+	isCompleted      bool
+	mu               sync.Mutex
+}
+
+func (s *TokenReservationScope) IsCompleted() bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.isCompleted
+}
+
+func (s *TokenReservationScope) Heartbeat(ctx context.Context, deltaUnits float64, isDurationMinutes bool) (*HeartbeatTokensResponse, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.isCompleted {
+		return nil, newError(ErrInvalidArgument, fmt.Sprintf("reservation '%s' is already completed", s.ReservationId))
+	}
+	resp, err := s.client.HeartbeatTokens(ctx, HeartbeatTokensRequest{
+		ReservationId:     s.ReservationId,
+		DeltaUnits:        deltaUnits,
+		IsDurationMinutes: isDurationMinutes,
+	})
+	if err == nil && resp.Success {
+		s.AvailableBalance = resp.AvailableBalance
+	}
+	return resp, err
+}
+
+func (s *TokenReservationScope) Commit(ctx context.Context, actualUnits float64, isDurationMinutes bool) (*CommitTokensResponse, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.isCompleted {
+		return nil, newError(ErrInvalidArgument, fmt.Sprintf("reservation '%s' is already completed", s.ReservationId))
+	}
+	resp, err := s.client.CommitTokens(ctx, CommitTokensRequest{
+		ReservationId:     s.ReservationId,
+		ActualUnits:       actualUnits,
+		IsDurationMinutes: isDurationMinutes,
+	})
+	if err == nil && resp.Success {
+		s.isCompleted = true
+		s.AvailableBalance = resp.NewBalance
+	}
+	return resp, err
+}
+
+func (s *TokenReservationScope) Rollback(ctx context.Context, reason string) (*RollbackTokensResponse, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.isCompleted {
+		return &RollbackTokensResponse{Success: true, RestoredCredits: 0, NewBalance: s.AvailableBalance}, nil
+	}
+	resp, err := s.client.RollbackTokens(ctx, RollbackTokensRequest{
+		ReservationId: s.ReservationId,
+		Reason:        reason,
+	})
+	s.isCompleted = true
+	if err == nil && resp.Success {
+		s.AvailableBalance = resp.NewBalance
+	}
+	return resp, err
+}
+
+// Close ensures uncommitted reservations are rolled back automatically.
+func (s *TokenReservationScope) Close() error {
+	s.mu.Lock()
+	completed := s.isCompleted
+	s.mu.Unlock()
+	if !completed {
+		ctx, cancel := context.WithTimeout(context.Background(), s.client.opts.Timeout)
+		defer cancel()
+		_, err := s.Rollback(ctx, "Scope closed without explicit commit")
+		return err
+	}
+	return nil
+}
+
+// ReserveTokens reserves credits from a wallet for a metered task.
+func (c *SymbolonClient) ReserveTokens(ctx context.Context, req ReserveTokensRequest) (*ReserveTokensResponse, error) {
+	data, err := json.Marshal(req)
+	if err != nil {
+		return nil, newError(ErrInvalidArgument, fmt.Sprintf("failed to serialize reserve request: %v", err))
+	}
+
+	urlStr := fmt.Sprintf("%s/v1/tokens/reserve", c.opts.ServerURL)
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, urlStr, bytes.NewReader(data))
+	if err != nil {
+		return nil, newError(ErrNetwork, fmt.Sprintf("failed to create request: %v", err))
+	}
+	httpReq.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.httpClient.Do(httpReq)
+	if err != nil {
+		return nil, newError(ErrNetwork, fmt.Sprintf("reserve HTTP request failed: %v", err))
+	}
+	defer resp.Body.Close()
+
+	var result ReserveTokensResponse
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return nil, newError(ErrNetwork, fmt.Sprintf("failed to decode response: %v", err))
+	}
+	return &result, nil
+}
+
+// HeartbeatTokens reports consumption and refreshes a token reservation.
+func (c *SymbolonClient) HeartbeatTokens(ctx context.Context, req HeartbeatTokensRequest) (*HeartbeatTokensResponse, error) {
+	data, err := json.Marshal(req)
+	if err != nil {
+		return nil, newError(ErrInvalidArgument, fmt.Sprintf("failed to serialize heartbeat request: %v", err))
+	}
+
+	urlStr := fmt.Sprintf("%s/v1/tokens/heartbeat", c.opts.ServerURL)
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, urlStr, bytes.NewReader(data))
+	if err != nil {
+		return nil, newError(ErrNetwork, fmt.Sprintf("failed to create request: %v", err))
+	}
+	httpReq.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.httpClient.Do(httpReq)
+	if err != nil {
+		return nil, newError(ErrNetwork, fmt.Sprintf("heartbeat HTTP request failed: %v", err))
+	}
+	defer resp.Body.Close()
+
+	var result HeartbeatTokensResponse
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return nil, newError(ErrNetwork, fmt.Sprintf("failed to decode response: %v", err))
+	}
+	return &result, nil
+}
+
+// CommitTokens settles a reservation with actual consumed units.
+func (c *SymbolonClient) CommitTokens(ctx context.Context, req CommitTokensRequest) (*CommitTokensResponse, error) {
+	data, err := json.Marshal(req)
+	if err != nil {
+		return nil, newError(ErrInvalidArgument, fmt.Sprintf("failed to serialize commit request: %v", err))
+	}
+
+	urlStr := fmt.Sprintf("%s/v1/tokens/commit", c.opts.ServerURL)
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, urlStr, bytes.NewReader(data))
+	if err != nil {
+		return nil, newError(ErrNetwork, fmt.Sprintf("failed to create request: %v", err))
+	}
+	httpReq.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.httpClient.Do(httpReq)
+	if err != nil {
+		return nil, newError(ErrNetwork, fmt.Sprintf("commit HTTP request failed: %v", err))
+	}
+	defer resp.Body.Close()
+
+	var result CommitTokensResponse
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return nil, newError(ErrNetwork, fmt.Sprintf("failed to decode response: %v", err))
+	}
+	return &result, nil
+}
+
+// RollbackTokens releases an uncommitted reservation back to the wallet.
+func (c *SymbolonClient) RollbackTokens(ctx context.Context, req RollbackTokensRequest) (*RollbackTokensResponse, error) {
+	data, err := json.Marshal(req)
+	if err != nil {
+		return nil, newError(ErrInvalidArgument, fmt.Sprintf("failed to serialize rollback request: %v", err))
+	}
+
+	urlStr := fmt.Sprintf("%s/v1/tokens/rollback", c.opts.ServerURL)
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, urlStr, bytes.NewReader(data))
+	if err != nil {
+		return nil, newError(ErrNetwork, fmt.Sprintf("failed to create request: %v", err))
+	}
+	httpReq.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.httpClient.Do(httpReq)
+	if err != nil {
+		return nil, newError(ErrNetwork, fmt.Sprintf("rollback HTTP request failed: %v", err))
+	}
+	defer resp.Body.Close()
+
+	var result RollbackTokensResponse
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return nil, newError(ErrNetwork, fmt.Sprintf("failed to decode response: %v", err))
+	}
+	return &result, nil
+}
+
+// GetTokenWalletBalance retrieves real-time balance and overdraft status.
+func (c *SymbolonClient) GetTokenWalletBalance(ctx context.Context, walletId string) (*TokenWalletBalance, error) {
+	escapedId := url.PathEscape(walletId)
+	urlStr := fmt.Sprintf("%s/v1/tokens/wallets/%s/balance", c.opts.ServerURL, escapedId)
+
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodGet, urlStr, nil)
+	if err != nil {
+		return nil, newError(ErrNetwork, fmt.Sprintf("failed to create request: %v", err))
+	}
+	httpReq.Header.Set("Accept", "application/json")
+
+	resp, err := c.httpClient.Do(httpReq)
+	if err != nil {
+		return nil, newError(ErrNetwork, fmt.Sprintf("balance HTTP request failed: %v", err))
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, newHttpError(ErrNetwork, resp.StatusCode, "failed to get balance", "")
+	}
+
+	var result TokenWalletBalance
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return nil, newError(ErrNetwork, fmt.Sprintf("failed to decode response: %v", err))
+	}
+	return &result, nil
+}
+
+// BeginMeteredScope initiates an auto-rollback metered reservation scope.
+func (c *SymbolonClient) BeginMeteredScope(ctx context.Context, req ReserveTokensRequest) (*TokenReservationScope, error) {
+	res, err := c.ReserveTokens(ctx, req)
+	if err != nil {
+		return nil, err
+	}
+	if !res.Success || res.ReservationId == "" {
+		reason := res.FailureReason
+		if reason == "" {
+			reason = "Insufficient credits or wallet inactive"
+		}
+		return nil, newError(ErrCapacityExhausted, fmt.Sprintf("token reservation failed: %s", reason))
+	}
+
+	return &TokenReservationScope{
+		client:           c,
+		WalletId:         req.WalletId,
+		ReservationId:    res.ReservationId,
+		FeatureCode:      req.FeatureCode,
+		ReservedAmount:   res.ReservedAmount,
+		AvailableBalance: res.AvailableBalance,
+	}, nil
+}
+

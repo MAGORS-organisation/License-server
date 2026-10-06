@@ -134,3 +134,86 @@ func newHttpError(code ErrorCode, statusCode int, message, detail string) *Symbo
 		Detail:     detail,
 	}
 }
+
+// ReserveTokensRequest represents a pay-as-you-go credit reservation request.
+type ReserveTokensRequest struct {
+	WalletId          string  `json:"walletId"`
+	FeatureCode       string  `json:"featureCode"`
+	EstimatedUnits    float64 `json:"estimatedUnits"`
+	IsDurationMinutes bool    `json:"isDurationMinutes,omitempty"`
+	ReservationTtl    string  `json:"reservationTtl,omitempty"`
+	ClientRef         string  `json:"clientRef,omitempty"`
+	MachineId         string  `json:"machineId,omitempty"`
+}
+
+// ReserveTokensResponse represents the server response after credit reservation.
+type ReserveTokensResponse struct {
+	Success            bool    `json:"success"`
+	ReservationId      string  `json:"reservationId,omitempty"`
+	ReservedAmount     float64 `json:"reservedAmount"`
+	AvailableBalance   float64 `json:"availableBalance"`
+	OverdraftRemaining float64 `json:"overdraftRemaining,omitempty"`
+	FailureReason      string  `json:"failureReason,omitempty"`
+}
+
+// HeartbeatTokensRequest represents an incremental heartbeat for an active reservation.
+type HeartbeatTokensRequest struct {
+	ReservationId     string  `json:"reservationId"`
+	DeltaUnits        float64 `json:"deltaUnits"`
+	IsDurationMinutes bool    `json:"isDurationMinutes,omitempty"`
+}
+
+// HeartbeatTokensResponse represents the response to a token heartbeat.
+type HeartbeatTokensResponse struct {
+	Success           bool    `json:"success"`
+	TotalConsumed     float64 `json:"totalConsumed"`
+	RemainingReserved float64 `json:"remainingReserved"`
+	AvailableBalance  float64 `json:"availableBalance"`
+	FailureReason     string  `json:"failureReason,omitempty"`
+}
+
+// CommitTokensRequest settles consumed credits upon metered operation completion.
+type CommitTokensRequest struct {
+	ReservationId     string  `json:"reservationId"`
+	ActualUnits       float64 `json:"actualUnits"`
+	IsDurationMinutes bool    `json:"isDurationMinutes,omitempty"`
+}
+
+// CommitTokensResponse represents the final settlement response of a reservation.
+type CommitTokensResponse struct {
+	Success         bool    `json:"success"`
+	ConsumedCredits float64 `json:"consumedCredits"`
+	RefundedCredits float64 `json:"refundedCredits"`
+	NewBalance      float64 `json:"newBalance"`
+	FailureReason   string  `json:"failureReason,omitempty"`
+}
+
+// RollbackTokensRequest restores reserved credits back to the wallet.
+type RollbackTokensRequest struct {
+	ReservationId string `json:"reservationId"`
+	Reason        string `json:"reason,omitempty"`
+}
+
+// RollbackTokensResponse represents the server response after a rollback.
+type RollbackTokensResponse struct {
+	Success         bool    `json:"success"`
+	RestoredCredits float64 `json:"restoredCredits"`
+	NewBalance      float64 `json:"newBalance"`
+	FailureReason   string  `json:"failureReason,omitempty"`
+}
+
+// TokenWalletBalance represents real-time balance and overdraft info of a wallet.
+type TokenWalletBalance struct {
+	WalletId         string  `json:"walletId"`
+	WalletCode       string  `json:"walletCode"`
+	WalletName       string  `json:"walletName"`
+	TotalCredits     float64 `json:"totalCredits"`
+	Balance          float64 `json:"balance"`
+	ReservedCredits  float64 `json:"reservedCredits"`
+	AvailableBalance float64 `json:"availableBalance"`
+	OverdraftLimit   float64 `json:"overdraftLimit"`
+	State            string  `json:"state"`
+	IsLowBalance     bool    `json:"isLowBalance"`
+	ExpiresAt        string  `json:"expiresAt,omitempty"`
+}
+
