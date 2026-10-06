@@ -54,6 +54,11 @@ services:
       - "8081:8081"
     volumes:
       - relay_data:/app/data
+    healthcheck:
+      test: ["CMD-SHELL", "wget --spider -q http://localhost:8081/health/ready || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
 
   prometheus:
     image: prom/prometheus:v2.54.1

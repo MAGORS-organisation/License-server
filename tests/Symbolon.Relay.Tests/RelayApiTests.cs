@@ -31,6 +31,39 @@ public sealed class RelayApiTests : IClassFixture<WebApplicationFactory<Program>
     }
 
     [Fact]
+    public async Task HealthLiveEndpoint_ReturnsHealthy()
+    {
+        var client = _factory.CreateClient();
+        var response = await client.GetAsync("/health/live");
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        string content = await response.Content.ReadAsStringAsync();
+        content.Should().Contain("healthy");
+    }
+
+    [Fact]
+    public async Task HealthReadyEndpoint_ReturnsReady()
+    {
+        var client = _factory.CreateClient();
+        var response = await client.GetAsync("/health/ready");
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        string content = await response.Content.ReadAsStringAsync();
+        content.Should().Contain("ready");
+    }
+
+    [Fact]
+    public async Task HealthGrantEndpoint_ReturnsGrantStatus()
+    {
+        var client = _factory.CreateClient();
+        var response = await client.GetAsync("/health/grant");
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        string content = await response.Content.ReadAsStringAsync();
+        content.Should().Contain("activeGrants");
+    }
+
+    [Fact]
     public async Task WellKnownKeysEndpoint_ReturnsJwks()
     {
         var client = _factory.CreateClient();

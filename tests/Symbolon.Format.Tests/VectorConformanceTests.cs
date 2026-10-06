@@ -243,11 +243,15 @@ public sealed class VectorConformanceTests
 
         var allVectors = new[] { v1, v2, v3, v4, v5, v6 };
 
-        // Write vectors out to JSON files in vectors/
+        // Write vectors out to JSON files in vectors/ only when regenerating or missing
+        bool regenerate = string.Equals(Environment.GetEnvironmentVariable("GENERATE_VECTORS"), "true", StringComparison.OrdinalIgnoreCase);
         foreach (var v in allVectors)
         {
             string filePath = Path.Combine(vectorsDir, $"{v.VectorId}.json");
-            File.WriteAllText(filePath, JsonSerializer.Serialize(v, JsonIndentOptions));
+            if (regenerate || !File.Exists(filePath))
+            {
+                File.WriteAllText(filePath, JsonSerializer.Serialize(v, JsonIndentOptions));
+            }
         }
 
         // Now run conformance validation on each vector

@@ -920,6 +920,58 @@ internal sealed class SqliteSeatStore : ISeatStore, IDisposable
         }
     }
 
+    /// <summary>
+    /// Retrieves all active, non-revoked grants across all licenses for health checks (FLT-32, §11.1).
+    /// </summary>
+    public async Task<IReadOnlyList<SeatGrantRecord>> GetAllActiveGrantsAsync(
+        DateTimeOffset now,
+        CancellationToken ct = default)
+    {
+        await _lock.WaitAsync(ct).ConfigureAwait(false);
+        try
+        {
+            var list = new List<SeatGrantRecord>();
+            string nowIso = now.ToString("O", CultureInfo.InvariantCulture);
+
+            using var cmd = _connection.CreateCommand();
+            cmd.CommandText = """
+                SELECT id, license_id, relay_id, seats, seat_from, seat_to, seq, supersedes,
+                       not_before, not_after, revoked_at, raw_document
+                FROM seat_grants
+                WHERE revoked_at IS NULL
+                  AND not_before <= @now
+                  AND not_after >= @now
+                ORDER BY license_id, seat_from;
+            """;
+            cmd.Parameters.AddWithValue("@now", nowIso);
+
+            using var reader = await cmd.ExecuteReaderAsync(ct).ConfigureAwait(false);
+            while (await reader.ReadAsync(ct).ConfigureAwait(false))
+            {
+                list.Add(new SeatGrantRecord(
+                    Id: reader.GetString(0),
+                    LicenseId: reader.GetString(1),
+                    RelayId: reader.GetString(2),
+                    Seats: reader.GetInt32(3),
+                    SeatFrom: reader.GetInt32(4),
+                    SeatTo: reader.GetInt32(5),
+                    Seq: reader.GetInt64(6),
+                    Supersedes: await reader.IsDBNullAsync(7, ct).ConfigureAwait(false) ? null : reader.GetInt64(7),
+                    NotBefore: DateTimeOffset.Parse(reader.GetString(8), CultureInfo.InvariantCulture),
+                    NotAfter: DateTimeOffset.Parse(reader.GetString(9), CultureInfo.InvariantCulture),
+                    RevokedAt: await reader.IsDBNullAsync(10, ct).ConfigureAwait(false) ? null : DateTimeOffset.Parse(reader.GetString(10), CultureInfo.InvariantCulture),
+                    Document: reader.GetString(11)
+                ));
+            }
+
+            return list;
+        }
+        finally
+        {
+            _lock.Release();
+        }
+    }
+
     public void Dispose()
     {
         _connection.Dispose();

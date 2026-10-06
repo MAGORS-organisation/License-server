@@ -49,6 +49,36 @@ var app = builder.Build();
 
 // Endpoints
 app.MapGet("/health", () => Results.Ok(new { status = "healthy", runtime = ".NET 10" }));
+app.MapGet("/health/live", () => Results.Ok(new { status = "healthy", runtime = ".NET 10" }));
+app.MapGet("/health/ready", (SqliteSeatStore seatStore) =>
+{
+    ArgumentNullException.ThrowIfNull(seatStore);
+    return Results.Ok(new { status = "ready", storage = "sqlite" });
+});
+app.MapGet("/health/grant", async (SqliteSeatStore seatStore, TimeProvider timeProvider, CancellationToken ct) =>
+{
+    ArgumentNullException.ThrowIfNull(seatStore);
+    ArgumentNullException.ThrowIfNull(timeProvider);
+    var now = timeProvider.GetUtcNow();
+    var grants = await seatStore.GetAllActiveGrantsAsync(now, ct).ConfigureAwait(false);
+    if (grants.Count == 0)
+    {
+        return Results.Ok(new
+        {
+            status = "no_active_grants",
+            activeGrants = 0,
+            daysUntilExpiration = 0.0
+        });
+    }
+
+    double minDays = grants.Min(g => (g.NotAfter - now).TotalDays);
+    return Results.Ok(new
+    {
+        status = minDays < 3.0 ? "expiring_soon" : "healthy",
+        activeGrants = grants.Count,
+        minDaysUntilExpiration = Math.Round(minDays, 2)
+    });
+});
 
 app.MapGet("/v1/.well-known/symbolon-keys", (ISignatureProvider key) =>
 {

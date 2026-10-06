@@ -2,7 +2,7 @@
 
 [![Platform](https://img.shields.io/badge/.NET-10.0%20LTS-512BD4?logo=dotnet)](https://dotnet.microsoft.com/)
 [![Language](https://img.shields.io/badge/C%23-14.0-239120?logo=csharp)](https://learn.microsoft.com/dotnet/csharp/)
-[![Tests](https://img.shields.io/badge/tests-550%20passed%20(+53%20Python%2C%20+12%20Wasm%2C%20+12%20Java%2C%20+10%20Go%2C%20+5%20Rust)-brightgreen)](#výsledky-testovania)
+[![Tests](https://img.shields.io/badge/tests-553%20passed%20(+53%20Python%2C%20+12%20Wasm%2C%20+13%20Java%2C%20+11%20Go%2C%20+6%20Rust)-brightgreen)](#výsledky-testovania)
 [![License: AGPL-3.0](https://img.shields.io/badge/license-AGPL--3.0-blue.svg)](LICENSE)
 [![License: Apache-2.0](https://img.shields.io/badge/client%20SDK-Apache--2.0-blue.svg)](LICENSES/Apache-2.0.txt)
 [![CRA Compliant](https://img.shields.io/badge/CRA%20Compliance-EU%202024%2F2847-success)](SECURITY.md)
@@ -531,7 +531,7 @@ Passed!  - Failed: 0, Passed:  57, Skipped: 0, Total:  57 - Symbolon.Crypto.Test
 Passed!  - Failed: 0, Passed:  61, Skipped: 0, Total:  61 - Symbolon.Format.Tests.dll
 Passed!  - Failed: 0, Passed:  24, Skipped: 0, Total:  24 - Symbolon.Protocol.Tests.dll
 Passed!  - Failed: 0, Passed: 127, Skipped: 0, Total: 127 - Symbolon.Domain.Tests.dll
-Passed!  - Failed: 0, Passed:  13, Skipped: 0, Total:  13 - Symbolon.Relay.Tests.dll
+Passed!  - Failed: 0, Passed:  16, Skipped: 0, Total:  16 - Symbolon.Relay.Tests.dll
 Passed!  - Failed: 0, Passed:  39, Skipped: 0, Total:  39 - Symbolon.Client.Tests.dll
 Passed!  - Failed: 0, Passed:  66, Skipped: 0, Total:  66 - Symbolon.Cli.Tests.dll
 Passed!  - Failed: 0, Passed:  24, Skipped: 0, Total:  24 - Symbolon.Data.Tests.dll
@@ -541,11 +541,11 @@ Passed!  - Failed: 0, Passed: 131, Skipped: 0, Total: 131 - Symbolon.ControlPlan
 Viacjazyčné SDK & WebAssembly testovacie sady:
 Passed!  - Failed: 0, Passed:  53, Skipped: 0, Total:  53 - Python SDK (unittest)
 Passed!  - Failed: 0, Passed:  12, Skipped: 0, Total:  12 - WebAssembly / WebCrypto SDK (node:test)
-Passed!  - Failed: 0, Passed:  12, Skipped: 0, Total:  12 - Java SDK (JUnit 5)
-Passed!  - Failed: 0, Passed:  10, Skipped: 0, Total:  10 - Go SDK (testing)
-Passed!  - Failed: 0, Passed:   5, Skipped: 0, Total:   5 - Rust SDK (cargo test suite)
+Passed!  - Failed: 0, Passed:  13, Skipped: 0, Total:  13 - Java SDK (JUnit 5)
+Passed!  - Failed: 0, Passed:  11, Skipped: 0, Total:  11 - Go SDK (testing)
+Passed!  - Failed: 0, Passed:   6, Skipped: 0, Total:   6 - Rust SDK (cargo test suite)
 
-Celkovo: 642 úspešných automatizovaných testov (550 .NET + 53 Python + 12 Node/Wasm + 12 Java + 10 Go + 5 Rust), 0 zlyhaní, 0 chýb.
+Celkovo: 648 úspešných automatizovaných testov (553 .NET + 53 Python + 12 Node/Wasm + 13 Java + 11 Go + 6 Rust), 0 zlyhaní, 0 chýb.
 ```
 
 ---
