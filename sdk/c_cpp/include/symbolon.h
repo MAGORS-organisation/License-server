@@ -211,6 +211,79 @@ SYMBOLON_API symbolon_status_t symbolon_pqc_is_cnsa2_compliant(
     const char* alg_name,
     int* out_is_compliant);
 
+/** Opaque metered token reservation scope handle. */
+typedef struct symbolon_token_scope symbolon_token_scope_t;
+
+/**
+ * Reserves tokens from a wallet before starting a metered operation.
+ */
+SYMBOLON_API symbolon_status_t symbolon_tokens_reserve(
+    symbolon_client_t* client,
+    const char* wallet_id,
+    const char* feature_code,
+    double estimated_units,
+    char* out_reservation_id,
+    size_t reservation_id_size,
+    double* out_reserved_amount,
+    double* out_available_balance);
+
+/**
+ * Sends a heartbeat to incrementally report consumption and maintain an active reservation.
+ */
+SYMBOLON_API symbolon_status_t symbolon_tokens_heartbeat(
+    symbolon_client_t* client,
+    const char* reservation_id,
+    double delta_units,
+    double* out_available_balance);
+
+/**
+ * Commits a metered reservation with actual consumed units, refunding unused credits.
+ */
+SYMBOLON_API symbolon_status_t symbolon_tokens_commit(
+    symbolon_client_t* client,
+    const char* reservation_id,
+    double actual_units,
+    double* out_new_balance);
+
+/**
+ * Rolls back an open token reservation, refunding all reserved credits.
+ */
+SYMBOLON_API symbolon_status_t symbolon_tokens_rollback(
+    symbolon_client_t* client,
+    const char* reservation_id,
+    const char* reason,
+    double* out_new_balance);
+
+/**
+ * Begins an auto-rollback metered reservation scope.
+ */
+SYMBOLON_API symbolon_status_t symbolon_tokens_begin_scope(
+    symbolon_client_t* client,
+    const char* wallet_id,
+    const char* feature_code,
+    double estimated_units,
+    symbolon_token_scope_t** out_scope);
+
+/**
+ * Commits a metered reservation scope.
+ */
+SYMBOLON_API symbolon_status_t symbolon_tokens_scope_commit(
+    symbolon_token_scope_t* scope,
+    double actual_units,
+    double* out_new_balance);
+
+/**
+ * Rolls back a metered reservation scope.
+ */
+SYMBOLON_API symbolon_status_t symbolon_tokens_scope_rollback(
+    symbolon_token_scope_t* scope,
+    const char* reason);
+
+/**
+ * Destroys a metered reservation scope handle. If uncommitted, rolls back automatically.
+ */
+SYMBOLON_API void symbolon_tokens_scope_destroy(symbolon_token_scope_t* scope);
+
 /**
  * Destroys the client handle and frees associated resources.
  */
@@ -221,6 +294,49 @@ SYMBOLON_API void symbolon_client_destroy(symbolon_client_t* client);
 
 // C++ RAII Wrappers
 namespace symbolon {
+
+class ScopedTokenReservation {
+public:
+    explicit ScopedTokenReservation(symbolon_token_scope_t* scope = nullptr) : scope_(scope) {}
+    ~ScopedTokenReservation() {
+        if (scope_) {
+            symbolon_tokens_scope_destroy(scope_);
+            scope_ = nullptr;
+        }
+    }
+
+    ScopedTokenReservation(ScopedTokenReservation&& other) noexcept : scope_(other.scope_) {
+        other.scope_ = nullptr;
+    }
+
+    ScopedTokenReservation& operator=(ScopedTokenReservation&& other) noexcept {
+        if (this != &other) {
+            if (scope_) symbolon_tokens_scope_destroy(scope_);
+            scope_ = other.scope_;
+            other.scope_ = nullptr;
+        }
+        return *this;
+    }
+
+    ScopedTokenReservation(const ScopedTokenReservation&) = delete;
+    ScopedTokenReservation& operator=(const ScopedTokenReservation&) = delete;
+
+    symbolon_status_t commit(double actual_units, double* out_new_balance = nullptr) {
+        if (!scope_) return SYMBOLON_ERR_INVALID_ARGUMENT;
+        return symbolon_tokens_scope_commit(scope_, actual_units, out_new_balance);
+    }
+
+    symbolon_status_t rollback(const char* reason = "Aborted by client") {
+        if (!scope_) return SYMBOLON_ERR_INVALID_ARGUMENT;
+        return symbolon_tokens_scope_rollback(scope_, reason);
+    }
+
+    symbolon_token_scope_t* get() const { return scope_; }
+    bool is_valid() const { return scope_ != nullptr; }
+
+private:
+    symbolon_token_scope_t* scope_;
+};
 
 class ScopedLease {
 public:

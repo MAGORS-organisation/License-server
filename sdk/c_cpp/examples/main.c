@@ -72,7 +72,20 @@ int main(void)
         printf("Capacity exhausted: No floating seats available.\n");
     }
 
-    // 9. Cleanup client
+    // 9. Metered Pay-As-You-Go Token Consumption
+    printf("\n--- Metered Pay-As-You-Go Token Usage ---\n");
+    symbolon_token_scope_t* token_scope = NULL;
+    status = symbolon_tokens_begin_scope(client, "wlt_enterprise", "ai_inference", 100.0, &token_scope);
+    if (status == SYMBOLON_OK) {
+        printf("✓ Reserved 100 credits in auto-rollback scope.\n");
+        // Simulate operation consuming 75 credits
+        double new_balance = 0.0;
+        symbolon_tokens_scope_commit(token_scope, 75.0, &new_balance);
+        printf("✓ Committed 75 credits. Wallet balance settled: %.2f\n", new_balance);
+        symbolon_tokens_scope_destroy(token_scope);
+    }
+
+    // 10. Cleanup client
     symbolon_client_destroy(client);
     printf("Done.\n");
     return 0;

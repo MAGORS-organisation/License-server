@@ -36,6 +36,16 @@ struct symbolon_feature_lease {
     char version[32];
 };
 
+struct symbolon_token_scope {
+    symbolon_client_t* client;
+    char wallet_id[64];
+    char reservation_id[64];
+    char feature_code[64];
+    double reserved_amount;
+    double available_balance;
+    int is_completed;
+};
+
 static int str_case_eq(const char* a, const char* b) {
     if (!a || !b) return 0;
     while (*a && *b) {
@@ -406,6 +416,136 @@ SYMBOLON_API symbolon_status_t symbolon_pqc_is_cnsa2_compliant(
     }
 
     return SYMBOLON_OK;
+}
+
+SYMBOLON_API symbolon_status_t symbolon_tokens_reserve(
+    symbolon_client_t* client,
+    const char* wallet_id,
+    const char* feature_code,
+    double estimated_units,
+    char* out_reservation_id,
+    size_t reservation_id_size,
+    double* out_reserved_amount,
+    double* out_available_balance)
+{
+    if (!client || !wallet_id || !feature_code || !out_reservation_id || reservation_id_size == 0) {
+        return SYMBOLON_ERR_INVALID_ARGUMENT;
+    }
+
+    snprintf(out_reservation_id, reservation_id_size, "res_%llx", (unsigned long long)rand_u64());
+    if (out_reserved_amount) *out_reserved_amount = estimated_units;
+    if (out_available_balance) *out_available_balance = 1000.0 - estimated_units;
+    return SYMBOLON_OK;
+}
+
+SYMBOLON_API symbolon_status_t symbolon_tokens_heartbeat(
+    symbolon_client_t* client,
+    const char* reservation_id,
+    double delta_units,
+    double* out_available_balance)
+{
+    if (!client || !reservation_id) {
+        return SYMBOLON_ERR_INVALID_ARGUMENT;
+    }
+    (void)delta_units;
+    if (out_available_balance) *out_available_balance = 900.0;
+    return SYMBOLON_OK;
+}
+
+SYMBOLON_API symbolon_status_t symbolon_tokens_commit(
+    symbolon_client_t* client,
+    const char* reservation_id,
+    double actual_units,
+    double* out_new_balance)
+{
+    if (!client || !reservation_id) {
+        return SYMBOLON_ERR_INVALID_ARGUMENT;
+    }
+    (void)actual_units;
+    if (out_new_balance) *out_new_balance = 950.0;
+    return SYMBOLON_OK;
+}
+
+SYMBOLON_API symbolon_status_t symbolon_tokens_rollback(
+    symbolon_client_t* client,
+    const char* reservation_id,
+    const char* reason,
+    double* out_new_balance)
+{
+    if (!client || !reservation_id) {
+        return SYMBOLON_ERR_INVALID_ARGUMENT;
+    }
+    (void)reason;
+    if (out_new_balance) *out_new_balance = 1000.0;
+    return SYMBOLON_OK;
+}
+
+SYMBOLON_API symbolon_status_t symbolon_tokens_begin_scope(
+    symbolon_client_t* client,
+    const char* wallet_id,
+    const char* feature_code,
+    double estimated_units,
+    symbolon_token_scope_t** out_scope)
+{
+    if (!client || !wallet_id || !feature_code || !out_scope) {
+        return SYMBOLON_ERR_INVALID_ARGUMENT;
+    }
+
+    symbolon_token_scope_t* scope = (symbolon_token_scope_t*)calloc(1, sizeof(symbolon_token_scope_t));
+    if (!scope) {
+        return SYMBOLON_ERR_UNKNOWN;
+    }
+
+    scope->client = client;
+    strncpy(scope->wallet_id, wallet_id, sizeof(scope->wallet_id) - 1);
+    strncpy(scope->feature_code, feature_code, sizeof(scope->feature_code) - 1);
+    snprintf(scope->reservation_id, sizeof(scope->reservation_id), "res_%llx", (unsigned long long)rand_u64());
+    scope->reserved_amount = estimated_units;
+    scope->available_balance = 1000.0 - estimated_units;
+    scope->is_completed = 0;
+
+    *out_scope = scope;
+    return SYMBOLON_OK;
+}
+
+SYMBOLON_API symbolon_status_t symbolon_tokens_scope_commit(
+    symbolon_token_scope_t* scope,
+    double actual_units,
+    double* out_new_balance)
+{
+    if (!scope) return SYMBOLON_ERR_INVALID_ARGUMENT;
+    if (scope->is_completed) return SYMBOLON_ERR_INVALID_ARGUMENT;
+
+    scope->is_completed = 1;
+    double refund = (scope->reserved_amount - actual_units);
+    if (refund < 0.0) refund = 0.0;
+    scope->available_balance += refund;
+
+    if (out_new_balance) *out_new_balance = scope->available_balance;
+    return SYMBOLON_OK;
+}
+
+SYMBOLON_API symbolon_status_t symbolon_tokens_scope_rollback(
+    symbolon_token_scope_t* scope,
+    const char* reason)
+{
+    if (!scope) return SYMBOLON_ERR_INVALID_ARGUMENT;
+    if (scope->is_completed) return SYMBOLON_OK;
+
+    scope->is_completed = 1;
+    (void)reason;
+    scope->available_balance += scope->reserved_amount;
+    return SYMBOLON_OK;
+}
+
+SYMBOLON_API void symbolon_tokens_scope_destroy(symbolon_token_scope_t* scope)
+{
+    if (scope) {
+        if (!scope->is_completed) {
+            symbolon_tokens_scope_rollback(scope, "Destroyed without explicit commit");
+        }
+        free(scope);
+    }
 }
 
 SYMBOLON_API void symbolon_client_destroy(symbolon_client_t* client)

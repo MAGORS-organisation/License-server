@@ -482,3 +482,63 @@ eyJwYXlsb2FkIjoiZXlKcGMzTWlPaUpvZEhSd2N6b3Z...
    - V podnikových sieťach konfigurujte `RelayUrl`. Ak je centrálny cloud nedostupný, SDK sa automaticky obráti na lokálny relay server v LAN sieti.
 5. **Post-Quantum Cryptography Gating**:
    - Pri overovaní certifikátov a dlhodobých licencií využívajte hybridný profil `hybrid-v1` (ES256 + ML-DSA-65). Pri prechode na CNSA 2.0 / NIS 2 aktivujte profil `pqc-strict`.
+
+---
+
+## 10. Kreditové a Metered Pay-As-You-Go Licencovanie (Token Wallets)
+
+Pre operácie účtované podľa reálnej spotreby (AI inferencia, rendering, cloudové výpočty, exporty) Symbolon poskytuje **Token & Metered Pay-As-You-Go** model s peňaženkami (`TokenWallet`) a bezpečnostným rozsahom **Auto-Rollback Scope**.
+
+Ak aplikácia spadne, vyhodí výnimku alebo skončí predčasne, nezužitkované rezervované kredity sa vďaka RAII vzoru (`IAsyncDisposable`, `with`, `Close`, `try-with-resources`) automaticky vrátia späť zákazníkovi — **nulové riziko úniku kreditov**.
+
+### C# / .NET 10
+```csharp
+// Začatie metered operácie s odhadom 100 kreditov
+await using var scope = await client.BeginMeteredScopeAsync("wlt_enterprise", "ai_inference", 100m);
+
+// Dlhšie bežiaca úloha môže odosielať priebežný heartbeat
+await scope.HeartbeatAsync(deltaUnits: 25m);
+
+// Po úspešnom dokončení potvrdíme reálnu spotrebu (napr. 75 jednotiek)
+// Zvyšných 25 kreditov sa okamžite refunduje do peňaženky
+await scope.CommitAsync(actualUnits: 75m);
+// Ak by nastala výnimka pred CommitAsync, DisposeAsync automaticky zavolá Rollback
+```
+
+### Python (3.10+)
+```python
+# Kontextový manažér s garantovaným auto-rollbackom pri výnimke
+with client.metered_scope("wlt_enterprise", "ai_inference", 100.0) as scope:
+    scope.heartbeat(delta_units=25.0)
+    
+    # Reálna práca...
+    scope.commit(actual_units=75.0)
+```
+
+### Go (Golang 1.22+)
+```go
+scope, err := client.BeginMeteredScope(ctx, symbolon.ReserveTokensRequest{
+    WalletId:       "wlt_enterprise",
+    FeatureCode:    "ai_inference",
+    EstimatedUnits: 100.0,
+})
+if err != nil {
+    log.Fatal(err)
+}
+defer scope.Close() // Automatický rollback pri neočakávanom návrate pred commitom
+
+// Potvrdenie spotrebovaných jednotiek
+commitResp, err := scope.Commit(ctx, 75.0, false)
+```
+
+### Java 17+ (Spring Boot / Quarkus)
+```java
+var req = new ReserveTokensRequest("wlt_enterprise", "ai_inference", 100.0);
+try (TokenReservationScope scope = client.beginMeteredScope(req)) {
+    scope.heartbeat(25.0, false);
+    
+    // Potvrdenie reálnej spotreby
+    scope.commit(75.0, false);
+} // V prípade chyby close() automaticky uvoľní a vráti rezervované kredity
+```
+

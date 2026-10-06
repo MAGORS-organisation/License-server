@@ -1,4 +1,9 @@
-use crate::models::{ActiveFeatureInfo, FeatureAcquisitionResponse, LeaseToken, SymbolonError};
+use crate::models::{
+    ActiveFeatureInfo, CommitTokensRequest, CommitTokensResponse, FeatureAcquisitionResponse,
+    HeartbeatTokensRequest, HeartbeatTokensResponse, LeaseToken, ReserveTokensRequest,
+    ReserveTokensResponse, RollbackTokensRequest, RollbackTokensResponse, SymbolonError,
+    TokenWalletBalance,
+};
 use std::collections::HashSet;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
@@ -196,6 +201,166 @@ impl SymbolonClient {
 
         let _ = license_key;
         Ok(SeatLease::new(dummy_token, self.server_url.clone()))
+    }
+
+    pub fn reserve_tokens(&self, req: &ReserveTokensRequest) -> Result<ReserveTokensResponse, SymbolonError> {
+        Ok(ReserveTokensResponse {
+            success: true,
+            reservation_id: Some(format!("res_{:x}", rand_u64())),
+            reserved_amount: req.estimated_units,
+            available_balance: 1000.0 - req.estimated_units,
+            overdraft_remaining: 100.0,
+            failure_reason: None,
+        })
+    }
+
+    pub fn heartbeat_tokens(&self, req: &HeartbeatTokensRequest) -> Result<HeartbeatTokensResponse, SymbolonError> {
+        Ok(HeartbeatTokensResponse {
+            success: true,
+            total_consumed: req.delta_units,
+            remaining_reserved: 50.0,
+            available_balance: 900.0,
+            failure_reason: None,
+        })
+    }
+
+    pub fn commit_tokens(&self, req: &CommitTokensRequest) -> Result<CommitTokensResponse, SymbolonError> {
+        Ok(CommitTokensResponse {
+            success: true,
+            consumed_credits: req.actual_units,
+            refunded_credits: 0.0,
+            new_balance: 950.0,
+            failure_reason: None,
+        })
+    }
+
+    pub fn rollback_tokens(&self, req: &RollbackTokensRequest) -> Result<RollbackTokensResponse, SymbolonError> {
+        let _ = req;
+        Ok(RollbackTokensResponse {
+            success: true,
+            restored_credits: 50.0,
+            new_balance: 1000.0,
+            failure_reason: None,
+        })
+    }
+
+    pub fn get_token_wallet_balance(&self, wallet_id: &str) -> Result<TokenWalletBalance, SymbolonError> {
+        Ok(TokenWalletBalance {
+            wallet_id: wallet_id.to_string(),
+            wallet_code: "WLT-RUST".to_string(),
+            wallet_name: "Rust Primary Wallet".to_string(),
+            total_credits: 5000.0,
+            balance: 4000.0,
+            reserved_credits: 500.0,
+            available_balance: 3500.0,
+            overdraft_limit: 500.0,
+            state: "Active".to_string(),
+            is_low_balance: false,
+            expires_at: None,
+        })
+    }
+
+    pub fn begin_metered_scope(&self, req: &ReserveTokensRequest) -> Result<TokenReservationScope, SymbolonError> {
+        let resp = self.reserve_tokens(req)?;
+        if !resp.success || resp.reservation_id.is_none() {
+            return Err(SymbolonError::CapacityExhausted);
+        }
+        Ok(TokenReservationScope::new(
+            &req.wallet_id,
+            resp.reservation_id.as_deref().unwrap_or_default(),
+            &req.feature_code,
+            resp.reserved_amount,
+            resp.available_balance,
+            &self.server_url,
+        ))
+    }
+}
+
+/// Scoped handle for metered pay-as-you-go credit reservations.
+/// On drop, if not explicitly committed, automatically rolls back reserved credits.
+pub struct TokenReservationScope {
+    pub wallet_id: String,
+    pub reservation_id: String,
+    pub feature_code: String,
+    pub reserved_amount: f64,
+    pub available_balance: Arc<Mutex<f64>>,
+    server_url: String,
+    is_completed: Arc<AtomicBool>,
+}
+
+impl TokenReservationScope {
+    pub fn new(
+        wallet_id: impl Into<String>,
+        reservation_id: impl Into<String>,
+        feature_code: impl Into<String>,
+        reserved_amount: f64,
+        available_balance: f64,
+        server_url: impl Into<String>,
+    ) -> Self {
+        Self {
+            wallet_id: wallet_id.into(),
+            reservation_id: reservation_id.into(),
+            feature_code: feature_code.into(),
+            reserved_amount,
+            available_balance: Arc::new(Mutex::new(available_balance)),
+            server_url: server_url.into(),
+            is_completed: Arc::new(AtomicBool::new(false)),
+        }
+    }
+
+    pub fn is_completed(&self) -> bool {
+        self.is_completed.load(Ordering::SeqCst)
+    }
+
+    pub fn available_balance(&self) -> f64 {
+        self.available_balance.lock().map(|b| *b).unwrap_or(0.0)
+    }
+
+    pub fn commit(&self, actual_units: f64, is_duration_minutes: bool) -> Result<CommitTokensResponse, SymbolonError> {
+        if self.is_completed.load(Ordering::SeqCst) {
+            return Err(SymbolonError::InvalidArgument(format!("Reservation '{}' already completed", self.reservation_id)));
+        }
+        let _ = is_duration_minutes;
+        self.is_completed.store(true, Ordering::SeqCst);
+        let refund = (self.reserved_amount - actual_units).max(0.0);
+        let mut bal = self.available_balance.lock().unwrap();
+        *bal += refund;
+        Ok(CommitTokensResponse {
+            success: true,
+            consumed_credits: actual_units,
+            refunded_credits: refund,
+            new_balance: *bal,
+            failure_reason: None,
+        })
+    }
+
+    pub fn rollback(&self, reason: &str) -> Result<RollbackTokensResponse, SymbolonError> {
+        if self.is_completed.load(Ordering::SeqCst) {
+            return Ok(RollbackTokensResponse {
+                success: true,
+                restored_credits: 0.0,
+                new_balance: self.available_balance(),
+                failure_reason: None,
+            });
+        }
+        self.is_completed.store(true, Ordering::SeqCst);
+        let _ = reason;
+        let mut bal = self.available_balance.lock().unwrap();
+        *bal += self.reserved_amount;
+        Ok(RollbackTokensResponse {
+            success: true,
+            restored_credits: self.reserved_amount,
+            new_balance: *bal,
+            failure_reason: None,
+        })
+    }
+}
+
+impl Drop for TokenReservationScope {
+    fn drop(&mut self) {
+        if !self.is_completed.load(Ordering::SeqCst) {
+            let _ = self.rollback("Scope dropped without explicit commit");
+        }
     }
 }
 

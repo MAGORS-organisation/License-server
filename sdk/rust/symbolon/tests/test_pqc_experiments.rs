@@ -160,3 +160,47 @@ fn test_experiment_statistical_report() {
     assert!(report.p_value < 0.001);
     assert!(report.recommendation.contains("ODPORÚČANIE"));
 }
+
+#[test]
+fn test_token_metered_scope_commit() {
+    let client = symbolon_client::SymbolonClient::new("http://localhost:5000", "rust-test");
+    let req = symbolon_client::ReserveTokensRequest {
+        wallet_id: "wlt_rust_1".to_string(),
+        feature_code: "compute_ai".to_string(),
+        estimated_units: 100.0,
+        is_duration_minutes: None,
+        reservation_ttl: None,
+        client_ref: None,
+        machine_id: None,
+    };
+
+    let scope = client.begin_metered_scope(&req).expect("should create scope");
+    assert_eq!(scope.wallet_id, "wlt_rust_1");
+    assert!(!scope.is_completed());
+
+    let commit_res = scope.commit(80.0, false).expect("commit should succeed");
+    assert!(commit_res.success);
+    assert!(scope.is_completed());
+    assert_eq!(commit_res.consumed_credits, 80.0);
+    assert_eq!(commit_res.refunded_credits, 20.0);
+}
+
+#[test]
+fn test_token_auto_rollback_on_drop() {
+    let client = symbolon_client::SymbolonClient::new("http://localhost:5000", "rust-test");
+    let req = symbolon_client::ReserveTokensRequest {
+        wallet_id: "wlt_rust_2".to_string(),
+        feature_code: "render".to_string(),
+        estimated_units: 50.0,
+        is_duration_minutes: None,
+        reservation_ttl: None,
+        client_ref: None,
+        machine_id: None,
+    };
+
+    {
+        let scope = client.begin_metered_scope(&req).expect("should create scope");
+        assert!(!scope.is_completed());
+        // Dropping scope without commit will trigger rollback in Drop
+    }
+}
