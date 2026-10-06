@@ -98,13 +98,13 @@ public sealed class DistributedTracingTests : IClassFixture<ControlPlaneFactory>
         Assert.NotNull(traces);
         Assert.NotEmpty(traces);
 
-        var checkoutSpan = traces.FirstOrDefault(s => s.Name == SymbolonTracing.OpCheckout);
+        var checkoutSpan = traces.FirstOrDefault(s => s.Name == SymbolonTracing.OpCheckout && s.TraceId == traceId);
         Assert.NotNull(checkoutSpan);
         Assert.Equal("OK", checkoutSpan.Status);
         Assert.True(checkoutSpan.DurationMs >= 0);
 
         // 4. Overenie prítomnosti fraud check stopy
-        var fraudSpan = traces.FirstOrDefault(s => s.Name == SymbolonTracing.OpFraudCheck);
+        var fraudSpan = traces.FirstOrDefault(s => s.Name == SymbolonTracing.OpFraudCheck && s.TraceId == traceId);
         Assert.NotNull(fraudSpan);
         Assert.Equal("OK", fraudSpan.Status);
     }

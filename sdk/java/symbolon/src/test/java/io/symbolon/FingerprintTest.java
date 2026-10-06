@@ -49,4 +49,21 @@ class FingerprintTest {
         assertTrue(hash1.startsWith("sha256:"));
         assertEquals(71, hash1.length()); // "sha256:" (7) + 64 hex chars = 71
     }
+
+    @Test
+    @DisplayName("Container UUID persistence generates stable UUID in volume")
+    void testContainerUuidPersistence() throws Exception {
+        java.nio.file.Path tempFile = java.nio.file.Files.createTempFile("symbolon_test_uuid", ".txt");
+        try {
+            java.nio.file.Files.deleteIfExists(tempFile);
+            String uuid1 = Fingerprint.getOrCreatePersistedContainerUuid(tempFile.toString());
+            assertNotNull(uuid1);
+            assertTrue(uuid1.length() >= 32);
+
+            String uuid2 = Fingerprint.getOrCreatePersistedContainerUuid(tempFile.toString());
+            assertEquals(uuid1, uuid2);
+        } finally {
+            java.nio.file.Files.deleteIfExists(tempFile);
+        }
+    }
 }

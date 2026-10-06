@@ -5,10 +5,14 @@ int main(void)
 {
     printf("=== Symbolon C/C++ SDK Example ===\n");
 
-    // 1. Check local hardware fingerprint
+    // 1. Check local environment and hardware/container fingerprint (FPR-10..FPR-14)
+    int is_container = 0;
+    symbolon_is_container_or_cloud(&is_container);
+    printf("Environment: %s\n", is_container ? "Container/Cloud (FPR-10)" : "Bare-metal/Host OS");
+
     char fp[72];
     if (symbolon_get_hardware_fingerprint(fp, sizeof(fp)) == SYMBOLON_OK) {
-        printf("Local HW Fingerprint: %s\n", fp);
+        printf("Device Fingerprint: %s\n", fp);
     }
 
     // 2. Initialize Symbolon Client

@@ -1,0 +1,34 @@
+[Unit]
+Description=Symbolon License Control Plane Server
+Documentation=https://github.com/MAGORS-organisation/License-server
+After=network.target network-online.target postgresql.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=symbolon
+Group=symbolon
+WorkingDirectory=/opt/symbolon/controlplane
+ExecStart=/usr/bin/dotnet /opt/symbolon/controlplane/Symbolon.ControlPlane.dll
+Restart=always
+RestartSec=5
+
+# Environment configuration
+Environment=ASPNETCORE_ENVIRONMENT=Production
+Environment=ASPNETCORE_HTTP_PORTS=8080
+Environment=ConnectionStrings__SymbolonDb="Host=localhost;Port=5432;Database=symbolon;Username=symbolon;Password=symbolon_secret"
+
+# Security & Sandbox hardening
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+NoNewPrivileges=true
+ProtectKernelTunables=true
+ProtectControlGroups=true
+RestrictRealtime=true
+
+# Resource limits
+LimitNOFILE=65535
+
+[Install]
+WantedBy=multi-user.target

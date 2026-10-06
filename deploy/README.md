@@ -79,10 +79,11 @@ helm upgrade --install symbolon ./helm/symbolon \
 
 ---
 
-## 4. Inštalácia Relay ako Linux Systemd Služby
+## 4. Inštalácia Control Plane a Relay ako Linux Systemd Služieb
 
-Pre on-premise nasadenie u zákazníka (bare-metal alebo virtuálny server):
+Pre on-premise nasadenie u zákazníka (bare-metal alebo virtuálny Linux server):
 
+### A. Symbolon Relay (Lokálny sieťový proxy agent u zákazníka):
 1. Skopírujte publikovaný binár `Symbolon.Relay` do `/opt/symbolon/relay/`.
 2. Vytvorte systémového používateľa:
    ```bash
@@ -100,3 +101,17 @@ Pre on-premise nasadenie u zákazníka (bare-metal alebo virtuálny server):
    ```bash
    sudo systemctl status symbolon-relay
    ```
+
+### B. Symbolon Control Plane (Centrálny licenčný server):
+1. Skopírujte publikovaný binár `Symbolon.ControlPlane` do `/opt/symbolon/controlplane/`.
+2. Skopírujte unit súbor:
+   ```bash
+   sudo cp systemd/symbolon-controlplane.service /etc/systemd/system/
+   sudo systemctl daemon-reload
+   sudo systemctl enable --now symbolon-controlplane
+   ```
+3. Kontrola stavu:
+   ```bash
+   sudo systemctl status symbolon-controlplane
+   ```
+

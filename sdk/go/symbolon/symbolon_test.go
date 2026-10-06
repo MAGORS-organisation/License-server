@@ -331,3 +331,34 @@ func TestClientMockTokensAutoRollbackOnClose(t *testing.T) {
 	}
 }
 
+func TestContainerAndCloudFingerprintGuard(t *testing.T) {
+	tmpDir := t.TempDir()
+	customPath := tmpDir + "/test_uuid.txt"
+
+	// 1. Persisted UUID generation and consistency
+	uuid1 := GetOrCreatePersistedContainerUUID(customPath)
+	if len(uuid1) < 32 {
+		t.Fatalf("expected valid UUID, got: %s", uuid1)
+	}
+
+	uuid2 := GetOrCreatePersistedContainerUUID(customPath)
+	if uuid1 != uuid2 {
+		t.Fatalf("expected persistent UUID across calls, got %s and %s", uuid1, uuid2)
+	}
+
+	// 2. Simulated container environment variable
+	t.Setenv("KUBERNETES_SERVICE_HOST", "10.96.0.1")
+	if !IsContainerOrCloud() {
+		t.Fatalf("expected IsContainerOrCloud() to be true when KUBERNETES_SERVICE_HOST is set")
+	}
+
+	comps := GetLocalFingerprintComponentsWithVolume(customPath)
+	if comps["isContainer"] != "true" {
+		t.Fatalf("expected isContainer='true' in container environment")
+	}
+	if comps["machineId"] != uuid1 {
+		t.Fatalf("expected machineId to equal persistent volume UUID %s, got %s", uuid1, comps["machineId"])
+	}
+}
+
+

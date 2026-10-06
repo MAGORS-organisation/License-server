@@ -542,3 +542,59 @@ try (TokenReservationScope scope = client.beginMeteredScope(req)) {
 } // V prípade chyby close() automaticky uvoľní a vráti rezervované kredity
 ```
 
+---
+
+## 11. Kontajnerový a Cloudový Fingerprint Guard (FPR-10 .. FPR-14, §7.6)
+
+V kontajneroch (Docker, Podman, Kubernetes, AWS ECS, Azure Container Apps, Google Cloud Run) a cloudových inštanciách je zber fyzického hardvérového fingerprintu anti-pattern:
+- Golden images a základné obrazy nesú identický `machine-id` do stoviek replík.
+- VM klony a autoscaling duplikujú CPU model aj MAC adresy virtuálnych adaptérov.
+- Každé nasadenie nového podu by viedlo k nežiaducemu node-lock zlyhaniu alebo rýchlemu vyčerpaniu limitu aktivácií.
+
+V súlade s normatívnou špecifikáciou `spec/08-fingerprint.md` (FPR-10 až FPR-14) všetky oficiálne Symbolon SDK (.NET, Python, Go, Java, Rust, C/C++):
+1. **Automaticky detegujú kontajnerové/cloudové prostredie** (kontrolou `/.dockerenv`, `/run/.containerenv`, `/proc/1/cgroup`, premenných `KUBERNETES_SERVICE_HOST`, `container`, `DOTNET_RUNNING_IN_CONTAINER`, `AWS_EXECUTION_ENV`, `AZURE_CONTAINER_APP_NAME`, `GOOGLE_CLOUD_PROJECT`).
+2. **Nikdy nepoužívajú fyzický hardvér v kontajneri** (FPR-12).
+3. **Generujú a perzistujú stabilný UUID v pripojenom volume** (`~/.symbolon/container_instance_uuid.txt` alebo v konfigurovateľnom zväzku).
+4. **Logujú odporúčanie (FPR-13)** použiť pre kontajnerové a autoscaling pracovné záťaže **floating licencie s krátkym lease TTL (10 min)** namiesto viazania na uzol (node-locking).
+
+### Príklad detekcie a získania komponentov naprieč jazykmi:
+- **.NET:** `DeviceFingerprint.IsContainerOrCloud()`, `DeviceFingerprint.Collect(...)`
+- **Python:** `symbolon.fingerprint.is_container_or_cloud()`, `symbolon.fingerprint.get_hardware_components(...)`
+- **Go:** `symbolon.IsContainerOrCloud()`, `symbolon.GetLocalFingerprintComponents()`
+- **Java:** `Fingerprint.isContainerOrCloud()`, `Fingerprint.getLocalFingerprintComponents()`
+- **Rust:** `symbolon::fingerprint::is_container_or_cloud()`, `symbolon::fingerprint::get_hardware_components()`
+- **C/C++:** `symbolon_is_container_or_cloud(&is_container)`, `symbolon_get_hardware_fingerprint(buf, len)`
+
+---
+
+## 12. Air-Gapped USB Digest & Audit Chain Synchronizácia (GNT-1..10, FLT-32..35, §7.7)
+
+Pre izolované priemyselné prevádzky, kritickú infraštruktúru a SCADA siete bez priameho prístupu na internet Symbolon implementuje bezpečný kryptografický protokol prenosu licencií cez fyzické médiá (USB):
+
+```
+[Izolovaná sieť / Air-Gap]                               [Online Sieť]
+Relay server / Operátor                                  Control Plane Server
+  │                                                            │
+  ├─ 1. symbolon grant request ──> req.symreq                  │
+  │     (obsahuje usageDigest hash-chain od minulého grantu)   │
+  │                                                            │
+  │     ═════════════ Prenos cez USB kľúč ═════════════════>  │
+  │                                                            │
+  │                                   2. symbolon grant issue ─┤
+  │                                      (--in req.symreq)     │
+  │                                      alebo POST /v1/offline/requests
+  │                                                            │
+  │                                   vytvorí grant.symgrant  ─┤
+  │                                                            │
+  │     <════════════ Prenos cez USB kľúč ═════════════════    │
+  │                                                            │
+  ├─ 3. symbolon grant import ──> pool rozšírený o sedadlá     │
+  │     (--in grant.symgrant)                                  │
+```
+
+### Kľúčové bezpečnostné garancie:
+- **Usage Digest Continuity (FLT-33):** Každá žiadosť `.symreq` musí obsahovať koreň Merkleho stromu / hash-chainu auditných udalostí od posledného grantu. Control Plane odmietne vydať nový grant, ak predchádzajúci reťazec nenadväzuje — relay nemôže donekonečna čerpať kapacitu bez preukázania reálneho využitia.
+- **Anti-Replay Nonce (FLT-34):** Každý `.symreq` má jedinečný nonce registrovaný v databáze Control Plane; opakované odoslanie toho istého súboru skončí s chybou `409 Conflict`.
+- **Monotónna sekvencia (GNT-7):** Každý grant nesie prísne rastúce sekvenčné číslo (`seq`), ktoré pri importe do relayu automaticky zneplatňuje a nahrádza starší grant (`supersedes`).
+
+

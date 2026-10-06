@@ -338,12 +338,153 @@ SYMBOLON_API symbolon_status_t symbolon_feature_lease_get_code(
     return SYMBOLON_OK;
 }
 
+SYMBOLON_API symbolon_status_t symbolon_is_container_or_cloud(int* out_is_container)
+{
+    if (!out_is_container) {
+        return SYMBOLON_ERR_INVALID_ARGUMENT;
+    }
+
+    *out_is_container = 0;
+
+    // 1. Container marker files
+    FILE* f_docker = fopen("/.dockerenv", "r");
+    if (f_docker) {
+        fclose(f_docker);
+        *out_is_container = 1;
+        return SYMBOLON_OK;
+    }
+    FILE* f_container = fopen("/run/.containerenv", "r");
+    if (f_container) {
+        fclose(f_container);
+        *out_is_container = 1;
+        return SYMBOLON_OK;
+    }
+
+    // 2. Linux /proc/1/cgroup inspection
+    FILE* f_cgroup = fopen("/proc/1/cgroup", "r");
+    if (f_cgroup) {
+        char buf[1024];
+        while (fgets(buf, sizeof(buf), f_cgroup)) {
+            for (char* p = buf; *p; ++p) *p = (char)tolower((unsigned char)*p);
+            if (strstr(buf, "docker") || strstr(buf, "containerd") ||
+                strstr(buf, "kubepods") || strstr(buf, "lxc")) {
+                fclose(f_cgroup);
+                *out_is_container = 1;
+                return SYMBOLON_OK;
+            }
+        }
+        fclose(f_cgroup);
+    }
+
+    // 3. Environment variables (FPR-11)
+    const char* cloud_vars[] = {
+        "KUBERNETES_SERVICE_HOST",
+        "container",
+        "DOTNET_RUNNING_IN_CONTAINER",
+        "AWS_EXECUTION_ENV",
+        "ECS_CONTAINER_METADATA_URI",
+        "AZURE_CONTAINER_APP_NAME",
+        "GOOGLE_CLOUD_PROJECT",
+        NULL
+    };
+    for (int i = 0; cloud_vars[i] != NULL; ++i) {
+        const char* val = getenv(cloud_vars[i]);
+        if (val && strlen(val) > 0) {
+            *out_is_container = 1;
+            return SYMBOLON_OK;
+        }
+    }
+
+    return SYMBOLON_OK;
+}
+
+SYMBOLON_API symbolon_status_t symbolon_get_or_create_persisted_container_uuid(
+    const char* custom_volume_path,
+    char* buffer,
+    size_t buffer_len)
+{
+    if (!buffer || buffer_len < 37) {
+        return SYMBOLON_ERR_INVALID_ARGUMENT;
+    }
+
+    char file_path[512];
+    if (custom_volume_path && strlen(custom_volume_path) > 0) {
+        strncpy(file_path, custom_volume_path, sizeof(file_path) - 1);
+        file_path[sizeof(file_path) - 1] = '\0';
+    } else {
+        const char* local_app = getenv("LOCALAPPDATA");
+        if (local_app && strlen(local_app) > 0) {
+            snprintf(file_path, sizeof(file_path), "%s\\symbolon_container_uuid.txt", local_app);
+        } else {
+            const char* home = getenv("HOME");
+            if (home && strlen(home) > 0) {
+                snprintf(file_path, sizeof(file_path), "%s/.symbolon_container_uuid.txt", home);
+            } else {
+                strncpy(file_path, "/tmp/symbolon_container_uuid.txt", sizeof(file_path) - 1);
+                file_path[sizeof(file_path) - 1] = '\0';
+            }
+        }
+    }
+
+    FILE* f = fopen(file_path, "r");
+    if (f) {
+        char existing[64];
+        if (fgets(existing, sizeof(existing), f)) {
+            char* trimmed = existing;
+            while (*trimmed && isspace((unsigned char)*trimmed)) trimmed++;
+            size_t len = strlen(trimmed);
+            while (len > 0 && isspace((unsigned char)trimmed[len - 1])) {
+                trimmed[--len] = '\0';
+            }
+            if (len >= 32) {
+                fclose(f);
+                strncpy(buffer, trimmed, buffer_len - 1);
+                buffer[buffer_len - 1] = '\0';
+                return SYMBOLON_OK;
+            }
+        }
+        fclose(f);
+    }
+
+    // Generate pseudo-random UUID v4
+    unsigned int r1 = (unsigned int)rand();
+    unsigned int r2 = (unsigned int)rand();
+    unsigned int r3 = (unsigned int)rand();
+    unsigned int r4 = (unsigned int)rand();
+    snprintf(buffer, buffer_len, "%08x-%04x-4%03x-%04x-%04x%08x",
+        r1,
+        (r2 >> 16) & 0xffff,
+        r2 & 0x0fff,
+        0x8000 | (r3 & 0x3fff),
+        r3 >> 16,
+        r4);
+
+    FILE* f_out = fopen(file_path, "w");
+    if (f_out) {
+        fputs(buffer, f_out);
+        fclose(f_out);
+    }
+
+    return SYMBOLON_OK;
+}
+
 SYMBOLON_API symbolon_status_t symbolon_get_hardware_fingerprint(
     char* buffer,
     size_t buffer_len)
 {
     if (!buffer || buffer_len < 72) {
         return SYMBOLON_ERR_INVALID_ARGUMENT;
+    }
+
+    int is_container = 0;
+    symbolon_is_container_or_cloud(&is_container);
+    if (is_container) {
+        fprintf(stderr, "WARNING: Containerized or cloud environment detected. Hardware node-locking is an anti-pattern in containers. Recommended: floating license with short lease TTL (FPR-13).\n");
+        char container_uuid[64];
+        if (symbolon_get_or_create_persisted_container_uuid(NULL, container_uuid, sizeof(container_uuid)) == SYMBOLON_OK) {
+            snprintf(buffer, buffer_len, "sha256:container-%s", container_uuid);
+            return SYMBOLON_OK;
+        }
     }
 
     // Default canonical hardware fingerprint format

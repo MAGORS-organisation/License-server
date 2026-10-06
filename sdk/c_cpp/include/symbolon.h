@@ -166,7 +166,28 @@ SYMBOLON_API symbolon_status_t symbolon_feature_lease_get_code(
     size_t buffer_len);
 
 /**
- * Computes canonical SHA-256 hardware fingerprint of the current machine.
+ * Detects if the current process is running in a container, Kubernetes, or cloud instance (FPR-10, FPR-11).
+ *
+ * @param out_is_container Pointer to integer receiving 1 if container/cloud detected, 0 otherwise.
+ * @return SYMBOLON_OK on success.
+ */
+SYMBOLON_API symbolon_status_t symbolon_is_container_or_cloud(int* out_is_container);
+
+/**
+ * Retrieves or generates a persistent UUID in volume storage for container environments (FPR-12).
+ *
+ * @param custom_volume_path Optional path to custom storage file (NULL for default).
+ * @param buffer Output buffer (min 37 bytes for UUID string).
+ * @param buffer_len Length of output buffer.
+ * @return SYMBOLON_OK on success.
+ */
+SYMBOLON_API symbolon_status_t symbolon_get_or_create_persisted_container_uuid(
+    const char* custom_volume_path,
+    char* buffer,
+    size_t buffer_len);
+
+/**
+ * Computes canonical SHA-256 hardware or container fingerprint of the current machine (FPR-1, FPR-12).
  *
  * @param buffer Output buffer (min 72 bytes recommended).
  * @param buffer_len Size of output buffer.

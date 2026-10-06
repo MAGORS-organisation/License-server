@@ -93,10 +93,6 @@ public static class PublicEndpoints
             .WithName("GetJwks")
             .WithSummary("Vráti JWKS verejných kľúčov.");
 
-        group.MapPost("/offline/requests", ProcessOfflineRequest)
-            .WithName("ProcessOfflineRequest")
-            .WithSummary("Spracuje offline .symreq požiadavku.");
-
         group.MapGet("/queue/{ticket}", GetQueueStatusAsync)
             .WithName("GetQueueStatus")
             .WithSummary("Zistí aktuálny stav čakajúcej požiadavky vo fronte.");
@@ -143,6 +139,7 @@ public static class PublicEndpoints
 
         if (license is null || license.State != "active" || !string.Equals(license.KeyHash, fullHashHex, StringComparison.OrdinalIgnoreCase))
         {
+            activity?.SetStatus(ActivityStatusCode.Error, "License Not Found");
             return TypedResults.Problem(
                 statusCode: StatusCodes.Status404NotFound,
                 title: "License Not Found",
@@ -152,6 +149,7 @@ public static class PublicEndpoints
         var now = time.GetUtcNow();
         if (license.ExpiresAt.HasValue && license.ExpiresAt.Value < now)
         {
+            activity?.SetStatus(ActivityStatusCode.Error, "License Expired");
             return TypedResults.Problem(
                 statusCode: StatusCodes.Status403Forbidden,
                 title: "License Expired",
@@ -163,6 +161,7 @@ public static class PublicEndpoints
         {
             if (string.IsNullOrWhiteSpace(dto.UserId))
             {
+                activity?.SetStatus(ActivityStatusCode.Error, "User Identification Required");
                 return TypedResults.Problem(
                     statusCode: StatusCodes.Status403Forbidden,
                     title: "User Identification Required",
@@ -175,6 +174,7 @@ public static class PublicEndpoints
 
             if (!authorized)
             {
+                activity?.SetStatus(ActivityStatusCode.Error, "User Not Authorized");
                 return TypedResults.Problem(
                     statusCode: StatusCodes.Status403Forbidden,
                     title: "User Not Authorized",
@@ -365,6 +365,7 @@ public static class PublicEndpoints
                     machineId = dto.MachineId
                 }, license.TenantId, ct).ConfigureAwait(false);
 
+                activity?.SetStatus(ActivityStatusCode.Error, evalResult.DenyReason ?? "Access Denied by Policy Rule");
                 if (evalResult.DenyType == "group-quota-exceeded")
                 {
                     return TypedResults.Problem(
@@ -510,6 +511,7 @@ public static class PublicEndpoints
             maxSeats = license.MaxSeats
         }, license.TenantId, ct).ConfigureAwait(false);
 
+        activity?.SetStatus(ActivityStatusCode.Error, result.Reason ?? "Unable to acquire seat.");
         if (result.Reason == "seat-pool-exhausted")
         {
             return TypedResults.Problem(
@@ -1451,11 +1453,6 @@ public static class PublicEndpoints
     {
         var jwks = await keyManager.GetPublicJwksAsync(ct).ConfigureAwait(false);
         return TypedResults.Ok(jwks);
-    }
-
-    private static IResult ProcessOfflineRequest()
-    {
-        return TypedResults.Ok(new { status = "received", message = "Offline request processed" });
     }
 
     private static async Task<IResult> GetQueueStatusAsync(

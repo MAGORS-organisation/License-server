@@ -10,6 +10,20 @@ a projekt striktne dodržiava [Sémantické Verziovanie (Semantic Versioning 2.0
 ## [Unreleased]
 
 ### Pridané (Added)
+- **Phase 13: Kontajnerový & Cloudový Fingerprint Guard (§7.6, FPR-10..14) a Systemd Hardening**:
+  - **Multi-SDK Kontajnerový Fingerprint Guard**:
+    - Implementácia normatívnych pravidiel `FPR-10` až `FPR-14` naprieč všetkými 6 klientskymi SDK (.NET, Python, Go, Java, Rust, C/C++).
+    - Spoľahlivá detekcia kontajnerov a cloudových prostredí (`/.dockerenv`, `/run/.containerenv`, `/proc/1/cgroup`, `KUBERNETES_SERVICE_HOST`, `container`, `DOTNET_RUNNING_IN_CONTAINER`, `AWS_EXECUTION_ENV`, `ECS_CONTAINER_METADATA_URI`, `AZURE_CONTAINER_APP_NAME`, `GOOGLE_CLOUD_PROJECT`).
+    - Eliminácia anti-patternu golden image / VM klonov: v kontajneroch sa nepoužíva nespoľahlivý hardvér, ale perzistovaný stabilný náhodný UUID vo volume úložisku (`container_instance_uuid.txt`) a komponent `isContainer=true`.
+    - Logovanie normatívneho odporúčania `FPR-13` preferovať pre kontajnery a autoscaling floating licencie s krátkym lease TTL namiesto node-locking.
+    - Nové unit testy v Go (`TestContainerAndCloudFingerprintGuard`), Java (`testContainerUuidPersistence`), Rust (`test_container_uuid_persistence`), a C/C++ (`symbolon_is_container_or_cloud`, `symbolon_get_or_create_persisted_container_uuid`).
+  - **Trasovanie a Odstránenie Routing Kolízie (`Symbolon.ControlPlane`)**:
+    - Odstránený duplicitný stub `ProcessOfflineRequest` v `PublicEndpoints.cs`, garantujúci jednoznačné smerovanie `POST /v1/offline/requests` na autoritatívny `OfflineEndpoints.ProcessAirGapRequestAsync`.
+    - Doplnené nastavovanie `ActivityStatusCode.Error` pre OpenTelemetry stopy na všetkých validačných a chybových vetvách `CheckoutAsync`.
+    - Izolácia testu `DistributedTracingTests` pomocou filtrovania podľa `TraceId`.
+  - **Produkčná Orchestrácia a Nasadenie (`deploy/`)**:
+    - Pridaný unit súbor `deploy/systemd/symbolon-controlplane.service` s bezpečnostným sandboxom (`ProtectSystem=strict`, `ProtectHome=true`, `PrivateTmp=true`, `LimitNOFILE=65535`).
+    - Aktualizovaná dokumentácia v `deploy/README.md` a `docs/quickstart-guide.md` (Sekcia 11: Kontajnerový a Cloudový Fingerprint Guard, Sekcia 12: Air-Gapped USB Digest & Audit Chain Synchronizácia).
 - **Phase 12: Klientske SDK pre Token & Metered Pay-As-You-Go Licencovanie (§4.4, §7.8)**:
   - **Protokol a DTO vrstva (`Symbolon.Protocol`)**:
     - Nové DTO modely pre kreditné a metered operácie: `ReserveTokensRequestDto`, `ReserveTokensResponseDto`, `HeartbeatTokensRequestDto`, `HeartbeatTokensResponseDto`, `CommitTokensRequestDto`, `CommitTokensResponseDto`, `RollbackTokensRequestDto`, `RollbackTokensResponseDto`, `TokenWalletBalanceResponseDto`.
