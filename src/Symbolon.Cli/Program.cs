@@ -763,71 +763,7 @@ internal static class Program
         return 0;
     }
 
-    private static async Task<int> HandleDoctorAsync(string[] args)
-    {
-        string? serverUrl = GetArg(args, "--server");
-
-        Console.ForegroundColor = ConsoleColor.Cyan;
-        Console.WriteLine("=== SYMBOLON DOCTOR ===");
-        Console.ResetColor();
-
-        // 1. ES256 check
-        Console.WriteLine("  [✔] Klasická kryptografia: ES256 (ECDSA P-256) podporované");
-
-        // 2. ML-DSA check
-        if (MlDsaSignatureProvider.IsSupported)
-        {
-            Console.ForegroundColor = ConsoleColor.Green;
-            Console.WriteLine("  [✔] Post-kvantová kryptografia: ML-DSA-65 (FIPS 204) natívne podporované");
-            Console.ResetColor();
-        }
-        else
-        {
-            Console.ForegroundColor = ConsoleColor.Yellow;
-            Console.WriteLine("  [⚠] Post-kvantová kryptografia: ML-DSA nie je natívne dostupné (vyžaduje Windows CNG PQC alebo OpenSSL 3.5+)");
-            Console.ResetColor();
-        }
-
-        // 3. System clock
-        var now = DateTimeOffset.UtcNow;
-        Console.WriteLine($"  [✔] Systémové hodiny: {now:u}");
-
-        // 4. Device fingerprint
-        var fp = DeviceFingerprint.Collect();
-        string fpHex = FingerprintHelper.ComputeHash(fp);
-        Console.WriteLine($"  [✔] Fingerprint zariadenia: {fpHex} ({fp.Count} komponentov)");
-
-        // 5. Server check if URL provided
-        if (!string.IsNullOrWhiteSpace(serverUrl))
-        {
-            Console.Write($"  [*] Kontrola servera {serverUrl} ... ");
-            try
-            {
-                using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(5) };
-                var res = await http.GetAsync(new Uri(new Uri(serverUrl), "health")).ConfigureAwait(false);
-                if (res.IsSuccessStatusCode)
-                {
-                    Console.ForegroundColor = ConsoleColor.Green;
-                    Console.WriteLine("Online [✔]");
-                    Console.ResetColor();
-                }
-                else
-                {
-                    Console.ForegroundColor = ConsoleColor.Yellow;
-                    Console.WriteLine($"Dostupný, ale stav je {(int)res.StatusCode} [⚠]");
-                    Console.ResetColor();
-                }
-            }
-            catch (Exception ex) when (ex is HttpRequestException or TimeoutException or SocketException)
-            {
-                Console.ForegroundColor = ConsoleColor.Red;
-                Console.WriteLine($"Nedostupný ({ex.Message}) [✖]");
-                Console.ResetColor();
-            }
-        }
-
-        return 0;
-    }
+    private static Task<int> HandleDoctorAsync(string[] args) => Commands.DoctorCommands.HandleDoctorAsync(args);
 
     private static string? GetArg(string[] args, string name)
     {
@@ -867,7 +803,7 @@ internal static class Program
               license borrow <leaseId> --days <n> [--out <f.symlease>] [--out-key <f.key>] [--server <url>]
               license return <leaseId> --symlease <f.symlease> --key <f.key> [--server <url>]
               license inspect-borrow <f.symlease>
-              doctor [--server <url>]
+              doctor [--server <url>] [--relay <url>] [--pqc] [--strict] [--json]
               import --file <cesta> --policy <policy-id> [--format <keygen|csv>] [--dry-run]
               export --out <cesta> [--format <json|csv>]
               sbom [--out <cesta>]                      Vygeneruje CycloneDX v1.6 SBOM v JSON formáte

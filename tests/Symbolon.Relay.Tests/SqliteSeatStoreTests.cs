@@ -84,6 +84,50 @@ public sealed class SqliteSeatStoreTests : IDisposable
         seat2!.SeatNo.Should().Be(0);
     }
 
+    [Fact]
+    public async Task TryAcquireOne_UnderHighConcurrency_GuaranteesZeroDoubleAllocation()
+    {
+        string licId = "lic_sqlite_concurrency";
+        const int totalSeats = 5;
+        const int concurrentClients = 50;
+
+        await _store.SeedSeatsAsync(licId, totalSeats);
+
+        var now = DateTimeOffset.UtcNow;
+        var ttl = TimeSpan.FromMinutes(15);
+
+        using var barrier = new SemaphoreSlim(0, concurrentClients);
+        var tasks = new Task<Domain.SeatAllocation?>[concurrentClients];
+
+        for (int i = 0; i < concurrentClients; i++)
+        {
+            int clientId = i;
+            tasks[i] = Task.Run(async () =>
+            {
+                barrier.Release();
+                await Task.Yield();
+
+                return await _store.TryAcquireOneAsync(
+                    licId,
+                    $"sha256:fp_{clientId}",
+                    $"pc_{clientId}",
+                    now,
+                    ttl);
+            });
+        }
+
+        var results = await Task.WhenAll(tasks);
+        var acquired = results.Where(s => s is not null).ToList();
+
+        // Exactly totalSeats allocations must succeed
+        acquired.Should().HaveCount(totalSeats);
+
+        // All allocated seat numbers must be distinct
+        var seatNumbers = acquired.Select(s => s!.SeatNo).Distinct().ToList();
+        seatNumbers.Should().HaveCount(totalSeats);
+        seatNumbers.Should().BeEquivalentTo(Enumerable.Range(0, totalSeats));
+    }
+
     public void Dispose()
     {
         _store.Dispose();

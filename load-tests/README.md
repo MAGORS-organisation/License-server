@@ -16,6 +16,7 @@ Profily sú navrhnuté a merané proti referenčnému hardvéru (Control Plane: 
 | **4. Klientska Verifikácia** | `k6/client-verification.js` | ES256 $< 1\text{ ms}$, ML-DSA-65 $< 3\text{ ms}$ | $> 10\text{ ms}$ |
 | **5. Dlhodobý Záťažový Soak Test** | `k6/soak-test.js` | 24-hodinový beh (alebo 1 h skrátený), stabilná pamäť RSS | nárast pamäte bez uvoľnenia (leak) |
 | **6. A/B Experimenty & Routing** | `k6/experiments-ab.js` | $p99 < 10\text{ ms}$, nulový drift, rovnomerné rozdelenie | $p > 0.05$ porušenie |
+| **7. Relay Súbeh & Probing** | `k6/relay-concurrency.js` | 100 súbežných staníc, $p99 < 200\text{ ms}$, probing $< 25\text{ ms}$ | chybovosť $> 1\%$ |
 
 ---
 
@@ -55,4 +56,7 @@ k6 run -e SERVER_URL=http://localhost:8080 k6/soak-test.js
 
 # 6. A/B Testovanie a Experimentálny Routing
 k6 run -e SERVER_URL=http://localhost:8080 k6/experiments-ab.js
+
+# 7. Relay Súbeh a Zdravotný Monitoring (100 súbežných staníc + probing)
+k6 run -e RELAY_URL=http://localhost:5001 k6/relay-concurrency.js
 ```

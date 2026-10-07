@@ -10,6 +10,22 @@ a projekt striktne dodržiava [Sémantické Verziovanie (Semantic Versioning 2.0
 ## [Unreleased]
 
 ### Pridané (Added)
+- **Phase 14: Diagnostický Doctor Engine, PQC Readiness & Záťažová Súbežnosť (§10.9, §11.1, §13.5)**:
+  - **Enterprise System Doctor & Operačná Diagnostika (`symbolon doctor`)**:
+    - Samostatný a modulárny diagnostický engine `Symbolon.Cli/Commands/DoctorCommands.cs` s podporou volieb `--server <url>`, `--relay <url>`, `--pqc`, `--strict`, `--json`.
+    - Hĺbková diagnostika krypto vrstvy: klasická ES256 (ECDSA P-256), natívny post-kvantový podpis ML-DSA-65 (FIPS 204), a post-kvantová enkapsulácia kľúčov ML-KEM-768/1024 (FIPS 203).
+    - Kontrola systémových hodín a UTC časovej synchronizácie.
+    - Kontrola hardvérového fingerprintu stanice s automatickou detekciou kontajnerového / cloudového prostredia a perzistenciou volume UUID (`container_instance_uuid.txt`) podľa normatívnych pravidiel `FPR-10` až `FPR-14`.
+    - Vzdialený probing Control Plane servera: liveness (`/health/live`), readiness (`/health/ready` s kontrolou DB pripojenia), a PQC Quantum Readiness audit (`/admin/v1/pqc/readiness`).
+    - Vzdialený probing Symbolon Relay servera: liveness (`/health/live`), readiness (`/health/ready`), a kontrola delegovaných sedadiel (`/health/grant`) s automatickým varovaním pri expirácii pod 3 dni (§11.1).
+    - Výstupné formátovanie: prehľadná Spectre.Console TUI tabuľka a súhrnný panel, alebo strojovo čitateľný `--json` formát pre Kubernetes readiness/liveness sondy a monitorovacie systémy.
+    - Integrácia do interaktívneho sprievodcu `SetupWizard.cs` a nová testovacia sada `DoctorCliTests.cs` (7 testov, 100% zelené).
+  - **Relay Výkonnostné Profily & Súbežnostné Invarianty (k6 & .NET)**:
+    - Nový profil `k6/relay-concurrency.js` v `load-tests/` simulujúci 100 súbežných staníc s uvoľňovaním sedadiel a nepretržitým probingom `/health/grant` s latenciou pod 25 ms.
+    - Nový test súbežnosti `TryAcquireOne_UnderHighConcurrency_GuaranteesZeroDoubleAllocation` v `SqliteSeatStoreTests.cs` garantujúci striktnú jednoznačnosť alokácie a nulovú kolíziu pri paralelnom nápore.
+  - **CI/CD Automatizácia & Multi-Platform Verifikácia**:
+    - Doplnená kontrola `symbolon doctor --json` do GitHub Actions `.github/workflows/ci.yml`.
+    - Spustenie `cargo test --verbose` v kroku verifikácie Rust SDK.
 - **Phase 13: Kontajnerový & Cloudový Fingerprint Guard (§7.6, FPR-10..14) a Systemd Hardening**:
   - **Multi-SDK Kontajnerový Fingerprint Guard**:
     - Implementácia normatívnych pravidiel `FPR-10` až `FPR-14` naprieč všetkými 6 klientskymi SDK (.NET, Python, Go, Java, Rust, C/C++).

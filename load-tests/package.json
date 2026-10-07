@@ -8,7 +8,8 @@
     "test:issuance": "k6 run k6/license-issuance.js",
     "test:verification": "k6 run k6/client-verification.js",
     "test:soak": "k6 run k6/soak-test.js",
-    "test:experiments": "k6 run k6/experiments-ab.js"
+    "test:experiments": "k6 run k6/experiments-ab.js",
+    "test:relay": "k6 run k6/relay-concurrency.js"
   },
   "keywords": [
     "symbolon",

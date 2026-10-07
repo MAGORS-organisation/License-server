@@ -153,7 +153,10 @@ public static class DeviceFingerprint
         return FingerprintHelper.FilterValidComponents(components);
     }
 
-    private static string GetOrCreatePersistedContainerUuid(string? customPath)
+    /// <summary>
+    /// Gets or creates a persisted container UUID in local app data or a custom volume mount (FPR-12).
+    /// </summary>
+    public static string GetOrCreatePersistedContainerUuid(string? customPath = null)
     {
         lock (UuidLock)
         {

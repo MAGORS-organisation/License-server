@@ -46,6 +46,9 @@ jobs:
       - name: Verify Artifact Checksum
         run: dotnet run --project src/Symbolon.Cli/Symbolon.Cli.csproj -- verify-artifact cyclonedx-sbom.json
 
+      - name: Run Symbolon System & PQC Doctor
+        run: dotnet run --project src/Symbolon.Cli/Symbolon.Cli.csproj -- doctor --json
+
   go-sdk-tests:
     name: Go SDK Verification
     runs-on: ubuntu-latest
@@ -111,8 +114,8 @@ jobs:
       - name: Setup Rust Toolchain
         uses: dtolnay/rust-toolchain@stable
 
-      - name: Verify Rust SDK Compilation
-        run: cargo check --manifest-path sdk/rust/symbolon/Cargo.toml
+      - name: Verify Rust SDK Compilation and Tests
+        run: cargo test --manifest-path sdk/rust/symbolon/Cargo.toml --verbose
 
   c-sdk-build:
     name: C/C++ SDK Verification

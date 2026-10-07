@@ -347,10 +347,13 @@ cd License-server
 # Zostavenie celého solution
 dotnet build Symbolon.slnx
 
-# Spustenie všetkých 216 testov v .NET (+ 13 v Pythone, + 11 v Node.js/Wasm)
+# Spustenie testov naprieč všetkými 10 .NET projektmi a klientskymi SDK (656 testov)
 dotnet test Symbolon.slnx
 python -m unittest discover sdk/python/symbolon/tests
 node --test sdk/wasm/tests/validator.test.js
+
+# Diagnostika prostredia, PQC pripravenosti a sond serverov (Doctor)
+dotnet run --project src/Symbolon.Cli/Symbolon.Cli.csproj -- doctor
 ```
 
 ### 2. Spustenie celého prostredia cez Docker Compose

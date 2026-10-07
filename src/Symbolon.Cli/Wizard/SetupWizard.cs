@@ -124,8 +124,24 @@ public static class SetupWizard
         {
             console.MarkupLine("[yellow]⚠[/] Post-kvantová kryptografia: ML-DSA nie je natívne podporované na tomto OS.");
         }
+        if (MlKemKeyEncapsulationProvider.IsSupported)
+        {
+            console.MarkupLine("[green]✔[/] Kvantovo-odolná enkapsulácia: ML-KEM-768/1024 (FIPS 203) pripravená.");
+        }
+        else
+        {
+            console.MarkupLine("[yellow]⚠[/] Kvantovo-odolná enkapsulácia: ML-KEM nie je natívne podporované.");
+        }
         console.MarkupLine($"[green]✔[/] Systémové hodiny: {DateTimeOffset.UtcNow:u} (UTC)");
-        console.MarkupLine($"[green]✔[/] Hardvérový fingerprint stanice: [cyan]{fpHex}[/] ({fp.Count} metrík)");
+        if (Symbolon.Client.DeviceFingerprint.IsContainerOrCloud())
+        {
+            string persistedUuid = Symbolon.Client.DeviceFingerprint.GetOrCreatePersistedContainerUuid();
+            console.MarkupLine($"[yellow]⚠[/] Kontajnerové / Cloudové prostredie detegované (FPR-12 UUID: [cyan]{persistedUuid}[/]). Odporúča sa floating licencia (FPR-13).");
+        }
+        else
+        {
+            console.MarkupLine($"[green]✔[/] Hardvérový fingerprint stanice: [cyan]{fpHex}[/] ({fp.Count} metrík)");
+        }
         console.WriteLine();
     }
 

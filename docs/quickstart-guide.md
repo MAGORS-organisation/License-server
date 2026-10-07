@@ -597,4 +597,38 @@ Relay server / Operátor                                  Control Plane Server
 - **Anti-Replay Nonce (FLT-34):** Každý `.symreq` má jedinečný nonce registrovaný v databáze Control Plane; opakované odoslanie toho istého súboru skončí s chybou `409 Conflict`.
 - **Monotónna sekvencia (GNT-7):** Každý grant nesie prísne rastúce sekvenčné číslo (`seq`), ktoré pri importe do relayu automaticky zneplatňuje a nahrádza starší grant (`supersedes`).
 
+---
+
+## 13. System Doctor & Prevádzková Diagnostika (`symbolon doctor`, §11.1, §13.5)
+
+Pre rýchle overenie prevádzkyschopnosti, post-kvantovej pripravenosti a sieťovej konektivity poskytuje CLI nástroj `symbolon doctor`:
+
+```bash
+# 1. Rýchla lokálna diagnostika prostredia a kryptografie
+symbolon doctor
+
+# 2. Kompletná diagnostika s overením Control Plane a Post-Quantum readiness
+symbolon doctor --server http://localhost:5000 --pqc
+
+# 3. Kontrola lokálneho on-premise Relay servera a platnosti sedadiel
+symbolon doctor --relay http://localhost:5001
+
+# 4. Strojovo čitateľný JSON výstup pre automatizáciu (Kubernetes probes / CI)
+symbolon doctor --server http://localhost:5000 --relay http://localhost:5001 --json
+
+# 5. Striktný audit režim (zlyhá s kódom 1 pri akomkoľvek varovaní alebo neúplnom PQC skóre)
+symbolon doctor --server http://localhost:5000 --strict
+```
+
+### Čo `symbolon doctor` kontroluje:
+1. **Kryptografický subsystém:**
+   - Klasická asymetrická kryptografia: ES256 (ECDSA NIST P-256 podľa FIPS 186-5).
+   - Post-kvantový podpis: ML-DSA-65 (FIPS 204) — kontrola natívnej podpory CNG PQC a OpenSSL 3.5+.
+   - Kvantovo-odolná enkapsulácia kľúčov: ML-KEM-768/1024 (FIPS 203 / CNSA 2.0).
+2. **Systémový čas & synchronizácia:** Presnosť systémových hodín voči UTC (nutné pre platnosť lease tokenov a certifikátov).
+3. **Hardvér a virtualizácia (FPR-10..14):** Detekcia Docker, Podman, Kubernetes a Cloud inštancií; automatická perzistencia volume UUID a odporúčanie prechodu na floating modely.
+4. **Control Plane sondy:** `/health/live` (liveness), `/health/ready` (databázová konektivita) a `/admin/v1/pqc/readiness` (CNSA 2.0 a NIS2 index pripravenosti).
+5. **Relay sondy:** `/health/live`, `/health/ready` (SQLite úložisko) a `/health/grant` s varovaním pred blížiacou sa expiráciou sedadiel (< 3 dni).
+
+
 
