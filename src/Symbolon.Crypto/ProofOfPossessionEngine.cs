@@ -41,31 +41,40 @@ public static class ProofOfPossessionEngine
     {
         using var ecdsa = ECDsa.Create(ECCurve.NamedCurves.nistP256);
         var ecParams = ecdsa.ExportParameters(includePrivateParameters: true);
-
-        string x = Base64Url.EncodeToString(ecParams.Q.X!);
-        string y = Base64Url.EncodeToString(ecParams.Q.Y!);
-        string d = Base64Url.EncodeToString(ecParams.D!);
-
-        var pubJwk = new JwkEcKey
+        try
         {
-            Kty = "EC",
-            Crv = "P-256",
-            X = x,
-            Y = y
-        };
+            string x = Base64Url.EncodeToString(ecParams.Q.X!);
+            string y = Base64Url.EncodeToString(ecParams.Q.Y!);
+            string d = Base64Url.EncodeToString(ecParams.D!);
 
-        var privJwk = new JwkEcKey
+            var pubJwk = new JwkEcKey
+            {
+                Kty = "EC",
+                Crv = "P-256",
+                X = x,
+                Y = y
+            };
+
+            var privJwk = new JwkEcKey
+            {
+                Kty = "EC",
+                Crv = "P-256",
+                X = x,
+                Y = y,
+                D = d
+            };
+
+            return new EphemeralPossessionKeyPair(
+                PublicKeyJwk: JsonSerializer.Serialize(pubJwk),
+                PrivateKeyJwk: JsonSerializer.Serialize(privJwk));
+        }
+        finally
         {
-            Kty = "EC",
-            Crv = "P-256",
-            X = x,
-            Y = y,
-            D = d
-        };
-
-        return new EphemeralPossessionKeyPair(
-            PublicKeyJwk: JsonSerializer.Serialize(pubJwk),
-            PrivateKeyJwk: JsonSerializer.Serialize(privJwk));
+            if (ecParams.D is not null)
+            {
+                CryptographicOperations.ZeroMemory(ecParams.D);
+            }
+        }
     }
 
     /// <summary>
@@ -84,22 +93,34 @@ public static class ProofOfPossessionEngine
             throw new ArgumentException("JWK must be a valid EC P-256 private key with d, x, y parameters.", nameof(privateKeyJwk));
         }
 
-        var ecParams = new ECParameters
+        byte[]? dBytes = null;
+        try
         {
-            Curve = ECCurve.NamedCurves.nistP256,
-            Q = new ECPoint
+            dBytes = Base64Url.DecodeFromChars(key.D);
+            var ecParams = new ECParameters
             {
-                X = Base64Url.DecodeFromChars(key.X),
-                Y = Base64Url.DecodeFromChars(key.Y)
-            },
-            D = Base64Url.DecodeFromChars(key.D)
-        };
+                Curve = ECCurve.NamedCurves.nistP256,
+                Q = new ECPoint
+                {
+                    X = Base64Url.DecodeFromChars(key.X),
+                    Y = Base64Url.DecodeFromChars(key.Y)
+                },
+                D = dBytes
+            };
 
-        using var ecdsa = ECDsa.Create(ecParams);
-        byte[] nonceBytes = Encoding.UTF8.GetBytes(nonce);
-        byte[] signatureBytes = ecdsa.SignData(nonceBytes, HashAlgorithmName.SHA256, DSASignatureFormat.IeeeP1363FixedFieldConcatenation);
+            using var ecdsa = ECDsa.Create(ecParams);
+            byte[] nonceBytes = Encoding.UTF8.GetBytes(nonce);
+            byte[] signatureBytes = ecdsa.SignData(nonceBytes, HashAlgorithmName.SHA256, DSASignatureFormat.IeeeP1363FixedFieldConcatenation);
 
-        return Base64Url.EncodeToString(signatureBytes);
+            return Base64Url.EncodeToString(signatureBytes);
+        }
+        finally
+        {
+            if (dBytes is not null)
+            {
+                CryptographicOperations.ZeroMemory(dBytes);
+            }
+        }
     }
 
     /// <summary>

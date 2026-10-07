@@ -48,15 +48,22 @@ public static class ShamirSecretSharing
         // c0 je samotný bajt tajomstva, c1 .. c_{k-1} sú kryptograficky náhodné bajty
         byte[] coeffBuffer = new byte[thresholdK];
 
-        for (int byteIdx = 0; byteIdx < secretLen; byteIdx++)
+        try
         {
-            coeffBuffer[0] = secret[byteIdx];
-            RandomNumberGenerator.Fill(coeffBuffer.AsSpan(1));
-
-            for (byte x = 1; x <= totalSharesN; x++)
+            for (int byteIdx = 0; byteIdx < secretLen; byteIdx++)
             {
-                shareBuffers[x - 1][byteIdx] = GaloisField256.EvaluatePolynomial(coeffBuffer, x);
+                coeffBuffer[0] = secret[byteIdx];
+                RandomNumberGenerator.Fill(coeffBuffer.AsSpan(1));
+
+                for (byte x = 1; x <= totalSharesN; x++)
+                {
+                    shareBuffers[x - 1][byteIdx] = GaloisField256.EvaluatePolynomial(coeffBuffer, x);
+                }
             }
+        }
+        finally
+        {
+            CryptographicOperations.ZeroMemory(coeffBuffer);
         }
 
         var result = new SecretShare[totalSharesN];
@@ -114,7 +121,7 @@ public static class ShamirSecretSharing
                 throw new ArgumentException("Dĺžka dát v podieloch sa nezhoduje.", nameof(shares));
             }
 
-            if (!share.Checksum.AsSpan().SequenceEqual(expectedChecksum))
+            if (!CryptographicOperations.FixedTimeEquals(share.Checksum, expectedChecksum))
             {
                 throw new ArgumentException("Kontrolný súčet v podieloch sa nezhoduje (podiely nepochádzajú z rovnakého tajomstva).", nameof(shares));
             }
@@ -162,8 +169,12 @@ public static class ShamirSecretSharing
 
         // Overenie kontrolného súčtu integrity
         byte[] computedHash = SHA256.HashData(reconstructed);
-        if (!computedHash.AsSpan(0, 4).SequenceEqual(expectedChecksum))
+        bool checksumMatches = CryptographicOperations.FixedTimeEquals(computedHash.AsSpan(0, 4), expectedChecksum);
+        CryptographicOperations.ZeroMemory(lagrangeWeights);
+
+        if (!checksumMatches)
         {
+            CryptographicOperations.ZeroMemory(reconstructed);
             throw new CryptographicException(
                 "Rekonštrukcia zlyhala: Kontrolný súčet nesúhlasí. Niektorý z podielov je pravdepodobne poškodený alebo pozmenený.");
         }

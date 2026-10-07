@@ -60,9 +60,18 @@ public sealed class InMemoryReturnChallengeStore : IReturnChallengeStore
 
         if (_challenges.TryRemove(leaseId, out var entry))
         {
-            if (entry.ExpiresAt >= now && string.Equals(entry.Nonce, nonce, StringComparison.OrdinalIgnoreCase))
+            if (entry.ExpiresAt >= now)
             {
-                return Task.FromResult(true);
+                try
+                {
+                    byte[] expected = Convert.FromHexString(entry.Nonce);
+                    byte[] actual = Convert.FromHexString(nonce);
+                    return Task.FromResult(CryptographicOperations.FixedTimeEquals(expected, actual));
+                }
+                catch (FormatException)
+                {
+                    return Task.FromResult(false);
+                }
             }
         }
 

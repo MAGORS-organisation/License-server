@@ -114,6 +114,7 @@ public class SymbolonDbContext : DbContext
             b.Property(l => l.KeyHash).IsRequired();
             b.Property(l => l.State).HasMaxLength(32).IsRequired();
             b.HasIndex(l => new { l.TenantId, l.KeyLookup }).IsUnique();
+            b.HasIndex(l => l.KeyLookup);
             b.HasOne(l => l.Tenant)
              .WithMany()
              .HasForeignKey(l => l.TenantId)

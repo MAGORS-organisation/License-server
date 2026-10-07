@@ -390,7 +390,7 @@ Java SDK (`sdk/java/symbolon`) poskytuje bezpečné enterprise riešenie pre Spr
 
 ```xml
 <dependency>
-    <groupId>dev.symbolon</groupId>
+    <groupId>io.symbolon</groupId>
     <artifactId>symbolon-client</artifactId>
     <version>1.0.0</version>
 </dependency>
@@ -401,9 +401,9 @@ Java SDK (`sdk/java/symbolon`) poskytuje bezpečné enterprise riešenie pre Spr
 ```java
 package com.example.app;
 
-import dev.symbolon.ClientOptions;
-import dev.symbolon.SymbolonClient;
-import dev.symbolon.models.CheckoutResponse;
+import io.symbolon.ClientOptions;
+import io.symbolon.SymbolonClient;
+import io.symbolon.models.CheckoutResponse;
 
 import java.util.List;
 

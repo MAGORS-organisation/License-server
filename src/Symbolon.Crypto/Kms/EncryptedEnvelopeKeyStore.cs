@@ -51,12 +51,14 @@ public static class EncryptedEnvelopeKeyStore
         byte[] salt = new byte[SaltSizeBytes];
         RandomNumberGenerator.Fill(salt);
 
+        byte[] passphraseBytes = Encoding.UTF8.GetBytes(passphrase);
         byte[] derivedKey = Rfc2898DeriveBytes.Pbkdf2(
-            Encoding.UTF8.GetBytes(passphrase),
+            passphraseBytes,
             salt,
             Pbkdf2Iterations,
             HashAlgorithmName.SHA256,
             KeySizeBytes);
+        CryptographicOperations.ZeroMemory(passphraseBytes);
 
         byte[] nonce = new byte[NonceSizeBytes];
         RandomNumberGenerator.Fill(nonce);
@@ -64,8 +66,15 @@ public static class EncryptedEnvelopeKeyStore
         byte[] cipherText = new byte[pkcs8Bytes.Length];
         byte[] tag = new byte[TagSizeBytes];
 
-        using var aesGcm = new AesGcm(derivedKey, TagSizeBytes);
-        aesGcm.Encrypt(nonce, pkcs8Bytes, cipherText, tag);
+        try
+        {
+            using var aesGcm = new AesGcm(derivedKey, TagSizeBytes);
+            aesGcm.Encrypt(nonce, pkcs8Bytes, cipherText, tag);
+        }
+        finally
+        {
+            CryptographicOperations.ZeroMemory(derivedKey);
+        }
 
         return new EncryptedKeyEnvelope(
             V: 1,
@@ -92,17 +101,26 @@ public static class EncryptedEnvelopeKeyStore
         byte[] cipherText = Convert.FromBase64String(envelope.CipherText);
         byte[] tag = Convert.FromBase64String(envelope.AuthTag);
 
+        byte[] passphraseBytes = Encoding.UTF8.GetBytes(passphrase);
         byte[] derivedKey = Rfc2898DeriveBytes.Pbkdf2(
-            Encoding.UTF8.GetBytes(passphrase),
+            passphraseBytes,
             salt,
             Pbkdf2Iterations,
             HashAlgorithmName.SHA256,
             KeySizeBytes);
+        CryptographicOperations.ZeroMemory(passphraseBytes);
 
         byte[] plainText = new byte[cipherText.Length];
 
-        using var aesGcm = new AesGcm(derivedKey, TagSizeBytes);
-        aesGcm.Decrypt(nonce, cipherText, tag, plainText);
+        try
+        {
+            using var aesGcm = new AesGcm(derivedKey, TagSizeBytes);
+            aesGcm.Decrypt(nonce, cipherText, tag, plainText);
+        }
+        finally
+        {
+            CryptographicOperations.ZeroMemory(derivedKey);
+        }
 
         return plainText;
     }

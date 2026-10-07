@@ -123,6 +123,15 @@ public static class PublicEndpoints
         IExperimentStore experimentStore,
         CancellationToken ct)
     {
+        if (dto is null || string.IsNullOrWhiteSpace(dto.LicenseKey) || dto.FingerprintComponents is null || dto.FingerprintComponents.Count == 0)
+        {
+            return TypedResults.Problem(
+                statusCode: StatusCodes.Status400BadRequest,
+                title: "Invalid Request",
+                detail: "License key and fingerprint components are required.",
+                type: ProblemTypes.InvalidRequest);
+        }
+
         using var activity = SymbolonTracing.ActivitySource.StartActivity(SymbolonTracing.OpCheckout);
         activity?.SetTag(SymbolonTracing.TagLicenseId, dto.LicenseKey);
         activity?.SetTag(SymbolonTracing.TagSeatCount, dto.Quantity);

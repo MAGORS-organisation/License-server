@@ -105,6 +105,15 @@ internal static class LeaseEndpoints
     {
         ArgumentNullException.ThrowIfNull(dto);
 
+        if (string.IsNullOrWhiteSpace(dto.LicenseKey) || dto.FingerprintComponents is null || dto.FingerprintComponents.Count == 0)
+        {
+            return Results.Problem(
+                statusCode: StatusCodes.Status400BadRequest,
+                type: ProblemTypes.InvalidRequest,
+                title: "Invalid Request",
+                detail: "License key and fingerprint components are required.");
+        }
+
         // Validate license key format & checksum before processing (KEY-8)
         if (!LicenseKey.TryParse(dto.LicenseKey, out var key, out string? keyError))
         {

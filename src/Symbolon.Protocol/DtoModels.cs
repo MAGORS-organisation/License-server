@@ -38,7 +38,9 @@ public sealed record CheckoutRequestDto
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public int? Priority { get; init; }
 
-    public string ToFingerprintHash() => FingerprintHelper.ComputeHash(FingerprintComponents);
+    public string ToFingerprintHash() => FingerprintComponents is { Count: > 0 }
+        ? FingerprintHelper.ComputeHash(FingerprintComponents)
+        : string.Empty;
 }
 
 public sealed record CheckoutResponseDto

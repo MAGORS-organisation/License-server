@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Security.Cryptography;
 using System.Text;
 using Microsoft.EntityFrameworkCore;
 using Symbolon.Data.Entities;
@@ -25,24 +26,24 @@ public sealed class EfSeatStore(SymbolonDbContext db) : ISeatStore
         const int maxRetries = 3;
         for (int retry = 0; retry < maxRetries; retry++)
         {
-            var seats = await db.Seats
-                .Where(s => s.LicenseId == licenseId && s.GrantId == null)
+            var baseQuery = db.Seats
+                .Where(s => s.LicenseId == licenseId && s.GrantId == null &&
+                            (s.LeaseId == null || s.ExpiresAt < now) &&
+                            (s.BorrowedUntil == null || s.BorrowedUntil < now))
                 .OrderBy(s => s.IsOverage)
-                .ThenBy(s => s.SeatNo)
-                .ToListAsync(ct)
-                .ConfigureAwait(false);
-
-            var freeSeats = seats.Where(s =>
-                (s.LeaseId == null || s.ExpiresAt < now) &&
-                (s.BorrowedUntil == null || s.BorrowedUntil < now)).ToList();
+                .ThenBy(s => s.SeatNo);
 
             SeatEntity? candidate = null;
             if (!string.IsNullOrWhiteSpace(reservationTarget))
             {
-                candidate = freeSeats.FirstOrDefault(s => string.Equals(s.ReservedFor, reservationTarget, StringComparison.OrdinalIgnoreCase));
+                candidate = await baseQuery
+                    .FirstOrDefaultAsync(s => s.ReservedFor == reservationTarget, ct)
+                    .ConfigureAwait(false);
             }
 
-            candidate ??= freeSeats.FirstOrDefault(s => s.ReservedFor == null);
+            candidate ??= await baseQuery
+                .FirstOrDefaultAsync(s => s.ReservedFor == null, ct)
+                .ConfigureAwait(false);
 
             if (candidate is null)
             {
@@ -108,25 +109,46 @@ public sealed class EfSeatStore(SymbolonDbContext db) : ISeatStore
         const int maxRetries = 3;
         for (int retry = 0; retry < maxRetries; retry++)
         {
-            var seats = await db.Seats
-                .Where(s => s.LicenseId == licenseId && s.GrantId == null)
-                .OrderBy(s => s.IsOverage)
-                .ThenBy(s => s.SeatNo)
-                .ToListAsync(ct)
-                .ConfigureAwait(false);
-
-            var freeSeats = seats
-                .Where(s => (s.LeaseId == null || s.ExpiresAt < now) &&
+            var baseQuery = db.Seats
+                .Where(s => s.LicenseId == licenseId && s.GrantId == null &&
+                            (s.LeaseId == null || s.ExpiresAt < now) &&
                             (s.BorrowedUntil == null || s.BorrowedUntil < now))
-                .ToList();
+                .OrderBy(s => s.IsOverage)
+                .ThenBy(s => s.SeatNo);
 
-            var matchingReserved = !string.IsNullOrWhiteSpace(reservationTarget)
-                ? freeSeats.Where(s => string.Equals(s.ReservedFor, reservationTarget, StringComparison.OrdinalIgnoreCase))
-                : Enumerable.Empty<SeatEntity>();
+            List<SeatEntity> candidates;
+            if (!string.IsNullOrWhiteSpace(reservationTarget))
+            {
+                var reservedCandidates = await baseQuery
+                    .Where(s => s.ReservedFor == reservationTarget)
+                    .Take(quantity)
+                    .ToListAsync(ct)
+                    .ConfigureAwait(false);
 
-            var unreserved = freeSeats.Where(s => s.ReservedFor == null);
-
-            var candidates = matchingReserved.Concat(unreserved).Take(quantity).ToList();
+                if (reservedCandidates.Count < quantity)
+                {
+                    int needed = quantity - reservedCandidates.Count;
+                    var reservedIds = reservedCandidates.Select(s => s.Id).ToList();
+                    var unreserved = await baseQuery
+                        .Where(s => s.ReservedFor == null && !reservedIds.Contains(s.Id))
+                        .Take(needed)
+                        .ToListAsync(ct)
+                        .ConfigureAwait(false);
+                    candidates = reservedCandidates.Concat(unreserved).ToList();
+                }
+                else
+                {
+                    candidates = reservedCandidates;
+                }
+            }
+            else
+            {
+                candidates = await baseQuery
+                    .Where(s => s.ReservedFor == null)
+                    .Take(quantity)
+                    .ToListAsync(ct)
+                    .ConfigureAwait(false);
+            }
 
             if (candidates.Count < quantity)
             {
@@ -199,7 +221,7 @@ public sealed class EfSeatStore(SymbolonDbContext db) : ISeatStore
         }
 
         byte[] fpBytes = Encoding.UTF8.GetBytes(fingerprint);
-        if (seat.HolderFp is null || !seat.HolderFp.AsSpan().SequenceEqual(fpBytes))
+        if (seat.HolderFp is null || !CryptographicOperations.FixedTimeEquals(seat.HolderFp, fpBytes))
         {
             return RenewOutcome.Taken;
         }
