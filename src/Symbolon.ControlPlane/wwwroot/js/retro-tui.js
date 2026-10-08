@@ -503,7 +503,8 @@
                 } else if (item.view) {
                     switchRetroView(item.view);
                 } else if (item.action === 'open-config') {
-                    openModal('modal-auth-config');
+                    switchRetroView('view-config');
+                    if (typeof updateConfigApiKeyStatus === 'function') updateConfigApiKeyStatus();
                 } else if (item.action === 'open-help') {
                     openHelpModal();
                 }

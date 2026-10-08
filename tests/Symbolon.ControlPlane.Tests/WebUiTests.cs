@@ -26,6 +26,9 @@ public sealed class WebUiTests : IClassFixture<ControlPlaneFactory>
         Assert.Contains("view-keys", content, StringComparison.Ordinal);
         Assert.Contains("view-wasm", content, StringComparison.Ordinal);
         Assert.Contains("view-migrate", content, StringComparison.Ordinal);
+        Assert.Contains("view-config", content, StringComparison.Ordinal);
+        Assert.Contains("topbar-lang-switcher", content, StringComparison.Ordinal);
+        Assert.Contains("i18n.js", content, StringComparison.Ordinal);
         Assert.Contains("symbolon-validator.js", content, StringComparison.Ordinal);
     }
 
@@ -36,11 +39,19 @@ public sealed class WebUiTests : IClassFixture<ControlPlaneFactory>
         Assert.Equal(HttpStatusCode.OK, cssResponse.StatusCode);
         string css = await cssResponse.Content.ReadAsStringAsync();
         Assert.Contains("--bg-primary", css, StringComparison.Ordinal);
+        Assert.Contains(".lang-switcher", css, StringComparison.Ordinal);
 
         var jsResponse = await _client.GetAsync("/js/dashboard.js");
         Assert.Equal(HttpStatusCode.OK, jsResponse.StatusCode);
         string js = await jsResponse.Content.ReadAsStringAsync();
         Assert.Contains("refreshAllData", js, StringComparison.Ordinal);
+
+        var i18nJs = await _client.GetAsync("/js/i18n.js");
+        Assert.Equal(HttpStatusCode.OK, i18nJs.StatusCode);
+        string i18nJsContent = await i18nJs.Content.ReadAsStringAsync();
+        Assert.Contains("translations", i18nJsContent, StringComparison.Ordinal);
+        Assert.Contains("setLanguage", i18nJsContent, StringComparison.Ordinal);
+        Assert.Contains("getLanguage", i18nJsContent, StringComparison.Ordinal);
 
         var retroCss = await _client.GetAsync("/css/retro-tui.css");
         Assert.Equal(HttpStatusCode.OK, retroCss.StatusCode);

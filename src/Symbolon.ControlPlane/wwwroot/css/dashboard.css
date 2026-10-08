@@ -650,3 +650,90 @@ tr:hover td {
   background-color: rgba(59, 130, 246, 0.05);
 }
 
+/* Language Switcher in Topbar */
+.lang-switcher {
+  display: inline-flex;
+  align-items: center;
+  background-color: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  padding: 2px;
+  gap: 2px;
+}
+
+.lang-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  font-size: 11px;
+  font-weight: 600;
+  padding: 4px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.lang-btn:hover {
+  color: var(--text-primary);
+  background-color: rgba(255, 255, 255, 0.08);
+}
+
+.lang-btn.active {
+  background-color: var(--accent-blue);
+  color: #ffffff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+}
+
+/* Configuration & Language View */
+.config-card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
+  gap: 20px;
+  margin-bottom: 24px;
+}
+
+.lang-choice-card {
+  background-color: var(--bg-card);
+  border: 2px solid var(--border-color);
+  border-radius: 10px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 16px;
+  transition: border-color 0.2s ease, transform 0.15s ease;
+  cursor: pointer;
+}
+
+.lang-choice-card:hover {
+  border-color: var(--accent-blue);
+  transform: translateY(-2px);
+}
+
+.lang-choice-card.border-active {
+  border-color: var(--accent-blue);
+  background-color: rgba(59, 130, 246, 0.04);
+  box-shadow: 0 0 0 1px var(--accent-blue);
+}
+
+.lang-choice-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.lang-choice-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.lang-flag {
+  font-size: 26px;
+}
+

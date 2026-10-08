@@ -29,6 +29,7 @@ document.addEventListener("DOMContentLoaded", () => {
     initNavigation();
     initModals();
     updateApiKeyButtonState();
+    updateConfigApiKeyStatus();
     checkSsoUserStatus();
     loadSsoProviders();
     refreshAllData();
@@ -88,6 +89,9 @@ function initNavigation() {
                 }
                 if (targetView === "view-pqc") {
                     loadPqcView();
+                }
+                if (targetView === "view-config") {
+                    updateConfigApiKeyStatus();
                 }
             }
         });
@@ -1319,23 +1323,58 @@ function saveApiKey() {
     const input = document.getElementById("cfg-api-key");
     const val = input.value.trim();
     if (!val) {
-        showToast("Zadajte platný API kľúč", "error");
+        showToast(typeof I18N !== "undefined" ? I18N.t("common.error", "Zadajte platný API kľúč") : "Zadajte platný API kľúč", "error");
         return;
     }
     localStorage.setItem("symbolon_api_key", val);
     updateApiKeyButtonState();
+    updateConfigApiKeyStatus();
     closeModal("modal-auth-config");
-    showToast("API kľúč bol uložený!", "success");
+    showToast(typeof I18N !== "undefined" ? I18N.t("common.success", "API kľúč bol uložený!") : "API kľúč bol uložený!", "success");
     refreshAllData();
 }
 
 function clearApiKey() {
     localStorage.removeItem("symbolon_api_key");
     updateApiKeyButtonState();
+    updateConfigApiKeyStatus();
     closeModal("modal-auth-config");
     showToast("API kľúč bol odstránený", "info");
     refreshAllData();
 }
+
+function clearLocalStorageCache() {
+    const lang = localStorage.getItem("symbolon_lang") || "sk";
+    localStorage.clear();
+    localStorage.setItem("symbolon_lang", lang);
+    const msg = typeof I18N !== "undefined"
+        ? I18N.t("config.cacheClearedMsg", "Lokálne nastavenia boli úspešne vymazané.")
+        : "Lokálne nastavenia boli úspešne vymazané.";
+    showToast(msg, "info");
+    updateApiKeyButtonState();
+    updateConfigApiKeyStatus();
+    if (typeof I18N !== "undefined") {
+        I18N.applyTranslations();
+    }
+}
+window.clearLocalStorageCache = clearLocalStorageCache;
+
+function updateConfigApiKeyStatus() {
+    const statusEl = document.getElementById("config-api-key-status");
+    if (!statusEl) return;
+    const key = localStorage.getItem("symbolon_api_key");
+    if (key) {
+        statusEl.textContent = key.substring(0, 12) + "••••••••••••";
+        statusEl.style.color = "var(--accent-emerald)";
+    } else {
+        const msg = typeof I18N !== "undefined"
+            ? I18N.t("config.apiKeyMissing", "Nenastavený (vyžaduje sa pre administratívne funkcie)")
+            : "Nenastavený (vyžaduje sa pre administratívne funkcie)";
+        statusEl.textContent = msg;
+        statusEl.style.color = "var(--accent-amber)";
+    }
+}
+window.updateConfigApiKeyStatus = updateConfigApiKeyStatus;
 
 function copyGeneratedApiKey() {
     const text = document.getElementById("generated-apikey-display").textContent;
