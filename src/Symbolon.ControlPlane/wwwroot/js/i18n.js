@@ -763,6 +763,11 @@
             }
         });
 
+        // Update Retro Topbar language links
+        document.querySelectorAll(".retro-lang-link").forEach(link => {
+            link.classList.toggle("active", link.getAttribute("data-lang") === currentLang);
+        });
+
         // Update Config View language card active states if present
         const skCard = document.getElementById("lang-card-sk");
         const enCard = document.getElementById("lang-card-en");

@@ -553,3 +553,100 @@ input:focus, select:focus, textarea:focus,
   overflow-y: auto !important;
 }
 
+/* ==============================================================================
+ * Retro Jazykové Komponenty (FoxPro / DOS Language Selection & Switcher)
+ * ============================================================================== */
+
+.retro-lang-switcher {
+  font-family: var(--retro-font);
+  font-size: 11px;
+  color: #333333;
+  font-weight: bold;
+}
+
+.retro-lang-link {
+  color: #000000;
+  text-decoration: none;
+  padding: 1px 4px;
+}
+
+.retro-lang-link:hover {
+  background-color: var(--retro-navy-bg);
+  color: #ffff00 !important;
+}
+
+.retro-lang-link.active {
+  background-color: var(--retro-select-bg);
+  color: #000000 !important;
+}
+
+/* Retro Karty Výberu Jazyka v Konfigurácii (#view-config) */
+.config-card-grid {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 12px !important;
+  margin-bottom: 16px !important;
+}
+
+.lang-choice-card {
+  background-color: #f0ece4 !important;
+  border: 2px solid #555555 !important;
+  box-shadow: 4px 4px 0px #000000 !important;
+  padding: 12px 16px !important;
+  color: #000000 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 8px !important;
+  cursor: pointer;
+}
+
+.lang-choice-card:hover {
+  background-color: #f7f4ee !important;
+  border-color: #222222 !important;
+}
+
+.lang-choice-card.border-active {
+  border: 2px solid #00396b !important;
+  background-color: #e8e4dc !important;
+  box-shadow: 4px 4px 0px #00396b !important;
+}
+
+.lang-choice-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.lang-choice-title {
+  font-weight: bold;
+  font-size: 13px;
+  color: #000000;
+}
+
+.lang-btn {
+  font-family: var(--retro-font) !important;
+  font-size: 12px !important;
+  padding: 3px 8px !important;
+  background-color: #dcd7ce !important;
+  color: #000000 !important;
+  border-top: 2px solid #ffffff !important;
+  border-left: 2px solid #ffffff !important;
+  border-right: 2px solid #555555 !important;
+  border-bottom: 2px solid #555555 !important;
+  cursor: pointer;
+}
+
+.lang-btn:hover {
+  background-color: #ede9e1 !important;
+}
+
+.lang-btn.active {
+  background-color: var(--retro-select-bg) !important;
+  color: #000000 !important;
+  border-top: 2px solid #333333 !important;
+  border-left: 2px solid #333333 !important;
+  border-right: 2px solid #ffffff !important;
+  border-bottom: 2px solid #ffffff !important;
+}
+
+

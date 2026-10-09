@@ -101,7 +101,8 @@
                 <li class="retro-menu-item" onclick="switchRetroView('view-system')" tabindex="0"><span class="hotkey">S</span>úlad CRA</li>
                 <li class="retro-menu-item" onclick="openModal('modal-auth-config')" tabindex="0">K<span class="hotkey">o</span>nfigurácia</li>
             </ul>
-            <div style="font-size: 11px; color: #444; font-weight: bold;">
+            <div style="font-size: 11px; color: #444; font-weight: bold; display: flex; align-items: center; gap: 8px;">
+                <span class="retro-lang-switcher">[ <a href="javascript:void(0)" class="retro-lang-link active" data-lang="sk" onclick="setAppLanguage('sk')"><span class="hotkey">S</span>K</a> | <a href="javascript:void(0)" class="retro-lang-link" data-lang="en" onclick="setAppLanguage('en')"><span class="hotkey">E</span>N</a> | <a href="javascript:void(0)" class="retro-lang-link" data-lang="de" onclick="setAppLanguage('de')"><span class="hotkey">D</span>E</a> ]</span>
                 <span id="retro-server-clock">--:--:--</span> | <span id="retro-conn-status" style="color: green;">● ONLINE</span>
             </div>
         `;
