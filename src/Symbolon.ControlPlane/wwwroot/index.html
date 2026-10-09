@@ -180,6 +180,7 @@
                 <div class="lang-switcher" id="topbar-lang-switcher" title="Zmeniť jazyk / Switch language" data-i18n-title="topbar.langTooltip">
                     <button class="lang-btn active" data-lang="sk" onclick="setAppLanguage('sk')">🇸🇰 SK</button>
                     <button class="lang-btn" data-lang="en" onclick="setAppLanguage('en')">🇬🇧 EN</button>
+                    <button class="lang-btn" data-lang="de" onclick="setAppLanguage('de')">🇩🇪 DE</button>
                 </div>
                 <button class="btn btn-secondary btn-sm" id="btn-api-key-config" onclick="openModal('modal-auth-config')" title="Nastaviť prístupový API kľúč pre Dashboard" data-i18n="topbar.apiKey" data-i18n-title="topbar.apiKeyTitle">🔑 API Kľúč</button>
                 <div class="health-badge">
@@ -2614,6 +2615,7 @@
                         <div class="lang-switcher" style="padding: 4px; gap: 4px;">
                             <button class="lang-btn active" data-lang="sk" onclick="setAppLanguage('sk')" style="font-size: 13px; padding: 6px 12px;">🇸🇰 Slovenčina</button>
                             <button class="lang-btn" data-lang="en" onclick="setAppLanguage('en')" style="font-size: 13px; padding: 6px 12px;">🇬🇧 English</button>
+                            <button class="lang-btn" data-lang="de" onclick="setAppLanguage('de')" style="font-size: 13px; padding: 6px 12px;">🇩🇪 Deutsch</button>
                         </div>
                     </div>
                 </div>
@@ -2661,6 +2663,25 @@
                             </div>
                             <div style="display: flex; justify-content: flex-end;">
                                 <button type="button" class="btn btn-secondary btn-sm" onclick="event.stopPropagation(); setAppLanguage('en');" data-i18n="config.btnActivateEn">Switch to English</button>
+                            </div>
+                        </div>
+
+                        <!-- German Card -->
+                        <div class="lang-choice-card" id="lang-card-de" onclick="setAppLanguage('de')">
+                            <div>
+                                <div class="lang-choice-header">
+                                    <div class="lang-choice-title">
+                                        <span class="lang-flag">🇩🇪</span>
+                                        <span data-i18n="config.deName">Deutsche Sprache (DE)</span>
+                                    </div>
+                                    <span class="badge" id="tag-active-de" style="background: var(--accent-blue); color: #fff; font-size: 11px; display: none;" data-i18n="config.activeTag">Aktive Sprache</span>
+                                </div>
+                                <p style="color: var(--text-secondary); font-size: 13px; margin-top: 10px; line-height: 1.5;" data-i18n="config.deDesc">
+                                    Umfassende deutsche Lokalisierung für Industrie 4.0, DACH-Region und Enterprise-Umgebungen.
+                                </p>
+                            </div>
+                            <div style="display: flex; justify-content: flex-end;">
+                                <button type="button" class="btn btn-secondary btn-sm" onclick="event.stopPropagation(); setAppLanguage('de');" data-i18n="config.btnActivateDe">Zu Deutsch wechseln</button>
                             </div>
                         </div>
                     </div>
@@ -3023,6 +3044,7 @@
                     <div class="lang-switcher" style="display: flex; width: 100%; padding: 4px; gap: 6px;">
                         <button type="button" class="lang-btn active" data-lang="sk" onclick="setAppLanguage('sk')" style="flex: 1; justify-content: center; padding: 6px 12px; font-size: 12px;">🇸🇰 Slovenčina (SK)</button>
                         <button type="button" class="lang-btn" data-lang="en" onclick="setAppLanguage('en')" style="flex: 1; justify-content: center; padding: 6px 12px; font-size: 12px;">🇬🇧 English (EN)</button>
+                        <button type="button" class="lang-btn" data-lang="de" onclick="setAppLanguage('de')" style="flex: 1; justify-content: center; padding: 6px 12px; font-size: 12px;">🇩🇪 Deutsch (DE)</button>
                     </div>
                 </div>
 

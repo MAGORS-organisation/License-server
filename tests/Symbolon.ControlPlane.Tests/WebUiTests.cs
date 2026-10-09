@@ -28,6 +28,8 @@ public sealed class WebUiTests : IClassFixture<ControlPlaneFactory>
         Assert.Contains("view-migrate", content, StringComparison.Ordinal);
         Assert.Contains("view-config", content, StringComparison.Ordinal);
         Assert.Contains("topbar-lang-switcher", content, StringComparison.Ordinal);
+        Assert.Contains("data-lang=\"de\"", content, StringComparison.Ordinal);
+        Assert.Contains("lang-card-de", content, StringComparison.Ordinal);
         Assert.Contains("i18n.js", content, StringComparison.Ordinal);
         Assert.Contains("symbolon-validator.js", content, StringComparison.Ordinal);
     }
@@ -50,6 +52,7 @@ public sealed class WebUiTests : IClassFixture<ControlPlaneFactory>
         Assert.Equal(HttpStatusCode.OK, i18nJs.StatusCode);
         string i18nJsContent = await i18nJs.Content.ReadAsStringAsync();
         Assert.Contains("translations", i18nJsContent, StringComparison.Ordinal);
+        Assert.Contains("de:", i18nJsContent, StringComparison.Ordinal);
         Assert.Contains("setLanguage", i18nJsContent, StringComparison.Ordinal);
         Assert.Contains("getLanguage", i18nJsContent, StringComparison.Ordinal);
 

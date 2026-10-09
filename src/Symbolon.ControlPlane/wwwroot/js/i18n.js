@@ -1,6 +1,6 @@
 /**
  * Symbolon Control Plane - Internationalization (i18n) Engine
- * Supported languages: 'sk' (Slovak, default), 'en' (English)
+ * Supported languages: 'sk' (Slovak, default), 'en' (English), 'de' (German)
  */
 (function (window) {
     'use strict';
@@ -43,7 +43,7 @@
             "topbar.healthDegraded": "Znížený výkon",
             "topbar.healthError": "Chyba spojenia",
             "topbar.issueLicense": "+ Vystaviť Licenciu",
-            "topbar.langTooltip": "Zmeniť jazyk / Switch language",
+            "topbar.langTooltip": "Zmeniť jazyk / Switch language / Sprache wechseln",
 
             // Overview KPIs & Charts
             "overview.floatingSeats": "Floating Sedadlá",
@@ -102,12 +102,15 @@
             "config.skDesc": "Predvolená slovenská lokalizácia pre riadenie licencií a kľúčov v stredoeurópskom regióne.",
             "config.enName": "English Language (EN)",
             "config.enDesc": "Full international English localization for global enterprise deployments and DevOps teams.",
+            "config.deName": "Nemecký Jazyk (DE)",
+            "config.deDesc": "Plnohodnotná nemecká lokalizácia pre Priemysel 4.0, región DACH a podnikové nasadenia.",
             "config.activeTag": "Aktívny Jazyk",
             "config.btnActivateSk": "Prepnúť na Slovenčinu",
             "config.btnActivateEn": "Prepnúť na English",
+            "config.btnActivateDe": "Prepnúť na Deutsch",
             "config.localeCardTitle": "📅 Regionálne Formátovanie (Locale & Date/Time)",
             "config.localeCardDesc": "Formát časových pečiatok, číselných údajov a dátumov v reportoch a tabuľkách.",
-            "config.optLocaleAuto": "Automaticky podľa zvoleného jazyka (SK: 24h / EN: 12h-24h)",
+            "config.optLocaleAuto": "Automaticky podľa zvoleného jazyka (SK/DE: 24h / EN: 12h-24h)",
             "config.optLocaleIso": "Štandardizovaný ISO 8601 (YYYY-MM-DDTHH:mm:ssZ)",
             "config.authCardTitle": "🔑 Autentifikácia & Riadenie Prístupu",
             "config.authCardDesc": "Konfigurácia servisného API kľúča a podnikových SSO integrácií pre prístup k riadiacemu centru.",
@@ -269,7 +272,7 @@
             "topbar.healthDegraded": "Degraded Performance",
             "topbar.healthError": "Connection Error",
             "topbar.issueLicense": "+ Issue License",
-            "topbar.langTooltip": "Switch language / Zmeniť jazyk",
+            "topbar.langTooltip": "Switch language / Zmeniť jazyk / Sprache wechseln",
 
             // Overview KPIs & Charts
             "overview.floatingSeats": "Floating Seats",
@@ -328,12 +331,15 @@
             "config.skDesc": "Native Central European Slovak localization for license, seat, and key governance.",
             "config.enName": "English Language (EN)",
             "config.enDesc": "Full international English localization for global enterprise deployments and DevOps teams.",
+            "config.deName": "German Language (DE)",
+            "config.deDesc": "Comprehensive German localization for Industry 4.0, DACH region, and enterprise environments.",
             "config.activeTag": "Active Language",
             "config.btnActivateSk": "Switch to Slovak",
             "config.btnActivateEn": "Switch to English",
+            "config.btnActivateDe": "Switch to German",
             "config.localeCardTitle": "📅 Regional Formatting (Locale & Date/Time)",
             "config.localeCardDesc": "Format of timestamps, numbers, and dates displayed across tables and audit logs.",
-            "config.optLocaleAuto": "Automatic based on active language (SK: 24h / EN: 12h-24h)",
+            "config.optLocaleAuto": "Automatic based on active language (SK/DE: 24h / EN: 12h-24h)",
             "config.optLocaleIso": "Standardized ISO 8601 (YYYY-MM-DDTHH:mm:ssZ)",
             "config.authCardTitle": "🔑 Authentication & Access Control",
             "config.authCardDesc": "Configure service API key and enterprise SSO identity providers for administrative access.",
@@ -457,6 +463,235 @@
             "modal.successTitle": "License Successfully Issued!",
             "modal.apiKeySave": "Save & Apply",
             "modal.apiKeyClear": "Remove Key"
+        },
+        de: {
+            // Navigation
+            "nav.overview": "Übersicht",
+            "nav.licenses": "Lizenzen",
+            "nav.keys": "Signaturschlüssel",
+            "nav.relays": "Relay-Knoten",
+            "nav.audit": "Audit-Protokoll",
+            "nav.reports": "Berichte & True-Up",
+            "nav.airgap": "Air-Gap-Portal",
+            "nav.webhooks": "Webhooks",
+            "nav.apikeys": "API-Schlüssel & Merkle-Baum",
+            "nav.mesh": "Relay-Mesh & Alarme",
+            "nav.scim": "SCIM 2.0 Identitäten",
+            "nav.wasm": "Wasm-Validator",
+            "nav.tokens": "Token & Guthaben",
+            "nav.migrate": "Migration (FlexNet)",
+            "nav.features": "Module & Funktionen",
+            "nav.revocations": "Widerrufe & CRL",
+            "nav.queue": "Lizenz-Warteschlange (FLT-31)",
+            "nav.policyRules": "Richtlinien & Optionen (FLT-24)",
+            "nav.machines": "Node-Lock & Maschinen",
+            "nav.experiments": "A/B-Experimente (AB-1)",
+            "nav.pqc": "Post-Quanten-Ära (M7)",
+            "nav.system": "API & Diagnose",
+            "nav.config": "Konfiguration & Sprache",
+
+            // Topbar
+            "topbar.user": "👤 Benutzer",
+            "topbar.logout": "🚪 Abmelden",
+            "topbar.logoutTitle": "SSO-Sitzung abmelden",
+            "topbar.apiKey": "🔑 API-Schlüssel",
+            "topbar.apiKeyTitle": "Dashboard-API-Zugriffsschlüssel festlegen",
+            "topbar.healthChecking": "Verbindung wird geprüft...",
+            "topbar.healthReady": "System bereit (DB verbunden)",
+            "topbar.healthDegraded": "Eingeschränkte Leistung",
+            "topbar.healthError": "Verbindungsfehler",
+            "topbar.issueLicense": "+ Lizenz ausstellen",
+            "topbar.langTooltip": "Sprache wechseln / Switch language / Zmeniť jazyk",
+
+            // Overview KPIs & Charts
+            "overview.floatingSeats": "Floating-Sitze",
+            "overview.ofTotalSeats": "von insgesamt {0} Sitzen",
+            "overview.capacityUtilization": "Kapazitätsauslastung",
+            "overview.realtimeConcurrent": "gleichzeitige Sitze in Echtzeit",
+            "overview.deniedRequests": "Abgelehnte Anfragen",
+            "overview.upsellPotential": "Potenzial für Sitz-Upselling",
+            "overview.activeLicenses": "Aktive Lizenzen",
+            "overview.allCustomers": "aller Kunden",
+            "overview.signingKeys": "Signaturschlüssel",
+            "overview.activeKeysDesc": "aktive ES256 / PQC-Schlüssel",
+            "overview.chartConcurrency": "Auslastung der Floating-Sitze (Parallelität)",
+            "overview.chartTypes": "Lizenztypen-Verteilung",
+            "overview.refresh": "Aktualisieren",
+
+            // Common Actions & Labels
+            "common.actions": "Aktionen",
+            "common.status": "Status",
+            "common.active": "Aktiv",
+            "common.expired": "Abgelaufen",
+            "common.revoked": "Widerrufen",
+            "common.suspended": "Ausgesetzt",
+            "common.details": "Details",
+            "common.download": "Herunterladen",
+            "common.copy": "Kopieren",
+            "common.copied": "Erfolgreich kopiert!",
+            "common.save": "Speichern",
+            "common.cancel": "Abbrechen",
+            "common.close": "Schließen",
+            "common.create": "Erstellen",
+            "common.delete": "Löschen",
+            "common.loading": "Daten werden geladen...",
+            "common.noRecords": "Keine Einträge gefunden",
+            "common.search": "Suchen...",
+            "common.filter": "Filtern",
+            "common.all": "Alle",
+            "common.success": "Erfolg",
+            "common.error": "Fehler",
+            "common.warning": "Warnung",
+            "common.confirm": "Bestätigen",
+            "common.product": "Produkt",
+            "common.customer": "Kunde",
+            "common.seats": "Sitze",
+            "common.created": "Erstellt",
+            "common.expires": "Ablauf",
+            "common.algorithm": "Algorithmus",
+            "common.export": "Exportieren",
+
+            // Configuration View
+            "config.pageTitle": "Konfiguration & Spracheinstellungen",
+            "config.subtitle": "Verwalten Sie die Sprache der Benutzeroberfläche, regionale Formate, Zugriffsschlüssel und Serverparameter.",
+            "config.langCardTitle": "🌐 Anwendungssprache (Application Language)",
+            "config.langCardDesc": "Wählen Sie Ihre bevorzugte Sprache für das Symbolon Control Plane Dashboard. Die Auswahl wird sofort wirksam und im Browser gespeichert.",
+            "config.skName": "Slowakische Sprache (SK)",
+            "config.skDesc": "Ursprüngliche mitteleuropäische Lokalisierung für Lizenz-, Sitz- und Schlüsselverwaltung.",
+            "config.enName": "Englische Sprache (EN)",
+            "config.enDesc": "Internationale englische Version für globale Enterprise-Bereitstellungen und DevOps-Teams.",
+            "config.deName": "Deutsche Sprache (DE)",
+            "config.deDesc": "Umfassende deutsche Lokalisierung für Industrie 4.0, DACH-Region und Enterprise-Umgebungen.",
+            "config.activeTag": "Aktive Sprache",
+            "config.btnActivateSk": "Zu Slowakisch wechseln",
+            "config.btnActivateEn": "Zu Englisch wechseln",
+            "config.btnActivateDe": "Zu Deutsch wechseln",
+            "config.localeCardTitle": "📅 Regionale Formatierung (Locale & Datum/Uhrzeit)",
+            "config.localeCardDesc": "Format von Zeitstempeln, Zahlen und Datumsangaben in Berichten und Tabellen.",
+            "config.optLocaleAuto": "Automatisch nach gewählter Sprache (SK/DE: 24h / EN: 12h-24h)",
+            "config.optLocaleIso": "Standardisiertes ISO 8601 (YYYY-MM-DDTHH:mm:ssZ)",
+            "config.authCardTitle": "🔑 Authentifizierung & Zugriffsverwaltung",
+            "config.authCardDesc": "Konfiguration von Service-API-Schlüsseln und Enterprise-SSO für den Administratorzugriff.",
+            "config.currentApiKeyLabel": "Aktueller Dashboard-API-Schlüssel:",
+            "config.apiKeyConfigured": "Konfiguriert und aktiv",
+            "config.apiKeyMissing": "Nicht konfiguriert (erforderlich für administrative Funktionen)",
+            "config.btnOpenAuthModal": "Authentifizierungsdialog öffnen",
+            "config.systemCardTitle": "⚡ Control-Plane-Laufzeitinformationen",
+            "config.versionLabel": "Lösungsversion:",
+            "config.runtimeLabel": "Laufzeitplattform:",
+            "config.pqcLabel": "Quantensicherheit:",
+            "config.pqcValue": "ML-DSA-65 (FIPS 204) + NIST P-256 (ES256)",
+            "config.cacheCardTitle": "🧹 Lokale Browserspeicher-Verwaltung",
+            "config.cacheCardDesc": "Löschen von zwischengespeicherten lokalen Einstellungen und temporären Daten im Browser.",
+            "config.btnClearCache": "Lokalen Speicher leeren",
+            "config.cacheClearedMsg": "Lokale Speichereinstellungen wurden erfolgreich geleert.",
+            "config.langSectionTitle": "🌐 Benutzeroberflächensprache (Language)",
+            "config.langSectionDesc": "Wählen Sie Ihre bevorzugte Sprache für die Symbolon-Konsole:",
+
+            // Licenses View
+            "licenses.title": "Übersicht aller Lizenzen",
+            "licenses.colKey": "Lizenzschlüssel",
+            "licenses.colProduct": "Produkt",
+            "licenses.colCustomer": "Kunde",
+            "licenses.colModel": "Modell",
+            "licenses.colSeats": "Sitze",
+            "licenses.colExpires": "Ablauf",
+            "licenses.colStatus": "Status",
+            "licenses.searchPlaceholder": "Nach Schlüssel oder Kunde filtern...",
+            "licenses.btnIssue": "+ Lizenz ausstellen",
+
+            // Signing Keys View
+            "keys.title": "Kryptografische Signaturschlüssel (KMS & HSM)",
+            "keys.colKid": "Key-ID (KID)",
+            "keys.colAlgorithm": "Algorithmus",
+            "keys.colUsage": "Verwendungszweck",
+            "keys.colCreated": "Erstellt",
+            "keys.colStatus": "Status",
+            "keys.btnRotate": "🔄 Schlüssel rotieren",
+            "keys.btnJwks": "🌐 JWKS anzeigen",
+
+            // Relays View
+            "relays.title": "Relay-Instanzen & Lokale Proxy-Server",
+            "relays.colName": "Relay-Name",
+            "relays.colEndpoint": "Endpoint-URL",
+            "relays.colAssignedSeats": "Zugewiesene Sitze",
+            "relays.colLastHeartbeat": "Letzter Heartbeat",
+
+            // Audit View
+            "audit.title": "Unveränderliches Audit-Protokoll (Tamper-Evident Hash Chain)",
+            "audit.colTime": "Zeitpunkt",
+            "audit.colType": "Ereignistyp",
+            "audit.colLicense": "Lizenz",
+            "audit.colFingerprint": "Fingerprint",
+            "audit.colHash": "Kryptografischer Hash",
+
+            // Reports View
+            "reports.title": "Nutzungsberichte & True-Up-Abrechnung",
+            "reports.btnGenerate": "Bericht generieren",
+
+            // Air-Gap View
+            "airgap.title": "Air-Gap-Offline-Aktivierung & Anfrageverarbeitung",
+            "airgap.dropzoneText": ".symreq-Datei hierher ziehen oder zum Auswählen klicken",
+            "airgap.btnProcess": "Anfrage verarbeiten (.symreq)",
+
+            // Webhooks View
+            "webhooks.title": "Webhook-Integrationen & Ereignisbenachrichtigungen",
+            "webhooks.btnCreate": "+ Webhook hinzufügen",
+
+            // API Keys View
+            "apikeys.title": "API-Schlüsselverwaltung & Merkle-Baum-Verifizierung",
+            "apikeys.btnCreate": "+ Neuer API-Schlüssel",
+
+            // Mesh View
+            "mesh.title": "Relay-Mesh-Koordination & Georeplikation",
+
+            // SCIM View
+            "scim.title": "SCIM 2.0 Enterprise-Benutzersynchronisierung",
+
+            // Wasm View
+            "wasm.title": "Clientseitiger WebAssembly- & WebCrypto-Validator",
+
+            // Tokens View
+            "tokens.title": "Token-Wallets & Guthaben-Verbrauchsmodell",
+
+            // Migrate View
+            "migrate.title": "Migrations-Engine für FlexNet / Reprise RLM",
+
+            // Features View
+            "features.title": "Katalog für Module, Pakete & Funktionen",
+            "features.btnCreate": "+ Funktion hinzufügen",
+
+            // Revocations View
+            "revocations.title": "Widerrufslisten & CRL-Blacklist",
+            "revocations.btnRevoke": "⛔ Widerruf erstellen",
+
+            // Queue View
+            "queue.title": "Lizenz-Warteschlangenverwaltung (Fair Queuing & Priorität)",
+
+            // Policy Rules View
+            "rules.title": "Zugriffsrichtlinien & Options-Dateien (YAML)",
+
+            // Machines View
+            "machines.title": "Node-Lock-Aktivierungen & Hardware-Maschinen",
+
+            // Experiments View
+            "experiments.title": "A/B-Experimente & Canary-Rollouts",
+            "experiments.btnNew": "+ Neues Experiment",
+
+            // PQC View
+            "pqc.title": "Post-Quanten-Kryptografiesignaturen (ML-DSA-65)",
+
+            // System View
+            "system.title": "API-Spezifikation & Diagnose",
+
+            // Modals
+            "modal.authTitle": "Authentifizierung & Zugriffsverwaltung",
+            "modal.issueTitle": "Neue Lizenz ausstellen",
+            "modal.rotateTitle": "Signaturschlüssel rotieren",
+            "modal.detailsTitle": "Lizenzdetails",
+            "modal.successTitle": "Lizenz erfolgreich ausgestellt!",
+            "modal.apiKeySave": "Speichern & Anwenden",
+            "modal.apiKeyClear": "Schlüssel entfernen"
         }
     };
 
@@ -465,7 +700,7 @@
 
     function getLanguage() {
         const stored = localStorage.getItem(STORAGE_KEY);
-        if (stored === "en" || stored === "sk") {
+        if (stored === "en" || stored === "sk" || stored === "de") {
             return stored;
         }
         return "sk";
@@ -531,23 +766,18 @@
         // Update Config View language card active states if present
         const skCard = document.getElementById("lang-card-sk");
         const enCard = document.getElementById("lang-card-en");
-        if (skCard && enCard) {
-            if (currentLang === "sk") {
-                skCard.classList.add("border-active");
-                enCard.classList.remove("border-active");
-                const skTag = document.getElementById("tag-active-sk");
-                const enTag = document.getElementById("tag-active-en");
-                if (skTag) skTag.style.display = "inline-block";
-                if (enTag) enTag.style.display = "none";
-            } else {
-                enCard.classList.add("border-active");
-                skCard.classList.remove("border-active");
-                const skTag = document.getElementById("tag-active-sk");
-                const enTag = document.getElementById("tag-active-en");
-                if (skTag) skTag.style.display = "none";
-                if (enTag) enTag.style.display = "inline-block";
-            }
-        }
+        const deCard = document.getElementById("lang-card-de");
+        const skTag = document.getElementById("tag-active-sk");
+        const enTag = document.getElementById("tag-active-en");
+        const deTag = document.getElementById("tag-active-de");
+
+        if (skCard) skCard.classList.toggle("border-active", currentLang === "sk");
+        if (enCard) enCard.classList.toggle("border-active", currentLang === "en");
+        if (deCard) deCard.classList.toggle("border-active", currentLang === "de");
+
+        if (skTag) skTag.style.display = currentLang === "sk" ? "inline-block" : "none";
+        if (enTag) enTag.style.display = currentLang === "en" ? "inline-block" : "none";
+        if (deTag) deTag.style.display = currentLang === "de" ? "inline-block" : "none";
 
         // Update Page Title if an active nav link exists
         const activeNavLink = document.querySelector(".nav-link.active");
@@ -566,7 +796,7 @@
     }
 
     function setLanguage(lang) {
-        if (lang !== "sk" && lang !== "en") {
+        if (lang !== "sk" && lang !== "en" && lang !== "de") {
             lang = "sk";
         }
         currentLang = lang;
