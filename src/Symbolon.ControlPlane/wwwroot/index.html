@@ -6,6 +6,22 @@
     <title>Symbolon Control Plane — Licenčný Server</title>
     <link rel="stylesheet" href="/css/dashboard.css">
     <link rel="stylesheet" href="/css/retro-tui.css">
+    <link rel="stylesheet" href="/css/themes.css">
+    <script>
+        (function() {
+            try {
+                var t = localStorage.getItem('symbolon_theme') || localStorage.getItem('symbolon-theme') || 'modern';
+                document.documentElement.setAttribute('data-theme', t);
+                var m = localStorage.getItem('symbolon_apple_mode') || 'system';
+                document.documentElement.setAttribute('data-apple-mode', m);
+                var eff = 'dark';
+                if (m === 'light') eff = 'light';
+                else if (m === 'dark') eff = 'dark';
+                else if (window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches) eff = 'light';
+                document.documentElement.setAttribute('data-apple-effective-theme', eff);
+            } catch(e) {}
+        })();
+    </script>
 </head>
 <body>
 
@@ -181,6 +197,14 @@
                     <button class="lang-btn active" data-lang="sk" onclick="setAppLanguage('sk')">🇸🇰 SK</button>
                     <button class="lang-btn" data-lang="en" onclick="setAppLanguage('en')">🇬🇧 EN</button>
                     <button class="lang-btn" data-lang="de" onclick="setAppLanguage('de')">🇩🇪 DE</button>
+                </div>
+                <!-- Theme Switcher in Topbar -->
+                <div class="theme-switcher" id="topbar-theme-switcher" title="Zmeniť tému rozhrania / Switch theme" data-i18n-title="topbar.themeTooltip">
+                    <button class="theme-btn-compact active" data-theme="modern" onclick="setAppTheme('modern')" title="Modern Enterprise">💼 Modern</button>
+                    <button class="theme-btn-compact" data-theme="retro" onclick="setAppTheme('retro')" title="Retro DOS / FoxPro">💾 Retro</button>
+                    <button class="theme-btn-compact" data-theme="cyberpunk" onclick="setAppTheme('cyberpunk')" title="Cyberpunk 2077 HUD">⚡ Cyber</button>
+                    <button class="theme-btn-compact" data-theme="apple" onclick="setAppTheme('apple')" title="Apple iOS">🍎 Apple</button>
+                    <button class="apple-quick-toggle" id="topbar-apple-toggle" style="display: none;" onclick="cycleAppleRegime()" title="Prepnúť režim Apple (Systém / Denný / Nočný)">🌓 Auto</button>
                 </div>
                 <button class="btn btn-secondary btn-sm" id="btn-api-key-config" onclick="openModal('modal-auth-config')" title="Nastaviť prístupový API kľúč pre Dashboard" data-i18n="topbar.apiKey" data-i18n-title="topbar.apiKeyTitle">🔑 API Kľúč</button>
                 <div class="health-badge">
@@ -2612,10 +2636,114 @@
                                 Nastavenie jazyka používateľského rozhrania, regionálnych formátov, prístupu a parametrov servera.
                             </p>
                         </div>
-                        <div class="lang-switcher" style="padding: 4px; gap: 4px;">
-                            <button class="lang-btn active" data-lang="sk" onclick="setAppLanguage('sk')" style="font-size: 13px; padding: 6px 12px;">🇸🇰 Slovenčina</button>
-                            <button class="lang-btn" data-lang="en" onclick="setAppLanguage('en')" style="font-size: 13px; padding: 6px 12px;">🇬🇧 English</button>
-                            <button class="lang-btn" data-lang="de" onclick="setAppLanguage('de')" style="font-size: 13px; padding: 6px 12px;">🇩🇪 Deutsch</button>
+                        <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                            <div class="lang-switcher" style="padding: 4px; gap: 4px;">
+                                <button class="lang-btn active" data-lang="sk" onclick="setAppLanguage('sk')" style="font-size: 13px; padding: 6px 12px;">🇸🇰 Slovenčina</button>
+                                <button class="lang-btn" data-lang="en" onclick="setAppLanguage('en')" style="font-size: 13px; padding: 6px 12px;">🇬🇧 English</button>
+                                <button class="lang-btn" data-lang="de" onclick="setAppLanguage('de')" style="font-size: 13px; padding: 6px 12px;">🇩🇪 Deutsch</button>
+                            </div>
+                            <div class="theme-switcher" style="padding: 4px; gap: 4px;">
+                                <button class="theme-btn-compact active" data-theme="modern" onclick="setAppTheme('modern')" style="font-size: 13px; padding: 6px 12px;">💼 Modern</button>
+                                <button class="theme-btn-compact" data-theme="retro" onclick="setAppTheme('retro')" style="font-size: 13px; padding: 6px 12px;">💾 Retro</button>
+                                <button class="theme-btn-compact" data-theme="cyberpunk" onclick="setAppTheme('cyberpunk')" style="font-size: 13px; padding: 6px 12px;">⚡ Cyberpunk</button>
+                                <button class="theme-btn-compact" data-theme="apple" onclick="setAppTheme('apple')" style="font-size: 13px; padding: 6px 12px;">🍎 Apple</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Theme & Design Selection Cards -->
+                <div class="table-card" style="margin-bottom: 24px; padding: 24px;">
+                    <div class="table-title" style="margin-bottom: 8px;" data-i18n="config.themeCardTitle">🎨 Vzhľad &amp; Dizajnové Témy (Theme &amp; UI Design)</div>
+                    <p style="color: var(--text-secondary); font-size: 13px; margin-bottom: 20px;" data-i18n="config.themeCardDesc">
+                        Vyberte primárnu dizajnovú tému pre Symbolon Control Plane. Zmeny sa aplikujú okamžite na všetky pohľady a ukladajú sa do prehliadača.
+                    </p>
+
+                    <div class="config-card-grid">
+                        <!-- Modern Dark Card -->
+                        <div class="theme-choice-card border-active" id="theme-card-modern" onclick="setAppTheme('modern')">
+                            <div>
+                                <div class="lang-choice-header">
+                                    <div class="lang-choice-title">
+                                        <span class="lang-flag">💼</span>
+                                        <span data-i18n="config.themeModernTitle">Modern Enterprise</span>
+                                    </div>
+                                    <span class="badge" id="tag-theme-active-modern" style="background: var(--accent-blue); color: #fff; font-size: 11px;" data-i18n="config.activeThemeTag">Aktívny Dizajn</span>
+                                </div>
+                                <p style="color: var(--text-secondary); font-size: 13px; margin-top: 10px; line-height: 1.5;" data-i18n="config.themeModernDesc">
+                                    Klasický tmavý bridlicový dizajn (Slate-900) optimalizovaný pre produkčné riadiace centrá a monitoring.
+                                </p>
+                            </div>
+                            <div style="display: flex; justify-content: flex-end;">
+                                <button type="button" class="btn btn-secondary btn-sm" onclick="event.stopPropagation(); setAppTheme('modern');" data-i18n="config.btnActivateTheme">Prepnúť Dizajn</button>
+                            </div>
+                        </div>
+
+                        <!-- Retro FoxPro Card -->
+                        <div class="theme-choice-card" id="theme-card-retro" onclick="setAppTheme('retro')">
+                            <div>
+                                <div class="lang-choice-header">
+                                    <div class="lang-choice-title">
+                                        <span class="lang-flag">💾</span>
+                                        <span data-i18n="config.themeRetroTitle">Retro FoxPro 2.6 / DOS TUI</span>
+                                    </div>
+                                    <span class="badge" id="tag-theme-active-retro" style="background: var(--accent-blue); color: #fff; font-size: 11px; display: none;" data-i18n="config.activeThemeTag">Aktívny Dizajn</span>
+                                </div>
+                                <p style="color: var(--text-secondary); font-size: 13px; margin-top: 10px; line-height: 1.5;" data-i18n="config.themeRetroDesc">
+                                    Nostalgická kaskádová DOS konzola v štýle 90. rokov s kompletnou podporou ovládania z klávesnice (F1-F10).
+                                </p>
+                            </div>
+                            <div style="display: flex; justify-content: flex-end;">
+                                <button type="button" class="btn btn-secondary btn-sm" onclick="event.stopPropagation(); setAppTheme('retro');" data-i18n="config.btnActivateTheme">Prepnúť Dizajn</button>
+                            </div>
+                        </div>
+
+                        <!-- Cyberpunk 2077 HUD Card -->
+                        <div class="theme-choice-card" id="theme-card-cyberpunk" onclick="setAppTheme('cyberpunk')">
+                            <div>
+                                <div class="lang-choice-header">
+                                    <div class="lang-choice-title">
+                                        <span class="lang-flag">⚡</span>
+                                        <span data-i18n="config.themeCyberpunkTitle">Cyberpunk 2077 HUD</span>
+                                    </div>
+                                    <span class="badge" id="tag-theme-active-cyberpunk" style="background: #00f0ff; color: #07070f; font-weight: 700; font-size: 11px; display: none;" data-i18n="config.activeThemeTag">Aktívny Dizajn</span>
+                                </div>
+                                <p style="color: var(--text-secondary); font-size: 13px; margin-top: 10px; line-height: 1.5;" data-i18n="config.themeCyberpunkDesc">
+                                    Futuristické sci-fi rozhranie s neónovým azúrovým (#00f0ff), žltým a purpurovým žiarením, kybernetickými prvkami a HUD estetikou.
+                                </p>
+                            </div>
+                            <div style="display: flex; justify-content: flex-end;">
+                                <button type="button" class="btn btn-secondary btn-sm" onclick="event.stopPropagation(); setAppTheme('cyberpunk');" data-i18n="config.btnActivateTheme">Prepnúť Dizajn</button>
+                            </div>
+                        </div>
+
+                        <!-- Apple iOS Card with Day/Night/System switcher -->
+                        <div class="theme-choice-card" id="theme-card-apple" onclick="setAppTheme('apple')">
+                            <div>
+                                <div class="lang-choice-header">
+                                    <div class="lang-choice-title">
+                                        <span class="lang-flag">🍎</span>
+                                        <span data-i18n="config.themeAppleTitle">Apple iOS (Human Interface)</span>
+                                    </div>
+                                    <span class="badge" id="tag-theme-active-apple" style="background: #007aff; color: #fff; font-size: 11px; display: none;" data-i18n="config.activeThemeTag">Aktívny Dizajn</span>
+                                </div>
+                                <p style="color: var(--text-secondary); font-size: 13px; margin-top: 10px; line-height: 1.5;" data-i18n="config.themeAppleDesc">
+                                    Čistý sklenený dizajn (Frosted Glass Glassmorphism) podľa Apple iOS s jemnými tieňmi, SF Pro typografiou a dynamickým denným / nočným režimom.
+                                </p>
+
+                                <!-- Apple Day / Night / System Segmented Control -->
+                                <div class="apple-regime-selector" style="margin-top: 12px; padding: 10px; background: rgba(0, 0, 0, 0.18); border-radius: 12px;">
+                                    <div style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; font-weight: 600; color: var(--text-secondary);" data-i18n="theme.appleRegimeLabel">Režim Apple iOS:</div>
+                                    <div class="segmented-control" id="apple-regime-segmented">
+                                        <button type="button" class="segmented-btn active" data-apple-regime="system" onclick="event.stopPropagation(); setAppleRegime('system'); setAppTheme('apple');">🌓 <span data-i18n="theme.regimeSystem">Systém</span></button>
+                                        <button type="button" class="segmented-btn" data-apple-regime="light" onclick="event.stopPropagation(); setAppleRegime('light'); setAppTheme('apple');">☀️ <span data-i18n="theme.regimeLight">Denný</span></button>
+                                        <button type="button" class="segmented-btn" data-apple-regime="dark" onclick="event.stopPropagation(); setAppleRegime('dark'); setAppTheme('apple');">🌙 <span data-i18n="theme.regimeDark">Nočný</span></button>
+                                    </div>
+                                </div>
+                            </div>
+                            <div style="display: flex; justify-content: flex-end; margin-top: 14px;">
+                                <button type="button" class="btn btn-secondary btn-sm" onclick="event.stopPropagation(); setAppTheme('apple');" data-i18n="config.btnActivateTheme">Prepnúť Dizajn</button>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -3045,6 +3173,22 @@
                         <button type="button" class="lang-btn active" data-lang="sk" onclick="setAppLanguage('sk')" style="flex: 1; justify-content: center; padding: 6px 12px; font-size: 12px;">🇸🇰 Slovenčina (SK)</button>
                         <button type="button" class="lang-btn" data-lang="en" onclick="setAppLanguage('en')" style="flex: 1; justify-content: center; padding: 6px 12px; font-size: 12px;">🇬🇧 English (EN)</button>
                         <button type="button" class="lang-btn" data-lang="de" onclick="setAppLanguage('de')" style="flex: 1; justify-content: center; padding: 6px 12px; font-size: 12px;">🇩🇪 Deutsch (DE)</button>
+                    </div>
+                </div>
+
+                <!-- Theme Section inside Modal -->
+                <div style="margin-bottom: 20px; padding-bottom: 16px; border-bottom: 1px solid var(--border-color);">
+                    <div style="font-weight: 600; font-size: 14px; margin-bottom: 6px; color: var(--text-primary); display: flex; align-items: center; gap: 6px;">
+                        <span data-i18n="config.themeSectionTitle">🎨 Vzhľad &amp; Téma (Theme)</span>
+                    </div>
+                    <p style="color: var(--text-secondary); font-size: 12px; margin-bottom: 10px;" data-i18n="config.themeSectionDesc">
+                        Zvoľte vizuálny štýl rozhrania Symbolon:
+                    </p>
+                    <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px;">
+                        <button type="button" class="btn btn-primary btn-sm" data-modal-theme="modern" onclick="setAppTheme('modern')" style="padding: 6px 4px; font-size: 11px; justify-content: center;">💼 Modern</button>
+                        <button type="button" class="btn btn-secondary btn-sm" data-modal-theme="retro" onclick="setAppTheme('retro')" style="padding: 6px 4px; font-size: 11px; justify-content: center;">💾 Retro</button>
+                        <button type="button" class="btn btn-secondary btn-sm" data-modal-theme="cyberpunk" onclick="setAppTheme('cyberpunk')" style="padding: 6px 4px; font-size: 11px; justify-content: center;">⚡ Cyber</button>
+                        <button type="button" class="btn btn-secondary btn-sm" data-modal-theme="apple" onclick="setAppTheme('apple')" style="padding: 6px 4px; font-size: 11px; justify-content: center;">🍎 Apple</button>
                     </div>
                 </div>
 
@@ -3536,6 +3680,7 @@
     <div class="toast-container" id="toast-container"></div>
 
     <script src="/js/i18n.js"></script>
+    <script src="/js/theme-manager.js"></script>
     <script src="/js/symbolon-validator.js"></script>
     <script src="/js/dashboard.js"></script>
     <script src="/js/retro-tui.js"></script>

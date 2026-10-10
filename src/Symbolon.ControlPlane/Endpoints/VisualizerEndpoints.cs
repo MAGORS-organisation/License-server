@@ -161,6 +161,40 @@ public static class VisualizerEndpoints
       --font-family: system-ui, -apple-system, sans-serif;
       --box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3);
     }
+    :root[data-theme="cyberpunk"] {
+      --bg-color: #07070f;
+      --card-bg: #120b24;
+      --border-color: #00f0ff;
+      --text-color: #00f0ff;
+      --accent-color: #ff0055;
+      --highlight: #fcee0a;
+      --dim: #8352a8;
+      --font-family: 'Rajdhani', monospace, sans-serif;
+      --box-shadow: 0 0 16px rgba(0, 240, 255, 0.4);
+    }
+    :root[data-theme="apple"],
+    :root[data-theme="apple"][data-apple-effective-theme="dark"] {
+      --bg-color: #000000;
+      --card-bg: rgba(28, 28, 30, 0.85);
+      --border-color: rgba(255, 255, 255, 0.15);
+      --text-color: #ffffff;
+      --accent-color: #0a84ff;
+      --highlight: #30d158;
+      --dim: #8e8e93;
+      --font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif;
+      --box-shadow: 0 8px 30px rgba(0, 0, 0, 0.5);
+    }
+    :root[data-theme="apple"][data-apple-effective-theme="light"] {
+      --bg-color: #f2f2f7;
+      --card-bg: rgba(255, 255, 255, 0.85);
+      --border-color: rgba(60, 60, 67, 0.12);
+      --text-color: #1c1c1e;
+      --accent-color: #007aff;
+      --highlight: #34c759;
+      --dim: #8e8e93;
+      --font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif;
+      --box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+    }
     body {
       margin: 0;
       padding: 20px;
@@ -262,7 +296,7 @@ public static class VisualizerEndpoints
       <small>Real-Time Cluster Topology & Transparency Log Inspector</small>
     </div>
     <div>
-      <button class="theme-btn" id="themeToggle" onclick="toggleTheme()">◒ Prepni Tému (CRT Phosphor / Modern Dark)</button>
+      <button class="theme-btn" id="themeToggle" onclick="toggleTheme()">◒ Prepni Tému (CRT Phosphor / Modern Dark / Cyberpunk / Apple iOS)</button>
     </div>
   </header>
 
@@ -307,15 +341,40 @@ public static class VisualizerEndpoints
   </div>
 
   <script>
+    const themes = ['retro', 'modern', 'cyberpunk', 'apple'];
+    const themeLabels = {
+      retro: 'CRT Phosphor (Retro)',
+      modern: 'Modern Dark',
+      cyberpunk: 'Cyberpunk 2077 HUD',
+      apple: 'Apple iOS Glass'
+    };
+    function updateThemeButton(theme) {
+      const btn = document.getElementById('themeToggle');
+      if (btn) btn.innerText = `◒ Téma: ${themeLabels[theme] || theme} (CRT Phosphor / Modern Dark / Cyberpunk / Apple iOS)`;
+    }
     function toggleTheme() {
       const html = document.documentElement;
       const current = html.getAttribute('data-theme') || 'retro';
-      const next = current === 'retro' ? 'modern' : 'retro';
+      const nextIdx = (themes.indexOf(current) + 1) % themes.length;
+      const next = themes[nextIdx];
       html.setAttribute('data-theme', next);
+      if (next === 'apple') {
+        const isLight = window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches;
+        html.setAttribute('data-apple-effective-theme', isLight ? 'light' : 'dark');
+      }
       localStorage.setItem('symbolon-theme', next);
+      localStorage.setItem('symbolon_theme', next);
+      updateThemeButton(next);
     }
-    const saved = localStorage.getItem('symbolon-theme');
-    if (saved) document.documentElement.setAttribute('data-theme', saved);
+    const saved = localStorage.getItem('symbolon_theme') || localStorage.getItem('symbolon-theme');
+    if (saved) {
+      document.documentElement.setAttribute('data-theme', saved);
+      if (saved === 'apple') {
+        const isLight = window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches;
+        document.documentElement.setAttribute('data-apple-effective-theme', isLight ? 'light' : 'dark');
+      }
+      updateThemeButton(saved);
+    }
 
     async function loadTopology() {
       try {

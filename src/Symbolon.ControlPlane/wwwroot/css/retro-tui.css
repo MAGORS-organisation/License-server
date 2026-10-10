@@ -21,7 +21,8 @@
   --retro-font: 'Consolas', 'Courier New', 'Lucida Console', Monaco, monospace;
 }
 
-body {
+html[data-theme="retro"] body,
+body.theme-retro {
   font-family: var(--retro-font) !important;
   background-color: var(--retro-desktop) !important;
   color: var(--retro-text-dark) !important;
@@ -37,8 +38,31 @@ body {
   flex-direction: column !important;
 }
 
-.main-wrapper {
+html[data-theme="retro"] .main-wrapper,
+body.theme-retro .main-wrapper,
+html[data-theme="retro"] .sidebar,
+body.theme-retro .sidebar {
   display: none !important;
+}
+
+/* Hide retro elements when NOT in retro theme */
+html:not([data-theme="retro"]):not(.theme-retro) .retro-top-bar,
+html:not([data-theme="retro"]):not(.theme-retro) .retro-workspace,
+html:not([data-theme="retro"]):not(.theme-retro) .retro-bottom-bar,
+html:not([data-theme="retro"]):not(.theme-retro) .retro-cascading-popup,
+html:not([data-theme="retro"]):not(.theme-retro) .retro-modal-overlay {
+  display: none !important;
+}
+
+.retro-theme-link {
+  color: #00396b;
+  text-decoration: none;
+  padding: 0 2px;
+}
+
+.retro-theme-link.active {
+  background-color: #00396b;
+  color: #ffffff !important;
 }
 
 /* Horná lišta FoxPro Menu */

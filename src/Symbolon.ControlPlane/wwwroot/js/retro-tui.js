@@ -102,18 +102,28 @@
                 <li class="retro-menu-item" onclick="openModal('modal-auth-config')" tabindex="0">K<span class="hotkey">o</span>nfigurácia</li>
             </ul>
             <div style="font-size: 11px; color: #444; font-weight: bold; display: flex; align-items: center; gap: 8px;">
+                <span class="retro-theme-switcher">[ Téma: <a href="javascript:void(0)" class="retro-theme-link active" data-theme="retro" onclick="setAppTheme('retro')"><span class="hotkey">R</span>etro</a> | <a href="javascript:void(0)" class="retro-theme-link" data-theme="modern" onclick="setAppTheme('modern')"><span class="hotkey">M</span>odern</a> | <a href="javascript:void(0)" class="retro-theme-link" data-theme="cyberpunk" onclick="setAppTheme('cyberpunk')"><span class="hotkey">C</span>yber</a> | <a href="javascript:void(0)" class="retro-theme-link" data-theme="apple" onclick="setAppTheme('apple')"><span class="hotkey">A</span>pple</a> ]</span>
                 <span class="retro-lang-switcher">[ <a href="javascript:void(0)" class="retro-lang-link active" data-lang="sk" onclick="setAppLanguage('sk')"><span class="hotkey">S</span>K</a> | <a href="javascript:void(0)" class="retro-lang-link" data-lang="en" onclick="setAppLanguage('en')"><span class="hotkey">E</span>N</a> | <a href="javascript:void(0)" class="retro-lang-link" data-lang="de" onclick="setAppLanguage('de')"><span class="hotkey">D</span>E</a> ]</span>
                 <span id="retro-server-clock">--:--:--</span> | <span id="retro-conn-status" style="color: green;">● ONLINE</span>
             </div>
         `;
+        const isRetroActive = (window.ThemeManager && window.ThemeManager.getAppTheme() === 'retro') || document.documentElement.getAttribute('data-theme') === 'retro';
+        if (!isRetroActive) {
+            topBar.style.display = 'none';
+        }
         document.body.insertBefore(topBar, document.body.firstChild);
 
         // 2. Hlavný retro workspace obalujúci obsah
         const mainWrapper = document.querySelector('.main-wrapper');
         if (mainWrapper) {
-            mainWrapper.style.display = 'none';
+            if (isRetroActive) {
+                mainWrapper.style.display = 'none';
+            }
             const workspace = document.createElement('div');
             workspace.className = 'retro-workspace';
+            if (!isRetroActive) {
+                workspace.style.display = 'none';
+            }
 
             // Ľavé okno menu
             const leftMenuWindow = document.createElement('aside');
@@ -173,7 +183,7 @@
             contentWindow.appendChild(titleBar);
 
             const contentArea = document.querySelector('.content-area');
-            if (contentArea) {
+            if (contentArea && isRetroActive) {
                 contentArea.classList.add('retro-view-body');
                 contentWindow.appendChild(contentArea);
             }
@@ -187,6 +197,9 @@
         // 3. Spodná dvojriadková lišta: F1-F10 a živá info lišta systémových zdrojov
         const bottomBar = document.createElement('footer');
         bottomBar.className = 'retro-bottom-bar';
+        if (!isRetroActive) {
+            bottomBar.style.display = 'none';
+        }
         bottomBar.innerHTML = `
             <div class="retro-fkey-row">
                 <button class="fkey-btn" onclick="openHelpModal()"><span class="fkey-badge">F1</span> Pomoc</button>

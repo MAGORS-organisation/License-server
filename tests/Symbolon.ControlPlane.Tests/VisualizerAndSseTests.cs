@@ -28,6 +28,8 @@ public sealed class VisualizerAndSseTests : IClassFixture<ControlPlaneFactory>
         html.Should().Contain("data-theme=\"retro\"");
         html.Should().Contain("CRT Phosphor");
         html.Should().Contain("Modern Dark");
+        html.Should().Contain("Cyberpunk");
+        html.Should().Contain("Apple iOS");
         html.Should().Contain("/v1/events");
         html.Should().Contain("/v1/cluster/topology");
     }

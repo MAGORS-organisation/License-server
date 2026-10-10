@@ -28,9 +28,14 @@ public sealed class WebUiTests : IClassFixture<ControlPlaneFactory>
         Assert.Contains("view-migrate", content, StringComparison.Ordinal);
         Assert.Contains("view-config", content, StringComparison.Ordinal);
         Assert.Contains("topbar-lang-switcher", content, StringComparison.Ordinal);
+        Assert.Contains("topbar-theme-switcher", content, StringComparison.Ordinal);
+        Assert.Contains("theme-card-cyberpunk", content, StringComparison.Ordinal);
+        Assert.Contains("theme-card-apple", content, StringComparison.Ordinal);
+        Assert.Contains("apple-regime-segmented", content, StringComparison.Ordinal);
         Assert.Contains("data-lang=\"de\"", content, StringComparison.Ordinal);
         Assert.Contains("lang-card-de", content, StringComparison.Ordinal);
         Assert.Contains("i18n.js", content, StringComparison.Ordinal);
+        Assert.Contains("theme-manager.js", content, StringComparison.Ordinal);
         Assert.Contains("symbolon-validator.js", content, StringComparison.Ordinal);
     }
 
@@ -43,10 +48,26 @@ public sealed class WebUiTests : IClassFixture<ControlPlaneFactory>
         Assert.Contains("--bg-primary", css, StringComparison.Ordinal);
         Assert.Contains(".lang-switcher", css, StringComparison.Ordinal);
 
+        var themesCssResponse = await _client.GetAsync("/css/themes.css");
+        Assert.Equal(HttpStatusCode.OK, themesCssResponse.StatusCode);
+        string themesCss = await themesCssResponse.Content.ReadAsStringAsync();
+        Assert.Contains("data-theme=\"cyberpunk\"", themesCss, StringComparison.Ordinal);
+        Assert.Contains("data-theme=\"apple\"", themesCss, StringComparison.Ordinal);
+        Assert.Contains("data-apple-effective-theme", themesCss, StringComparison.Ordinal);
+        Assert.Contains(".segmented-control", themesCss, StringComparison.Ordinal);
+
         var jsResponse = await _client.GetAsync("/js/dashboard.js");
         Assert.Equal(HttpStatusCode.OK, jsResponse.StatusCode);
         string js = await jsResponse.Content.ReadAsStringAsync();
         Assert.Contains("refreshAllData", js, StringComparison.Ordinal);
+
+        var themeManagerJs = await _client.GetAsync("/js/theme-manager.js");
+        Assert.Equal(HttpStatusCode.OK, themeManagerJs.StatusCode);
+        string themeManagerContent = await themeManagerJs.Content.ReadAsStringAsync();
+        Assert.Contains("setAppTheme", themeManagerContent, StringComparison.Ordinal);
+        Assert.Contains("setAppleRegime", themeManagerContent, StringComparison.Ordinal);
+        Assert.Contains("cyberpunk", themeManagerContent, StringComparison.Ordinal);
+        Assert.Contains("apple", themeManagerContent, StringComparison.Ordinal);
 
         var i18nJs = await _client.GetAsync("/js/i18n.js");
         Assert.Equal(HttpStatusCode.OK, i18nJs.StatusCode);
@@ -55,6 +76,8 @@ public sealed class WebUiTests : IClassFixture<ControlPlaneFactory>
         Assert.Contains("de:", i18nJsContent, StringComparison.Ordinal);
         Assert.Contains("setLanguage", i18nJsContent, StringComparison.Ordinal);
         Assert.Contains("getLanguage", i18nJsContent, StringComparison.Ordinal);
+        Assert.Contains("config.themeCyberpunkTitle", i18nJsContent, StringComparison.Ordinal);
+        Assert.Contains("config.themeAppleTitle", i18nJsContent, StringComparison.Ordinal);
 
         var retroCss = await _client.GetAsync("/css/retro-tui.css");
         Assert.Equal(HttpStatusCode.OK, retroCss.StatusCode);

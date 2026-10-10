@@ -10,7 +10,25 @@ a projekt striktne dodržiava [Sémantické Verziovanie (Semantic Versioning 2.0
 ## [Unreleased]
 
 ### Pridané (Added)
-- **Phase 22: Multi-Tenancy B2B Self-Service Portál & Tenant Branding, Produkčné Grafana Dashboardy & Alertmanager Pack, WASM Envoy & Cloudflare Edge Filtre, Chaos Monkey Runner & Zero-Trust WireGuard Mesh Tunnel (§9.8, §10.11, §11.6, §12.7, §13.3)**:
+- **Phase 23: Multi-Theme Engine: Cyberpunk 2077 HUD & Apple iOS Glassmorphism s Denným / Nočným / Systémovým Režimom**:
+  - **Dizajnová Schéma Cyberpunk 2077 HUD**:
+    - Futuristické neónové rozhranie v štýle Night City so žiarivým azúrovým (`#00f0ff`), purpurovým (`#ff0055`) a kybernetickým žltým (`#fcee0a`) akcentom.
+    - Štylizované kybernetické karty, neónový glow efekt (`box-shadow`, `text-shadow`), sci-fi monospace prvky, high-contrast tabuľky a akcentovaný sidebar.
+  - **Dizajnová Schéma Apple iOS (Human Interface Glassmorphism)**:
+    - Čistá Apple typografia (`SF Pro Display` / `-apple-system`), hodvábne zaoblené rohy (18-24px), jemné vrstvené tiene a skutočný polopriehľadný frosted glass efekt (`backdrop-filter: blur(25px) saturate(180%)`).
+    - **Plnohodnotný trojrežimový systém**:
+      - 🌓 **Systémový (Auto)**: Automatická adaptácia na systémové nastavenie OS cez `prefers-color-scheme` s dynamickým prechodom v reálnom čase bez nutnosti obnovenia stránky.
+      - ☀️ **Denný (Light)**: iOS Grouped Background (`#f2f2f7`), snehobiele matné karty (`rgba(255,255,255,0.88)`), tmavé systémové písmo (`#1c1c1e`) a iOS System Blue (`#007aff`).
+      - 🌙 **Nočný (Dark)**: Hlboký OLED True Black podklad (`#000000`), tmavé matné karty (`rgba(28,28,30,0.85)`), jemné biele ohraničenia a neon iOS modrá (`#0a84ff`).
+    - Apple Segmented Control prepínač režimov priamo na konfiguračnej karte aj s rýchlym prepínačom v hornej lište (`topbar`).
+  - **Integrovaný Správca Tém (`theme-manager.js` & `themes.css`)**:
+    - Centralizovaný manažér prepínania tém s perzistenciou v `localStorage` (`symbolon_theme`, `symbolon_apple_mode`).
+    - Interaktívna sekcia v **Konfigurácii** (`view-config`) s náhľadovými kartami pre všetky 4 dizajny: *Modern Enterprise*, *Retro FoxPro 2.6*, *Cyberpunk 2077* a *Apple iOS*.
+    - Rýchly prepínač tém v hornej lište (`#topbar-theme-switcher`), v modálnom dialógu nastavení (`modal-auth-config`) a v Retro topbare (`retro-tui.js`).
+    - Bezvýpadkový a plynulý prechod DOM medzi plnohodnotným Retro DOS TUI a moderným/cyber/apple webovým rozhraním bez reloadu.
+    - Podpora všetkých 4 tém v Live Cluster Visualizeri (`/visualizer`, `visualizer.html`, `EmbeddedVisualizerHtml`).
+    - Lokalizačná podpora pre témy a režimy v slovenčine, angličtine a nemčine (`i18n.js`).
+    - Komplexné integračné testy v `WebUiTests.cs` a `VisualizerAndSseTests.cs`.
   - **Multi-Tenancy B2B Self-Service Portál & Tenant Branding**:
     - Entita `TenantDepartmentQuota` a `TenantBrandingEntity` v `src/Symbolon.Data/Entities/Entities.cs` a konfigurácia v `SymbolonDbContext.cs` pre riadenie oddelení (Engineering, QA, Sales) a vizuálnu identitu tenantov (názov, logo URL, primárne/sekundárne farby, kontaktný email, portálové správy).
     - DTO modely v `src/Symbolon.ControlPlane/Models/AdminDtos.cs` (`TenantBrandingDto`, `UpdateTenantBrandingDto`, `TenantDepartmentQuotaDto`, `SetDepartmentQuotaDto`, `DepartmentUsageSummaryDto`).
