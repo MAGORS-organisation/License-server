@@ -174,6 +174,12 @@
                     <span data-i18n="nav.config">Konfigurácia &amp; Jazyk</span>
                 </a>
             </li>
+            <li class="nav-item">
+                <a class="nav-link" data-view="view-help">
+                    <span class="nav-icon">📖</span>
+                    <span data-i18n="nav.help">Príručka &amp; Nápoveda</span>
+                </a>
+            </li>
         </ul>
 
         <div class="sidebar-footer">
@@ -206,6 +212,7 @@
                     <button class="theme-btn-compact" data-theme="apple" onclick="setAppTheme('apple')" title="Apple iOS">🍎 Apple</button>
                     <button class="apple-quick-toggle" id="topbar-apple-toggle" style="display: none;" onclick="cycleAppleRegime()" title="Prepnúť režim Apple (Systém / Denný / Nočný)">🌓 Auto</button>
                 </div>
+                <button class="btn btn-secondary btn-sm" id="btn-topbar-help" onclick="switchToView('view-help')" title="Komplexná Príručka a Nápoveda (F1)" data-i18n="topbar.helpGuide" data-i18n-title="topbar.helpGuideTitle">📖 Príručka [F1]</button>
                 <button class="btn btn-secondary btn-sm" id="btn-api-key-config" onclick="openModal('modal-auth-config')" title="Nastaviť prístupový API kľúč pre Dashboard" data-i18n="topbar.apiKey" data-i18n-title="topbar.apiKeyTitle">🔑 API Kľúč</button>
                 <div class="health-badge">
                     <div class="pulse-dot"></div>
@@ -2875,6 +2882,63 @@
                 </div>
             </section>
 
+            <!-- VIEW: Comprehensive Help Guide & Documentation -->
+            <section id="view-help" class="view-section">
+                <!-- Header card with search & quick actions -->
+                <div class="table-card help-header-card" style="margin-bottom: 20px; padding: 20px;">
+                    <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 16px; margin-bottom: 16px;">
+                        <div>
+                            <h2 style="font-size: 20px; font-weight: 700; margin-bottom: 4px; display: flex; align-items: center; gap: 10px;">
+                                <span>📖</span>
+                                <span data-i18n="help.title">Komplexná Príručka &amp; Nápoveda (Achilles Guide)</span>
+                            </h2>
+                            <p style="color: var(--text-secondary); font-size: 13px;" data-i18n="help.subtitle">
+                                Kompletný funkčný manuál, architektúra, konfigurácia, post-kvantová bezpečnosť, API a klávesové skratky.
+                            </p>
+                        </div>
+                        <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+                            <span class="badge" style="background: rgba(16, 185, 129, 0.15); color: #10b981; border: 1px solid rgba(16, 185, 129, 0.3); font-size: 12px; padding: 4px 10px;">
+                                ⌨️ Klávesová skratka: F1
+                            </span>
+                            <button type="button" class="btn btn-secondary btn-sm" onclick="window.HelpGuide.resetFilters()" title="Obnoviť filtre a zobraziť všetky kapitoly">
+                                ↺ Reset Filtra
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Search Input & Filter Pills -->
+                    <div class="help-search-container" style="display: flex; flex-direction: column; gap: 12px;">
+                        <div style="position: relative;">
+                            <input type="text" id="help-search-input" class="form-control help-search-input" 
+                                   placeholder="🔍 Hľadať v príručke (napr. floating, PQC, relay, air-gap, ebpf, crdt, scim, tokeny, sdk, docker, klávesy)..."
+                                   style="padding-left: 14px; font-size: 14px; width: 100%;">
+                        </div>
+                        <div class="help-filter-pills" id="help-filter-pills" style="display: flex; gap: 6px; overflow-x: auto; padding-bottom: 4px; flex-wrap: wrap;">
+                            <!-- Dynamicky naplnené z help-guide.js -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Main Guide Split Layout: TOC List on Left, Content on Right -->
+                <div class="help-guide-layout" style="display: grid; grid-template-columns: 340px 1fr; gap: 20px; align-items: start;">
+                    <!-- Left: Table of Contents -->
+                    <div class="table-card help-toc-card" style="padding: 16px; max-height: calc(100vh - 280px); overflow-y: auto;">
+                        <div class="table-title" style="font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 12px; color: var(--text-secondary); display: flex; justify-content: space-between;">
+                            <span>Zoznam Kapitol (TOC)</span>
+                            <span id="help-chapter-count">22 Kapitol</span>
+                        </div>
+                        <ul class="help-toc-list" id="help-toc-list" style="list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 6px;">
+                            <!-- Naplnené dynamicky z help-guide.js -->
+                        </ul>
+                    </div>
+
+                    <!-- Right: Content Display Pane -->
+                    <div class="table-card help-content-card" id="help-content-display" style="padding: 28px; max-height: calc(100vh - 280px); overflow-y: auto;">
+                        <!-- Naplnené dynamicky z help-guide.js -->
+                    </div>
+                </div>
+            </section>
+
         </main>
     </div>
 
@@ -3683,6 +3747,7 @@
     <script src="/js/theme-manager.js"></script>
     <script src="/js/achilles-validator.js"></script><script src="/js/symbolon-validator.js"></script>
     <script src="/js/dashboard.js"></script>
+    <script src="/js/help-guide.js"></script>
     <script src="/js/retro-tui.js"></script>
 </body>
 </html>

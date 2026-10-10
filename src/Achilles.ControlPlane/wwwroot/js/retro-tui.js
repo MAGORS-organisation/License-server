@@ -44,8 +44,8 @@
         { isSeparator: true },
         { id: 'sulad', label: 'Súlad & CRA / SBOM', hotkey: 'S', view: 'view-system', hasSub: false },
         { id: 'apikeys', label: 'API Kľúče & Merkle', hotkey: 'T', view: 'view-apikeys', hasSub: false },
-        { id: 'konfiguracia', label: 'Konfigurácia', hotkey: 'O', action: 'open-config', hasSub: false },
-        { id: 'pomoc', label: 'Pomoc (F1)', hotkey: 'P', action: 'open-help', hasSub: false }
+        { id: 'konfiguracia', label: 'Konfigurácia', hotkey: 'O', view: 'view-config', hasSub: false },
+        { id: 'pomoc', label: 'Príručka & Pomoc (F1)', hotkey: 'P', view: 'view-help', hasSub: false }
     ];
 
     // Položky kaskádového podmenu "Číselníky" (ako na screenshotu)
@@ -79,7 +79,7 @@
         topBar.className = 'retro-top-bar';
         topBar.innerHTML = `
             <ul class="retro-menu-bar">
-                <li class="retro-menu-item" onclick="toggleMainMenu()" tabindex="0">≡ <span class="hotkey">S</span>ymbolon</li>
+                <li class="retro-menu-item" onclick="toggleMainMenu()" tabindex="0">≡ <span class="hotkey">A</span>chilles</li>
                 <li class="retro-menu-item" onclick="switchRetroView('view-overview')" tabindex="0"><span class="hotkey">P</span>rehľad</li>
                 <li class="retro-menu-item" onclick="switchRetroView('view-licenses')" tabindex="0"><span class="hotkey">L</span>icencie</li>
                 <li class="retro-menu-item" onclick="switchRetroView('view-keys')" tabindex="0"><span class="hotkey">K</span>ľúče</li>
@@ -99,7 +99,8 @@
                 <li class="retro-menu-item" onclick="switchRetroView('view-experiments')" tabindex="0">A/<span class="hotkey">B</span> Exp</li>
                 <li class="retro-menu-item" onclick="switchRetroView('view-pqc')" tabindex="0">P<span class="hotkey">Q</span>C M7</li>
                 <li class="retro-menu-item" onclick="switchRetroView('view-system')" tabindex="0"><span class="hotkey">S</span>úlad CRA</li>
-                <li class="retro-menu-item" onclick="openModal('modal-auth-config')" tabindex="0">K<span class="hotkey">o</span>nfigurácia</li>
+                <li class="retro-menu-item" onclick="switchRetroView('view-config')" tabindex="0">K<span class="hotkey">o</span>nfigurácia</li>
+                <li class="retro-menu-item" onclick="switchRetroView('view-help')" tabindex="0"><span class="hotkey">H</span>elp (F1)</li>
             </ul>
             <div style="font-size: 11px; color: #444; font-weight: bold; display: flex; align-items: center; gap: 8px;">
                 <span class="retro-theme-switcher">[ Téma: <a href="javascript:void(0)" class="retro-theme-link active" data-theme="retro" onclick="setAppTheme('retro')"><span class="hotkey">D</span>OS</a> | <a href="javascript:void(0)" class="retro-theme-link" data-theme="modern" onclick="setAppTheme('modern')"><span class="hotkey">M</span>odern</a> | <a href="javascript:void(0)" class="retro-theme-link" data-theme="cyberpunk" onclick="setAppTheme('cyberpunk')"><span class="hotkey">C</span>yber</a> | <a href="javascript:void(0)" class="retro-theme-link" data-theme="apple" onclick="setAppTheme('apple')"><span class="hotkey">A</span>pple</a> ]</span>
@@ -177,7 +178,7 @@
                 <span id="retro-window-title">PREHĽAD LICENČNÉHO SERVERA</span>
                 <div>
                     <button class="retro-btn retro-btn-primary" onclick="openModal('modal-issue-license')">+ Vystaviť [V]</button>
-                    <button class="retro-btn" onclick="openHelpModal()">Pomoc [F1]</button>
+                    <button class="retro-btn" onclick="switchRetroView('view-help')">Príručka [F1]</button>
                 </div>
             `;
             contentWindow.appendChild(titleBar);
@@ -202,7 +203,7 @@
         }
         bottomBar.innerHTML = `
             <div class="retro-fkey-row">
-                <button class="fkey-btn" onclick="openHelpModal()"><span class="fkey-badge">F1</span> Pomoc</button>
+                <button class="fkey-btn" onclick="switchRetroView('view-help')"><span class="fkey-badge">F1</span> Príručka</button>
                 <button class="fkey-btn" onclick="switchRetroView('view-overview')"><span class="fkey-badge">F2</span> Prehľad</button>
                 <button class="fkey-btn" onclick="switchRetroView('view-licenses')"><span class="fkey-badge">F3</span> Licencie</button>
                 <button class="fkey-btn" onclick="switchRetroView('view-keys')"><span class="fkey-badge">F4</span> Kľúče</button>
@@ -322,7 +323,7 @@
             switch (e.key) {
                 case 'F1':
                     e.preventDefault();
-                    openHelpModal();
+                    switchRetroView('view-help');
                     return;
                 case 'F2':
                     e.preventDefault();
@@ -651,7 +652,9 @@
             'view-migrate': 'MIGRÁCIA Z FLEXNET PUBLISHER (FLEXLM) & KEYGEN.SH',
             'view-scim': 'SCIM 2.0 IDENTITA & FIREMNÁ SYNCHRONIZÁCIA',
             'view-experiments': 'A/B TESTOVANIE & EXPERIMENTAČNÝ ENGINE (AB-1 .. AB-15)',
-            'view-pqc': 'POST-QUANTUM ERA SUITE & QUANTUM READINESS AUDIT (M7, §13.5)'
+            'view-pqc': 'POST-QUANTUM ERA SUITE & QUANTUM READINESS AUDIT (M7, §13.5)',
+            'view-config': 'KONFIGURÁCIA SYSTÉMU, JAZYK & TÉMY ROZHRANIA',
+            'view-help': 'KOMPLEXNÁ PRÍRUČKA & NÁPOVEDA SYSTÉMU ACHILLES (F1)'
         };
 
         const titleEl = document.getElementById('retro-window-title');
@@ -676,6 +679,9 @@
         }
         if (viewId === 'view-pqc' && typeof window.loadPqcView === 'function') {
             window.loadPqcView();
+        }
+        if (viewId === 'view-help' && window.HelpGuide && typeof window.HelpGuide.init === 'function') {
+            window.HelpGuide.init();
         }
 
         // Zatvorenie podmenu pri prepnutí
@@ -736,8 +742,8 @@
         } else if (hash === 'machines' || hash === 'stroje' || hash === 'nodelock') {
             switchRetroView('view-machines');
             if (typeof window.loadMachinesView === 'function') window.loadMachinesView();
-        } else if (hash === 'help') {
-            openHelpModal();
+        } else if (hash === 'help' || hash === 'prirucka' || hash === 'guide') {
+            switchRetroView('view-help');
         }
     }
 

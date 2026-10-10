@@ -508,3 +508,102 @@ html[data-theme="apple"][data-apple-effective-theme="light"] .theme-choice-card.
   background-color: rgba(0, 122, 255, 0.04);
   box-shadow: 0 0 0 1px #007aff, 0 6px 20px rgba(0, 122, 255, 0.12);
 }
+
+/* ------------------------------------------------------------------------------
+ * Help Guide View (#view-help) Theme Customizations
+ * ------------------------------------------------------------------------------ */
+
+/* Cyberpunk HUD Theme */
+html[data-theme="cyberpunk"] .help-header-card,
+html[data-theme="cyberpunk"] .help-toc-card,
+html[data-theme="cyberpunk"] .help-content-card {
+  border-left: 3px solid var(--cyber-cyan);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.6), 0 0 12px rgba(0, 240, 255, 0.15);
+}
+
+html[data-theme="cyberpunk"] .help-pill {
+  font-family: monospace;
+  border-color: rgba(0, 240, 255, 0.3);
+  color: #ff77a8;
+}
+
+html[data-theme="cyberpunk"] .help-pill:hover {
+  border-color: var(--cyber-cyan);
+  color: var(--cyber-cyan);
+  box-shadow: 0 0 8px rgba(0, 240, 255, 0.4);
+}
+
+html[data-theme="cyberpunk"] .help-pill.active {
+  background: var(--cyber-cyan);
+  color: #0a0416;
+  border-color: var(--cyber-cyan);
+  box-shadow: 0 0 12px var(--cyber-cyan);
+  font-weight: 700;
+}
+
+html[data-theme="cyberpunk"] .help-toc-item:hover {
+  background: rgba(0, 240, 255, 0.1);
+  border-color: var(--cyber-cyan);
+}
+
+html[data-theme="cyberpunk"] .help-toc-item.active {
+  background: rgba(255, 0, 127, 0.15);
+  border-color: var(--cyber-pink);
+  border-left: 3px solid var(--cyber-pink);
+  box-shadow: 0 0 10px rgba(255, 0, 127, 0.3);
+}
+
+html[data-theme="cyberpunk"] .help-toc-item.active .help-toc-badge {
+  background: var(--cyber-pink);
+  color: #ffffff;
+}
+
+html[data-theme="cyberpunk"] .help-article-body pre {
+  border: 1px solid var(--cyber-cyan);
+  box-shadow: 0 0 10px rgba(0, 240, 255, 0.2);
+}
+
+/* Apple iOS Theme */
+html[data-theme="apple"] .help-header-card,
+html[data-theme="apple"] .help-toc-card,
+html[data-theme="apple"] .help-content-card {
+  border-radius: 16px;
+}
+
+html[data-theme="apple"] .help-pill {
+  border-radius: 9999px;
+}
+
+html[data-theme="apple"] .help-pill.active {
+  background: #007aff;
+  border-color: #007aff;
+  box-shadow: 0 2px 8px rgba(0, 122, 255, 0.35);
+}
+
+html[data-theme="apple"] .help-toc-item {
+  border-radius: 10px;
+}
+
+html[data-theme="apple"] .help-toc-item.active {
+  background: rgba(0, 122, 255, 0.12);
+  border-color: #007aff;
+}
+
+html[data-theme="apple"] .help-toc-item.active .help-toc-badge {
+  background: #007aff;
+  color: #ffffff;
+}
+
+html[data-theme="apple"][data-apple-effective-theme="light"] .help-header-card,
+html[data-theme="apple"][data-apple-effective-theme="light"] .help-toc-card,
+html[data-theme="apple"][data-apple-effective-theme="light"] .help-content-card {
+  background-color: rgba(255, 255, 255, 0.9);
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+}
+
+html[data-theme="apple"][data-apple-effective-theme="light"] .help-article-body pre {
+  background: #1c1c1e;
+  color: #f2f2f7;
+}
+

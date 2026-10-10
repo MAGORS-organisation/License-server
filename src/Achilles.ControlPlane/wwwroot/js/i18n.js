@@ -29,13 +29,15 @@
             "nav.machines": "Node-Lock & Stroje",
             "nav.experiments": "A/B Experimenty (AB-1)",
             "nav.pqc": "Post-Quantum Era (M7)",
-            "nav.system": "API & Diagnostika",
             "nav.config": "Konfigurácia & Jazyk",
+            "nav.help": "Príručka & Nápoveda",
 
             // Topbar
             "topbar.user": "👤 Používateľ",
             "topbar.logout": "🚪 Odhlásiť",
             "topbar.logoutTitle": "Odhlásiť SSO reláciu",
+            "topbar.helpGuide": "📖 Príručka [F1]",
+            "topbar.helpGuideTitle": "Komplexná Príručka a Nápoveda (F1)",
             "topbar.apiKey": "🔑 API Kľúč",
             "topbar.apiKeyTitle": "Nastaviť prístupový API kľúč pre Dashboard",
             "topbar.healthChecking": "Kontrola spojenia...",
@@ -44,6 +46,10 @@
             "topbar.healthError": "Chyba spojenia",
             "topbar.issueLicense": "+ Vystaviť Licenciu",
             "topbar.langTooltip": "Zmeniť jazyk / Switch language / Sprache wechseln",
+
+            // Help Guide
+            "help.title": "Komplexná Príručka & Nápoveda (Achilles Guide)",
+            "help.subtitle": "Kompletný funkčný manuál, architektúra, konfigurácia, post-kvantová bezpečnosť, API a klávesové skratky.",
 
             // Overview KPIs & Charts
             "overview.floatingSeats": "Floating Sedadlá",
@@ -277,13 +283,15 @@
             "nav.machines": "Node-Lock & Machines",
             "nav.experiments": "A/B Experiments (AB-1)",
             "nav.pqc": "Post-Quantum Era (M7)",
-            "nav.system": "API & Diagnostics",
             "nav.config": "Configuration & Language",
+            "nav.help": "Manual & Help",
 
             // Topbar
             "topbar.user": "👤 User",
             "topbar.logout": "🚪 Sign Out",
             "topbar.logoutTitle": "Sign out of SSO session",
+            "topbar.helpGuide": "📖 Manual [F1]",
+            "topbar.helpGuideTitle": "Comprehensive User Manual & Help (F1)",
             "topbar.apiKey": "🔑 API Key",
             "topbar.apiKeyTitle": "Set dashboard access API key",
             "topbar.healthChecking": "Checking connection...",
@@ -292,6 +300,10 @@
             "topbar.healthError": "Connection Error",
             "topbar.issueLicense": "+ Issue License",
             "topbar.langTooltip": "Switch language / Zmeniť jazyk / Sprache wechseln",
+
+            // Help Guide
+            "help.title": "Comprehensive Guide & Documentation (Achilles Guide)",
+            "help.subtitle": "Complete operations manual, architecture, configuration, post-quantum security, API and keyboard shortcuts.",
 
             // Overview KPIs & Charts
             "overview.floatingSeats": "Floating Seats",
@@ -525,13 +537,15 @@
             "nav.machines": "Node-Lock & Maschinen",
             "nav.experiments": "A/B-Experimente (AB-1)",
             "nav.pqc": "Post-Quanten-Ära (M7)",
-            "nav.system": "API & Diagnose",
             "nav.config": "Konfiguration & Sprache",
+            "nav.help": "Handbuch & Hilfe",
 
             // Topbar
             "topbar.user": "👤 Benutzer",
             "topbar.logout": "🚪 Abmelden",
             "topbar.logoutTitle": "SSO-Sitzung abmelden",
+            "topbar.helpGuide": "📖 Handbuch [F1]",
+            "topbar.helpGuideTitle": "Umfassendes Handbuch & Hilfe (F1)",
             "topbar.apiKey": "🔑 API-Schlüssel",
             "topbar.apiKeyTitle": "Dashboard-API-Zugriffsschlüssel festlegen",
             "topbar.healthChecking": "Verbindung wird geprüft...",
@@ -540,6 +554,10 @@
             "topbar.healthError": "Verbindungsfehler",
             "topbar.issueLicense": "+ Lizenz ausstellen",
             "topbar.langTooltip": "Sprache wechseln / Switch language / Zmeniť jazyk",
+
+            // Help Guide
+            "help.title": "Umfassendes Handbuch & Dokumentation (Achilles Guide)",
+            "help.subtitle": "Vollständiges Betriebshandbuch, Architektur, Konfiguration, Post-Quanten-Sicherheit, API und Tastaturkürzel.",
 
             // Overview KPIs & Charts
             "overview.floatingSeats": "Floating-Sitze",

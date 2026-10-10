@@ -93,18 +93,27 @@ function initNavigation() {
                 if (targetView === "view-config") {
                     updateConfigApiKeyStatus();
                 }
+                if (targetView === "view-help") {
+                    if (window.HelpGuide && typeof window.HelpGuide.init === "function") {
+                        window.HelpGuide.init();
+                    }
+                }
             }
         });
     });
 }
 
 function switchToView(targetView) {
+    if (targetView === "help" || targetView === "prirucka" || targetView === "guide") {
+        targetView = "view-help";
+    }
     const link = document.querySelector(`.nav-link[data-view="${targetView}"]`);
     if (link) {
         link.click();
     }
 }
 window.switchToView = switchToView;
+window.switchView = switchToView;
 
 // Global Refresh
 async function refreshAllData() {

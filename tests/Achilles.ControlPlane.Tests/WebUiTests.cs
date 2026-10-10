@@ -27,6 +27,8 @@ public sealed class WebUiTests : IClassFixture<ControlPlaneFactory>
         Assert.Contains("view-wasm", content, StringComparison.Ordinal);
         Assert.Contains("view-migrate", content, StringComparison.Ordinal);
         Assert.Contains("view-config", content, StringComparison.Ordinal);
+        Assert.Contains("view-help", content, StringComparison.Ordinal);
+        Assert.Contains("btn-topbar-help", content, StringComparison.Ordinal);
         Assert.Contains("topbar-lang-switcher", content, StringComparison.Ordinal);
         Assert.Contains("topbar-theme-switcher", content, StringComparison.Ordinal);
         Assert.Contains("theme-card-cyberpunk", content, StringComparison.Ordinal);
@@ -36,6 +38,7 @@ public sealed class WebUiTests : IClassFixture<ControlPlaneFactory>
         Assert.Contains("lang-card-de", content, StringComparison.Ordinal);
         Assert.Contains("i18n.js", content, StringComparison.Ordinal);
         Assert.Contains("theme-manager.js", content, StringComparison.Ordinal);
+        Assert.Contains("help-guide.js", content, StringComparison.Ordinal);
         Assert.Contains("achilles-validator.js", content, StringComparison.Ordinal);
     }
 
@@ -94,6 +97,20 @@ public sealed class WebUiTests : IClassFixture<ControlPlaneFactory>
         string wasmJsContent = await wasmJs.Content.ReadAsStringAsync();
         Assert.Contains("SymbolonOfflineValidator", wasmJsContent, StringComparison.Ordinal);
         Assert.Contains("generateBrowserFingerprint", wasmJsContent, StringComparison.Ordinal);
+
+        var helpGuideJs = await _client.GetAsync("/js/help-guide.js");
+        Assert.Equal(HttpStatusCode.OK, helpGuideJs.StatusCode);
+        string helpContent = await helpGuideJs.Content.ReadAsStringAsync();
+        Assert.Contains("HelpGuide", helpContent, StringComparison.Ordinal);
+        Assert.Contains("ch-intro", helpContent, StringComparison.Ordinal);
+        Assert.Contains("ch-pqc", helpContent, StringComparison.Ordinal);
+        Assert.Contains("renderChapterContent", helpContent, StringComparison.Ordinal);
+
+        Assert.Contains(".help-pill", css, StringComparison.Ordinal);
+        Assert.Contains(".help-toc-item", css, StringComparison.Ordinal);
+        Assert.Contains(".btn-copy-code", css, StringComparison.Ordinal);
+        Assert.Contains("nav.help", i18nJsContent, StringComparison.Ordinal);
+        Assert.Contains("help.title", i18nJsContent, StringComparison.Ordinal);
     }
 
     [Fact]

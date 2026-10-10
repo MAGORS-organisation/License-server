@@ -673,4 +673,124 @@ input:focus, select:focus, textarea:focus,
   border-bottom: 2px solid #ffffff !important;
 }
 
+/* Retro DOS Príručka & Pomocník (#view-help) */
+html[data-theme="retro"] .help-header-card,
+body.theme-retro .help-header-card,
+html[data-theme="retro"] .help-toc-card,
+body.theme-retro .help-toc-card,
+html[data-theme="retro"] .help-content-card,
+body.theme-retro .help-content-card {
+  background-color: var(--retro-panel-bg) !important;
+  border: 2px solid var(--retro-panel-border) !important;
+  box-shadow: 4px 4px 0px #000000 !important;
+  color: var(--retro-text-dark) !important;
+  border-radius: 0px !important;
+}
+
+html[data-theme="retro"] .help-search-input,
+body.theme-retro .help-search-input {
+  font-family: var(--retro-font) !important;
+  background-color: #ffffff !important;
+  color: #000000 !important;
+  border: 2px solid #000000 !important;
+  border-radius: 0px !important;
+}
+
+html[data-theme="retro"] .help-pill,
+body.theme-retro .help-pill {
+  font-family: var(--retro-font) !important;
+  font-size: 11px !important;
+  padding: 3px 8px !important;
+  background-color: #dcd7ce !important;
+  color: #000000 !important;
+  border-top: 2px solid #ffffff !important;
+  border-left: 2px solid #ffffff !important;
+  border-right: 2px solid #555555 !important;
+  border-bottom: 2px solid #555555 !important;
+  border-radius: 0px !important;
+  cursor: pointer;
+}
+
+html[data-theme="retro"] .help-pill:hover,
+body.theme-retro .help-pill:hover {
+  background-color: #ede9e1 !important;
+}
+
+html[data-theme="retro"] .help-pill.active,
+body.theme-retro .help-pill.active {
+  background-color: var(--retro-select-bg) !important;
+  color: #000000 !important;
+  border-top: 2px solid #333333 !important;
+  border-left: 2px solid #333333 !important;
+  border-right: 2px solid #ffffff !important;
+  border-bottom: 2px solid #ffffff !important;
+  box-shadow: none !important;
+}
+
+html[data-theme="retro"] .help-toc-item,
+body.theme-retro .help-toc-item {
+  border-radius: 0px !important;
+  border: 1px solid #999999 !important;
+  background-color: #f0ece4 !important;
+  margin-bottom: 4px;
+}
+
+html[data-theme="retro"] .help-toc-item:hover,
+body.theme-retro .help-toc-item:hover {
+  background-color: #f7f4ee !important;
+  border-color: #00396b !important;
+}
+
+html[data-theme="retro"] .help-toc-item.active,
+body.theme-retro .help-toc-item.active {
+  background-color: var(--retro-select-bg) !important;
+  border-color: #000000 !important;
+  box-shadow: 2px 2px 0px #000000 !important;
+}
+
+html[data-theme="retro"] .help-toc-title,
+body.theme-retro .help-toc-title {
+  color: #000000 !important;
+  font-family: var(--retro-font) !important;
+}
+
+html[data-theme="retro"] .help-toc-desc,
+body.theme-retro .help-toc-desc {
+  color: #333333 !important;
+  font-family: var(--retro-font) !important;
+}
+
+html[data-theme="retro"] .help-toc-badge,
+body.theme-retro .help-toc-badge {
+  font-family: var(--retro-font) !important;
+  background: #333333 !important;
+  color: #ffffff !important;
+  border-radius: 0px !important;
+}
+
+html[data-theme="retro"] .help-article-body pre,
+body.theme-retro .help-article-body pre {
+  background: #001122 !important;
+  color: #00ff66 !important;
+  border: 2px solid #00396b !important;
+  border-radius: 0px !important;
+  font-family: var(--retro-font) !important;
+}
+
+html[data-theme="retro"] .help-article-body code,
+body.theme-retro .help-article-body code {
+  color: #00396b !important;
+  background: rgba(0, 57, 107, 0.12) !important;
+  font-family: var(--retro-font) !important;
+}
+
+html[data-theme="retro"] .btn-copy-code,
+body.theme-retro .btn-copy-code {
+  font-family: var(--retro-font) !important;
+  background-color: #dcd7ce !important;
+  color: #000000 !important;
+  border: 1px solid #000000 !important;
+  border-radius: 0px !important;
+}
+
 
