@@ -99,8 +99,19 @@ public static class ComplianceEndpoints
 
         group.MapGet("/cra", GetCraComplianceReportAsync).WithName("GetCraComplianceReport");
         group.MapGet("/sbom", GetCycloneDxSbomAsync).WithName("GetCycloneDxSbom");
+        group.MapGet("/bundle", ExportComplianceBundleAsync).WithName("ExportComplianceBundle");
+        group.MapPost("/bundle", ExportComplianceBundleAsync).WithName("ExportComplianceBundlePost");
 
         return group;
+    }
+
+    private static IResult ExportComplianceBundleAsync(
+        Symbolon.ControlPlane.Compliance.ComplianceBundleService bundleService,
+        TimeProvider time)
+    {
+        var bytes = bundleService.GenerateBundle(time.GetUtcNow());
+        string filename = $"symbolon-compliance-bundle-{time.GetUtcNow():yyyyMMdd-HHmmss}.zip";
+        return TypedResults.File(bytes, "application/zip", filename);
     }
 
     private static IResult GetCraComplianceReportAsync(TimeProvider time)

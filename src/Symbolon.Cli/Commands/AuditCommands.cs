@@ -26,6 +26,7 @@ public static class AuditCommands
         {
             "VERIFY-CHAIN" => await HandleVerifyChainAsync(args[1..]).ConfigureAwait(false),
             "EXPORT-PROOF" or "PROOF" => await HandleExportProofAsync(args[1..]).ConfigureAwait(false),
+            "EXPORT-COMPLIANCE-BUNDLE" or "EXPORT-BUNDLE" or "BUNDLE" => await HandleExportComplianceBundleAsync(args[1..]).ConfigureAwait(false),
             "LIST" => await HandleListAsync(args[1..]).ConfigureAwait(false),
             _ => UnknownSubcommand(args[0])
         };
@@ -266,6 +267,52 @@ public static class AuditCommands
         }
     }
 
+    private static async Task<int> HandleExportComplianceBundleAsync(string[] args)
+    {
+        string server = GetArg(args, "--server") ?? "http://localhost:8080";
+        string? apiKey = GetArg(args, "--api-key");
+        string outPath = GetArg(args, "--out") ?? GetArg(args, "-o") ?? $"symbolon-compliance-bundle-{DateTimeOffset.UtcNow:yyyyMMdd-HHmmss}.zip";
+
+        AnsiConsole.MarkupLine("[bold blue]=== Generujem a exportujem Compliance & Audit Balíček (SOC 2, ISO 27001, NIS 2) ===[/]");
+
+        using var client = CreateClient(server, apiKey);
+        try
+        {
+            var res = await client.GetAsync(new Uri("/v1/compliance/bundle", UriKind.Relative)).ConfigureAwait(false);
+            if (!res.IsSuccessStatusCode)
+            {
+                AnsiConsole.MarkupLine($"[bold red]Chyba servera pri exporte balíčka:[/] HTTP {(int)res.StatusCode} {res.ReasonPhrase}");
+                return 1;
+            }
+
+            byte[] zipBytes = await res.Content.ReadAsByteArrayAsync().ConfigureAwait(false);
+            await File.WriteAllBytesAsync(outPath, zipBytes).ConfigureAwait(false);
+
+            AnsiConsole.MarkupLine($"[green]✓ Compliance balíček úspešne uložený:[/] [bold cyan]{Markup.Escape(outPath)}[/] ({zipBytes.Length:N0} bajtov)");
+
+            var table = new Table().Border(TableBorder.Rounded);
+            table.AddColumn("[bold]Komponent v ZIP balíčku[/]");
+            table.AddColumn("[bold]Popis / Štandard[/]");
+            table.AddRow("manifest.json", "Metadáta balíčka, podpisová autorita, PQC úroveň 3");
+            table.AddRow("audit_trail_merkle_verified.json", "Merkle STH log a kryptografický dôkaz nemennosti");
+            table.AddRow("sbom_cyclonedx.json", "CycloneDX v1.6 Software Bill of Materials (SBOM)");
+            table.AddRow("soc2_iso27001_nis2_mapping.json", "Matica bezpečnostných kontrol pre SOC 2, ISO 27001 a NIS 2");
+            table.AddRow("pqc_readiness_assessment.json", "Post-Quantum Cryptography audit (ML-DSA-65 / ML-KEM)");
+            table.AddRow("concurrency_trueup_report.json", "True-up report floating licencií a špičková súbežnosť");
+            table.AddRow("access_and_scim_audit.json", "SCIM 2.0 provisioning a SSO identity audit logy");
+            table.AddRow("checksums.sha256", "SHA-256 kontrolné súčty všetkých artefaktov");
+            table.AddRow("signature.pqc.sig", "Kryptografický digitálny podpis balíčka");
+
+            AnsiConsole.Write(table);
+            return 0;
+        }
+        catch (HttpRequestException ex)
+        {
+            AnsiConsole.MarkupLine($"[bold red]Chyba spojenia:[/] {Markup.Escape(ex.Message)}");
+            return 1;
+        }
+    }
+
     private static void PrintAuditHelp()
     {
         AnsiConsole.WriteLine("""
@@ -276,6 +323,8 @@ public static class AuditCommands
                   Kryptografické overenie nemenného reťazca SHA-256 hashov auditného denníka.
               export-proof <auditId> [--server <url>] [--api-key <key>] [--out <file>] [--json]
                   Získanie a exportovanie Merkle Inclusion Proofu pre konkrétnu auditnú udalosť.
+              export-compliance-bundle [--server <url>] [--api-key <key>] [--out <file>]
+                  Automatizovaný export podpísaného compliance balíčka (SOC 2, ISO 27001, NIS 2, SBOM, PQC).
               list [--server <url>] [--api-key <key>] [--limit <n>]
                   Zobrazenie prehľadnej tabuľky posledných auditných udalostí.
             """);

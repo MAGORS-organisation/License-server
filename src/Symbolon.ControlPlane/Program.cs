@@ -93,6 +93,8 @@ builder.Services.AddSingleton<Symbolon.Domain.Security.IFraudDetectionService, S
 builder.Services.AddSingleton<Symbolon.ControlPlane.Security.Sso.SsoSessionManager>();
 builder.Services.AddSingleton<Symbolon.ControlPlane.Security.Sso.SsoEngine>();
 builder.Services.AddSingleton<Symbolon.ControlPlane.Security.KmsHierarchyManager>();
+builder.Services.AddSingleton<Symbolon.ControlPlane.Events.IClusterEventBroadcaster, Symbolon.ControlPlane.Events.ClusterEventBroadcaster>();
+builder.Services.AddSingleton<Symbolon.ControlPlane.Compliance.ComplianceBundleService>();
 builder.Services.AddScoped<Symbolon.Domain.Entitlements.IFeatureEntitlementStore, Symbolon.Data.Stores.EfFeatureEntitlementStore>();
 builder.Services.AddScoped<Symbolon.Domain.Entitlements.FeatureEntitlementEngine>();
 builder.Services.AddScoped<Symbolon.Domain.Experiments.IExperimentStore, Symbolon.Data.Stores.EfExperimentStore>();
@@ -256,6 +258,7 @@ app.MapTokenEndpoints();
 app.MapMigrationEndpoints();
 app.MapLicenseLifecycleEndpoints().RequireAuthorization().RequireRateLimiting("admin");
 app.MapBillingEndpoints();
+app.MapVisualizerEndpoints();
 
 // SPA Fallback
 app.MapFallbackToFile("index.html");

@@ -30,6 +30,41 @@ public static class KmsEndpoints
             });
         });
 
+        kmsGroup.MapGet("/hsm-status", async (KmsHierarchyManager manager, CancellationToken ct) =>
+        {
+            var health = await manager.KmsProvider.CheckHealthAsync(ct).ConfigureAwait(false);
+            var keys = await manager.KmsProvider.ListKeysAsync(ct).ConfigureAwait(false);
+
+            return Results.Ok(new
+            {
+                isHealthy = health.IsHealthy,
+                providerType = health.ProviderType.ToString(),
+                details = health.Details,
+                keysCount = keys.Count,
+                keys,
+                timestamp = health.Timestamp
+            });
+        });
+
+        var keysAdminGroup = app.MapGroup("/admin/v1/keys")
+            .WithTags("KMS & Hardware Isolation");
+
+        keysAdminGroup.MapGet("/hsm-status", async (KmsHierarchyManager manager, CancellationToken ct) =>
+        {
+            var health = await manager.KmsProvider.CheckHealthAsync(ct).ConfigureAwait(false);
+            var keys = await manager.KmsProvider.ListKeysAsync(ct).ConfigureAwait(false);
+
+            return Results.Ok(new
+            {
+                isHealthy = health.IsHealthy,
+                providerType = health.ProviderType.ToString(),
+                details = health.Details,
+                keysCount = keys.Count,
+                keys,
+                timestamp = health.Timestamp
+            });
+        });
+
         var hierarchyGroup = app.MapGroup("/admin/v1/keys/hierarchy")
             .WithTags("Key Hierarchy");
 

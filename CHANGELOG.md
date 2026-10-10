@@ -10,6 +10,34 @@ a projekt striktne dodržiava [Sémantické Verziovanie (Semantic Versioning 2.0
 ## [Unreleased]
 
 ### Pridané (Added)
+- **Phase 20: C/C++ Natívne SDK & FlexNet Drop-In Wrapper, Desktop GUI Tray Notifikátor, Real-Time Web Visualizer, Compliance Export Balíček & Hardvérové Podpisovanie PKCS#11 / HSM (§9.6, §10.8, §12.6, §13.1)**:
+  - **C/C++ Natívna Knižnica & FlexNet Drop-In Wrapper (`libsymbolon` / `symbolon.dll`)**:
+    - Komplexné C/C++ rozhranie v `sdk/c/include/symbolon.h` a `sdk/c/src/symbolon.c` s podporou IPC komunikácie s lokálnym `symbolon-agent` (127.0.0.1:8189) a priamym HTTP REST fallbackom.
+    - Plnohodnotný FlexNet / FlexLM drop-in wrapper (`sdk/c/include/flexnet_shim.h`, `sdk/c/src/flexnet_shim.c`) emulujúci štandardné funkcie `lc_init`, `lc_checkout`, `lc_heartbeat`, `lc_checkin`, `lc_free_job`, `lc_errstring` s mapovaním návratových kódov (`LM_NOERROR`, `LM_AUTHFAIL`, `LM_DENIED`, `LM_CANTCONNECT`, `LM_EXPIRED`).
+    - Spravovaný interop shim `FlexNetShim` v `src/Symbolon.Client/Native/FlexNetShim.cs` a testovacia sada `FlexNetShimTests.cs`.
+    - CMake zostavovacia konfigurácia `sdk/c/CMakeLists.txt` pre Windows (`symbolon.dll`), Linux (`libsymbolon.so`) a macOS (`libsymbolon.dylib`).
+  - **Desktop GUI Tray Notifikátor & Roaming Menu pre `symbolon-agent`**:
+    - Rozšírená notifikačná služba `TrayNotificationService` (`src/Symbolon.Client/Agent/TrayNotificationService.cs`) s cross-platform dispatchom desktop toastov/balónov (PowerShell na Windows, `notify-send` na Linux, `osascript` na macOS), kruhovou vyrovnávacou pamäťou na 100 správ a udalosťami `NotificationRaised`.
+    - Integrácia tray notifikácií do `SymbolonAgentDaemon` pri získaní lease (`NotifyLeaseAcquired`), uvoľnení (`NotifyLeaseReleased`), blížiacej sa expirácii (`NotifyExpiringSoon`), sieťovom výpadku / grace perióde (`NotifyNetworkFailureGrace`) a offline vypožičaní (`NotifyOfflineBorrowActive`).
+    - Nový CLI príkaz `symbolon agent tray` s autentickým NetWare/FoxPro TUI panelom, monitoringom stavu a interaktívnym roaming borrow menu (`[B]` Borrow, `[R]` Release, `[T]` Test notification, `[Q]` Quit).
+    - Nová testovacia sada `TrayNotificationTests.cs`.
+  - **Real-Time Web Visualizer & Klastrová Topológia (SSE `/v1/events`, Merkle Tree Inspector)**:
+    - Služba `ClusterEventBroadcaster` (`src/Symbolon.ControlPlane/Events/ClusterEventBroadcaster.cs`) poskytujúca asynchrónne publikovanie a odber klastrových udalostí cez bezpečné kanály.
+    - REST / SSE endpointy: `GET /v1/events` (Server-Sent Events streaming udalostí `ready`, `lease.acquired`, `merkle.root_updated`), `GET /v1/cluster/topology` (JSON snímka uzlov klastra, latencie a stavu Merkle stromu) a `GET /visualizer` (responzívny dashboard).
+    - Webový dashboard (`src/Symbolon.ControlPlane/wwwroot/visualizer.html` aj vložený fallback) s prepínačom dvoch tém: autentická **Retro CRT Phosphor Theme** (zelený fosfor P3, skenovacie riadky, text-shadow glow, monospace písmo) a **Modern Dark Enterprise** (Slate-900, smaragdové a tyrkysové akcenty).
+    - Interaktívny SVG diagram sieťového meshu a inšpektor Merkleho stromu s klientskou simuláciou verifikácie inklúzie SHA-256 hashov.
+    - Nová integračná testovacia sada `VisualizerAndSseTests.cs`.
+  - **Automatizovaný Compliance & Audit Export Balíček (SOC 2, ISO 27001, NIS 2)**:
+    - Nová služba `ComplianceBundleService` (`src/Symbolon.ControlPlane/Compliance/ComplianceBundleService.cs`) generujúca kryptograficky podpísaný ZIP archív s kompletnou regulačnou dokumentáciou.
+    - Balíček obsahuje: `manifest.json`, `audit_trail_merkle_verified.json`, `sbom_cyclonedx.json` (CycloneDX v1.6), `soc2_iso27001_nis2_mapping.json` (kontroly CC6.1, CC6.7, A.8.24, A.8.28, NIS 2 Článok 21), `pqc_readiness_assessment.json` (ML-DSA-65 / ML-KEM), `concurrency_trueup_report.json`, `access_and_scim_audit.json`, `checksums.sha256` a digitálny podpis `signature.pqc.sig`.
+    - Endpointy `GET /v1/compliance/bundle` a `POST /v1/compliance/bundle`.
+    - CLI príkaz `symbolon audit export-compliance-bundle [--out <súbor>]` s formátovanou Spectre.Console tabuľkou obsahu.
+    - Nová testovacia sada `ComplianceBundleTests.cs`.
+  - **Hardvérové Podpisovanie cez PKCS#11 & HSM (YubiKey / Nitrokey / CloudHSM)**:
+    - Plnohodnotný PKCS#11 v3.2 Cryptoki poskytovateľ `Pkcs11HsmProvider` a podpisovač `Pkcs11SignatureProvider` v `Symbolon.Crypto.Kms` s hardvérovou izoláciou kľúčov podľa FIPS 140-3 Level 3/4 a podporou ML-DSA-65 (FIPS 204) a ES256 (NIST P-256).
+    - REST endpointy `GET /admin/v1/kms/hsm-status` a `GET /admin/v1/keys/hsm-status`.
+    - CLI príkaz `symbolon keys hsm` (tiež `symbolon kms status --provider pkcs11`).
+    - Nová testovacia sada `Pkcs11HsmTests.cs`.
 - **Phase 19: Kryptografický Audit Hash Chain, Enterprise Identity Sync, Webhook DLQ, Retro NetWare Real-Time Monitor & Klientsky Tray Agent (§10.8, §10.9, §12.6)**:
   - **Kryptografický Tamper-Proof Audit Hash Chain & Merkle Notarizácia (§10.8)**:
     - Implementovaný `MerkleTreeHelper` (`Symbolon.Crypto/MerkleTreeHelper.cs`) v súlade s RFC 6962: SHA-256 separácia domén (`0x00` leaf, `0x01` interior node), generovanie vyvážených Merkle stromov, extrakcia auditných ciest (audit path) a verifikácia inklúznych dôkazov.

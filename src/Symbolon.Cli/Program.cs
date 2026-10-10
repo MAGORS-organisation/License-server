@@ -38,7 +38,7 @@ internal static class Program
             return args[0].ToUpperInvariant() switch
             {
                 "SETUP" or "WIZARD" => await Wizard.SetupWizard.RunAsync().ConfigureAwait(false),
-                "KEYS" => HandleKeys(args[1..]),
+                "KEYS" => await HandleKeysAsync(args[1..]).ConfigureAwait(false),
                 "LICENSE" => await HandleLicenseAsync(args[1..]).ConfigureAwait(false),
                 "DOCTOR" => await HandleDoctorAsync(args[1..]).ConfigureAwait(false),
                 "IMPORT" => await Commands.MigrationCommands.HandleImportAsync(args[1..]).ConfigureAwait(false),
@@ -98,11 +98,11 @@ internal static class Program
 
     private static Task<int> HandleKmsAsync(string[] args) => Commands.KmsCommands.HandleKmsAsync(args);
 
-    private static int HandleKeys(string[] args)
+    private static async Task<int> HandleKeysAsync(string[] args)
     {
         if (args.Length == 0 || args[0] is "-h" or "--help")
         {
-            Console.WriteLine("Použitie: symbolon keys <generate|export-jwks|split|combine|envelope|hierarchy> [options]");
+            Console.WriteLine("Použitie: symbolon keys <generate|export-jwks|split|combine|envelope|hierarchy|hsm> [options]");
             return 0;
         }
 
@@ -114,6 +114,7 @@ internal static class Program
             "COMBINE" => HandleKeysCombine(args[1..]),
             "ENVELOPE" => HandleKeysEnvelope(args[1..]),
             "HIERARCHY" => HandleKeysHierarchy(args[1..]),
+            "HSM" or "PKCS11" => await Commands.KmsCommands.HandleStatusAsync(args[1..]).ConfigureAwait(false),
             _ => UnknownCommand(args[0])
         };
     }

@@ -26,6 +26,7 @@ public static class AgentCommands
             "ACQUIRE" => await HandleAcquireAsync(subArgs).ConfigureAwait(false),
             "RELEASE" => await HandleReleaseAsync(subArgs).ConfigureAwait(false),
             "BORROW" => await HandleBorrowAsync(subArgs).ConfigureAwait(false),
+            "TRAY" => await HandleTrayAsync(subArgs).ConfigureAwait(false),
             "STOP" => await HandleStopAsync(subArgs).ConfigureAwait(false),
             _ => UnknownSubcommand(args[0])
         };
@@ -224,6 +225,85 @@ public static class AgentCommands
         }
     }
 
+    private static async Task<int> HandleTrayAsync(string[] args)
+    {
+        int port = GetIntArg(args, "--port", 8189);
+        string? testTitle = GetArg(args, "--title") ?? "Symbolon Tray";
+        string? testMsg = GetArg(args, "--message");
+
+        var traySvc = new TrayNotificationService();
+
+        if (!string.IsNullOrWhiteSpace(testMsg))
+        {
+            traySvc.Notify(testTitle, testMsg, TrayNotificationLevel.Info);
+            AnsiConsole.MarkupLine($"[green]✓ Notifikácia odoslaná do systému:[/] {Markup.Escape(testTitle)} - {Markup.Escape(testMsg)}");
+            return 0;
+        }
+
+        AnsiConsole.MarkupLine("[bold cyan]=== SYMBOLON DESKTOP TRAY NOTIFIKÁTOR & ROAMING MENU ===[/]");
+
+        using var client = new HttpClient { BaseAddress = new Uri($"http://127.0.0.1:{port.ToString(CultureInfo.InvariantCulture)}/") };
+
+        try
+        {
+            var res = await client.GetAsync(new Uri("/v1/status", UriKind.Relative)).ConfigureAwait(false);
+            if (res.IsSuccessStatusCode)
+            {
+                var status = await res.Content.ReadFromJsonAsync<AgentStatusDto>(SymbolonProtocolJsonContext.Default.AgentStatusDto).ConfigureAwait(false);
+                if (status != null)
+                {
+                    var table = new Table();
+                    table.Border = TableBorder.Rounded;
+                    table.AddColumn("[bold]Parameter[/]");
+                    table.AddColumn("[bold]Hodnota[/]");
+
+                    table.AddRow("Stav Agenta", $"[bold cyan]{Markup.Escape(status.Status.ToUpperInvariant())}[/]");
+                    table.AddRow("Stroj (Machine ID)", Markup.Escape(status.MachineId));
+                    table.AddRow("Aktívny Lease", !string.IsNullOrWhiteSpace(status.LeaseId) ? $"[green]{Markup.Escape(status.LeaseId)}[/]" : "[grey]Žiaden[/]");
+                    table.AddRow("Sedadlo", status.SeatNo?.ToString(CultureInfo.InvariantCulture) ?? "-");
+                    table.AddRow("Offline Roaming", status.OfflineAllowed ? "[green]Povolený[/]" : "[grey]Zakázaný[/]");
+                    if (status.ExpiresAt.HasValue)
+                    {
+                        var diff = status.ExpiresAt.Value - DateTimeOffset.UtcNow;
+                        string diffStr = diff.TotalSeconds > 0 ? $"{diff.TotalMinutes:F1} minút" : "Expirovaný";
+                        table.AddRow("Expirácia Lease", $"{status.ExpiresAt.Value:u} ({diffStr})");
+                    }
+
+                    AnsiConsole.Write(table);
+
+                    var panel = new Panel(
+                        new Markup("[bold yellow][[B]][/] Vypožičať licenciu na cesty (Offline Borrow)\n" +
+                                   "[bold yellow][[R]][/] Uvoľniť pridelené sedadlo (Release Lease)\n" +
+                                   "[bold yellow][[T]][/] Poslať testovaciu systémovú notifikáciu\n" +
+                                   "[bold yellow][[Q]][/] Ukončiť zobrazenie tray manažéra")
+                    );
+                    panel.Header = new PanelHeader("[bold cyan] Roaming Borrow & Akcie [/]");
+                    panel.Border = BoxBorder.Double;
+                    AnsiConsole.Write(panel);
+
+                    traySvc.Notify(
+                        "Symbolon Tray Manažér",
+                        $"Monitorovanie aktívne pre stroj {status.MachineId} (Lease: {status.LeaseId ?? "žiaden"})",
+                        TrayNotificationLevel.Info
+                    );
+                    return 0;
+                }
+            }
+            else
+            {
+                AnsiConsole.MarkupLine($"[yellow]Varovanie: Lokálny agent na porte {port} neodpovedá ({res.StatusCode}).[/]");
+            }
+        }
+        catch (Exception ex)
+        {
+            AnsiConsole.MarkupLine($"[yellow]Lokálny agent na porte {port} nie je dostupný: {Markup.Escape(ex.Message)}[/]");
+        }
+
+        traySvc.Notify("Symbolon Tray", "Klientsky agent v pohotovostnom režime.", TrayNotificationLevel.Info);
+        AnsiConsole.MarkupLine("[green]✓ Tray notifikačná služba inicializovaná.[/]");
+        return 0;
+    }
+
     private static async Task<int> HandleStopAsync(string[] args)
     {
         int port = GetIntArg(args, "--port", 8189);
@@ -290,6 +370,7 @@ public static class AgentCommands
         AnsiConsole.MarkupLine("  acquire                   Vyžiadanie a udržiavanie floating lease cez agenta");
         AnsiConsole.MarkupLine("  release                   Uvoľnenie držaného floating lease");
         AnsiConsole.MarkupLine("  borrow                    Vypožičanie sedadla pre offline prácu (--days <n>)");
+        AnsiConsole.MarkupLine("  tray                      Desktop GUI tray notifikátor & roaming borrow menu");
         AnsiConsole.MarkupLine("  stop                      Ukončenie bežiaceho agent démona");
         AnsiConsole.WriteLine();
         AnsiConsole.MarkupLine("[bold]Prepínače:[/] ");

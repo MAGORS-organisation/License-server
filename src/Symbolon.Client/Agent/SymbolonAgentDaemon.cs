@@ -28,6 +28,7 @@ public sealed class SymbolonAgentDaemon : IAsyncDisposable, IDisposable
     public int Port => _port;
     public bool IsRunning => _listener.IsListening && !_cts.IsCancellationRequested;
     public string MachineId => _machineId;
+    public TrayNotificationService Notifications { get; } = new();
 
     public SymbolonAgentDaemon(int port = 8189, Uri? serverUri = null, string? licenseKey = null, ILogger? logger = null)
     {
@@ -253,6 +254,7 @@ public sealed class SymbolonAgentDaemon : IAsyncDisposable, IDisposable
             if (_currentLease.Acquired)
             {
                 _lastError = null;
+                Notifications.NotifyLeaseAcquired(_currentLease.LeaseId ?? "unknown", _currentLease.SeatNo, DateTimeOffset.UtcNow.AddMinutes(10));
                 return new AgentActionResponseDto(true, $"Lease {_currentLease.LeaseId} úspešne získaný.", _currentLease.LeaseId);
             }
 
@@ -278,6 +280,7 @@ public sealed class SymbolonAgentDaemon : IAsyncDisposable, IDisposable
         {
             await _currentLease.DisposeAsync().ConfigureAwait(false);
             _currentLease = null;
+            Notifications.NotifyLeaseReleased(leaseId);
             return new AgentActionResponseDto(true, $"Lease {leaseId} uvoľnený.", leaseId);
         }
         catch (Exception ex)
@@ -309,6 +312,7 @@ public sealed class SymbolonAgentDaemon : IAsyncDisposable, IDisposable
             bool borrowed = await lease.BorrowAsync(days).ConfigureAwait(false);
             if (borrowed)
             {
+                Notifications.NotifyOfflineBorrowActive(lease.LeaseId ?? "unknown", days);
                 return new AgentActionResponseDto(true, $"Sedadlo úspešne vypožičané na {days} dní offline.", lease.LeaseId);
             }
             return new AgentActionResponseDto(false, "Offline borrow bolo zamietnuté serverom.");
