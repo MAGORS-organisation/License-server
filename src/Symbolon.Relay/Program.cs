@@ -86,6 +86,31 @@ app.MapGet("/v1/.well-known/symbolon-keys", (ISignatureProvider key) =>
     return Results.Ok(new JsonWebKeySetDto { Keys = [jwk] });
 });
 
+app.MapGet("/metrics", async (SqliteSeatStore seatStore, TimeProvider timeProvider, CancellationToken ct) =>
+{
+    ArgumentNullException.ThrowIfNull(seatStore);
+    ArgumentNullException.ThrowIfNull(timeProvider);
+    var now = timeProvider.GetUtcNow();
+    var grants = await seatStore.GetAllActiveGrantsAsync(now, ct).ConfigureAwait(false);
+    int totalAllocated = await seatStore.GetAllocatedSeatCountAsync(now, ct).ConfigureAwait(false);
+    int totalSeats = await seatStore.GetTotalSeatCountAsync(ct).ConfigureAwait(false);
+
+    var sb = new System.Text.StringBuilder(512);
+    sb.AppendLine("# HELP symbolon_relay_seats_allocated Current number of allocated seats on this relay node.");
+    sb.AppendLine("# TYPE symbolon_relay_seats_allocated gauge");
+    sb.Append("symbolon_relay_seats_allocated ").AppendLine(totalAllocated.ToString(System.Globalization.CultureInfo.InvariantCulture));
+
+    sb.AppendLine("# HELP symbolon_relay_seats_total Total number of seats available on this relay node.");
+    sb.AppendLine("# TYPE symbolon_relay_seats_total gauge");
+    sb.Append("symbolon_relay_seats_total ").AppendLine(totalSeats.ToString(System.Globalization.CultureInfo.InvariantCulture));
+
+    sb.AppendLine("# HELP symbolon_relay_active_grants Number of upstream seat grants held by this relay.");
+    sb.AppendLine("# TYPE symbolon_relay_active_grants gauge");
+    sb.Append("symbolon_relay_active_grants ").AppendLine(grants.Count.ToString(System.Globalization.CultureInfo.InvariantCulture));
+
+    return Results.Content(sb.ToString(), "text/plain; version=0.0.4");
+});
+
 app.MapLeases();
 
 app.Run();

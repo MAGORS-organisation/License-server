@@ -528,6 +528,39 @@ internal sealed class SqliteSeatStore : ISeatStore, IDisposable
         }
     }
 
+    public async Task<int> GetAllocatedSeatCountAsync(DateTimeOffset now, CancellationToken ct = default)
+    {
+        await _lock.WaitAsync(ct).ConfigureAwait(false);
+        try
+        {
+            using var cmd = _connection.CreateCommand();
+            cmd.CommandText = "SELECT COUNT(*) FROM seats WHERE lease_id IS NOT NULL AND expires_at > @now;";
+            cmd.Parameters.AddWithValue("@now", now.ToString("O", CultureInfo.InvariantCulture));
+            var result = await cmd.ExecuteScalarAsync(ct).ConfigureAwait(false);
+            return Convert.ToInt32(result, CultureInfo.InvariantCulture);
+        }
+        finally
+        {
+            _lock.Release();
+        }
+    }
+
+    public async Task<int> GetTotalSeatCountAsync(CancellationToken ct = default)
+    {
+        await _lock.WaitAsync(ct).ConfigureAwait(false);
+        try
+        {
+            using var cmd = _connection.CreateCommand();
+            cmd.CommandText = "SELECT COUNT(*) FROM seats;";
+            var result = await cmd.ExecuteScalarAsync(ct).ConfigureAwait(false);
+            return Convert.ToInt32(result, CultureInfo.InvariantCulture);
+        }
+        finally
+        {
+            _lock.Release();
+        }
+    }
+
     public async Task<SeatAllocation[]?> TryGetIdempotentAsync(
         string licenseId,
         string idempotencyKey,

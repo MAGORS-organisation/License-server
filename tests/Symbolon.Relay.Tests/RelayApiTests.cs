@@ -64,6 +64,21 @@ public sealed class RelayApiTests : IClassFixture<WebApplicationFactory<Program>
     }
 
     [Fact]
+    public async Task MetricsEndpoint_ReturnsPrometheusMetrics()
+    {
+        var client = _factory.CreateClient();
+        var response = await client.GetAsync("/metrics");
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        response.Content.Headers.ContentType?.MediaType.Should().Be("text/plain");
+
+        string content = await response.Content.ReadAsStringAsync();
+        content.Should().Contain("symbolon_relay_seats_allocated");
+        content.Should().Contain("symbolon_relay_seats_total");
+        content.Should().Contain("symbolon_relay_active_grants");
+    }
+
+    [Fact]
     public async Task WellKnownKeysEndpoint_ReturnsJwks()
     {
         var client = _factory.CreateClient();

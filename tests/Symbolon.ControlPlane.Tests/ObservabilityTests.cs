@@ -21,10 +21,16 @@ public sealed class ObservabilityTests : IClassFixture<ControlPlaneFactory>
 
         var content = await response.Content.ReadAsStringAsync();
         Assert.Contains("symbolon_seats_active", content, StringComparison.Ordinal);
+        Assert.Contains("symbolon_seats_total", content, StringComparison.Ordinal);
+        Assert.Contains("symbolon_checkout_success_total", content, StringComparison.Ordinal);
         Assert.Contains("symbolon_checkout_denied_total", content, StringComparison.Ordinal);
         Assert.Contains("symbolon_lease_renewed_total", content, StringComparison.Ordinal);
         Assert.Contains("symbolon_lease_released_total", content, StringComparison.Ordinal);
+        Assert.Contains("symbolon_pqc_signatures_total", content, StringComparison.Ordinal);
+        Assert.Contains("symbolon_tokens_consumed_total", content, StringComparison.Ordinal);
         Assert.Contains("symbolon_clock_skew_detected_total", content, StringComparison.Ordinal);
+        Assert.Contains("symbolon_crypto_keys_total", content, StringComparison.Ordinal);
+        Assert.Contains("symbolon_server_uptime_seconds", content, StringComparison.Ordinal);
     }
 
     [Fact]

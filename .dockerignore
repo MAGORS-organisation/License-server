@@ -1,0 +1,40 @@
+# Git and IDE metadata
+.git/
+.github/
+.vscode/
+.idea/
+.vs/
+.gemini/
+
+# Build artifacts and compilation outputs
+bin/
+obj/
+out/
+publish/
+TestResults/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+# Databases, local logs and test data
+*.db
+*.db-shm
+*.db-wal
+*.sqlite
+*.sqlite3
+*.log
+data/
+relay_data/
+postgres_data/
+
+# Documentation and non-containerized SDKs
+docs/
+sdk/
+spec/
+artifacts/
+
+# Deployment local overrides
+.env
+.env.local
+docker-compose.override.yml

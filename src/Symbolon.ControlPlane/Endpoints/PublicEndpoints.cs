@@ -419,6 +419,7 @@ public static class PublicEndpoints
         if (result.IsSuccess && result.Allocations is { Count: > 0 } && result.Tokens is { Count: > 0 })
         {
             metrics.RecordSeatAcquired(quantity);
+            metrics.RecordCheckoutSuccess();
 
             // Enterprise Alerting (Phase 2.5)
             int activeSeats = await db.Seats.CountAsync(s => s.LicenseId == license.Id && s.LeaseId != null && s.ExpiresAt > now, ct).ConfigureAwait(false);

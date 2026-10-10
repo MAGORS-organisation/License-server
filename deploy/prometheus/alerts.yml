@@ -1,0 +1,75 @@
+# ==============================================================================
+# Symbolon Prometheus Alerting Rules
+# ==============================================================================
+groups:
+  - name: symbolon_licensing_alerts
+    rules:
+      - alert: SymbolonControlPlaneDown
+        expr: up{job="symbolon-controlplane"} == 0
+        for: 30s
+        labels:
+          severity: critical
+          tier: controlplane
+        annotations:
+          summary: "Symbolon Control Plane instance is unreachable"
+          description: "Control plane service on {{ $labels.instance }} has been down for more than 30 seconds."
+
+      - alert: SymbolonRelayDown
+        expr: up{job="symbolon-relay"} == 0
+        for: 1m
+        labels:
+          severity: warning
+          tier: relay
+        annotations:
+          summary: "Symbolon Relay proxy node is unreachable"
+          description: "Relay node on {{ $labels.instance }} is unreachable. Clients may switch to offline caching."
+
+      - alert: HighSeatUtilization
+        expr: (symbolon_seats_active / symbolon_seats_total) * 100 > 90
+        for: 2m
+        labels:
+          severity: warning
+          tier: licensing
+        annotations:
+          summary: "Floating seat capacity near exhaustion (> 90%)"
+          description: "Active floating seat usage is at {{ $value | printf \"%.1f\" }}% of total available capacity."
+
+      - alert: CriticalSeatExhaustion
+        expr: (symbolon_seats_active / symbolon_seats_total) * 100 >= 100
+        for: 1m
+        labels:
+          severity: critical
+          tier: licensing
+        annotations:
+          summary: "Floating seat pool completely exhausted (100%)"
+          description: "All licensed seats are allocated. New checkout requests will be queued or rejected."
+
+      - alert: HighLeaseDenialRate
+        expr: rate(symbolon_checkout_denied_total[5m]) > 0.5
+        for: 1m
+        labels:
+          severity: warning
+          tier: licensing
+        annotations:
+          summary: "Spike in denied license checkouts detected"
+          description: "Clients are experiencing license checkout denials at a rate of {{ $value }} req/sec (upsell/quota signal)."
+
+      - alert: ClockSkewDetected
+        expr: increase(symbolon_clock_skew_detected_total[5m]) > 0
+        for: 0m
+        labels:
+          severity: warning
+          tier: security
+        annotations:
+          summary: "Client clock skew anomaly detected"
+          description: "Client devices with out-of-sync system clocks are attempting license leasing."
+
+      - alert: RelaySeatGrantsExpiringSoon
+        expr: symbolon_relay_active_grants > 0 and symbolon_relay_active_grants < 1
+        for: 5m
+        labels:
+          severity: warning
+          tier: relay
+        annotations:
+          summary: "Relay seat grants need renewal from upstream Control Plane"
+          description: "Delegated seat grants are close to expiration."

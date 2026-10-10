@@ -103,10 +103,12 @@ builder.Services.AddRateLimiter(options =>
 
     options.AddPolicy("public-leases", httpContext =>
     {
-        var partitionKey = httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown_client";
+        var partitionKey = httpContext.Request.Headers["X-Forwarded-For"].FirstOrDefault()
+            ?? httpContext.Connection.RemoteIpAddress?.ToString()
+            ?? "unknown_client";
         return RateLimitPartition.GetFixedWindowLimiter(partitionKey, _ => new FixedWindowRateLimiterOptions
         {
-            PermitLimit = 100,
+            PermitLimit = 10000,
             Window = TimeSpan.FromMinutes(1),
             QueueLimit = 0
         });
@@ -115,11 +117,12 @@ builder.Services.AddRateLimiter(options =>
     options.AddPolicy("admin", httpContext =>
     {
         var partitionKey = httpContext.User.Identity?.Name
+            ?? httpContext.Request.Headers["X-Forwarded-For"].FirstOrDefault()
             ?? httpContext.Connection.RemoteIpAddress?.ToString()
             ?? "unknown_admin";
         return RateLimitPartition.GetSlidingWindowLimiter(partitionKey, _ => new SlidingWindowRateLimiterOptions
         {
-            PermitLimit = 200,
+            PermitLimit = 5000,
             Window = TimeSpan.FromMinutes(1),
             SegmentsPerWindow = 4,
             QueueLimit = 0
@@ -128,10 +131,12 @@ builder.Services.AddRateLimiter(options =>
 
     options.AddPolicy("relay", httpContext =>
     {
-        var partitionKey = httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown_relay";
+        var partitionKey = httpContext.Request.Headers["X-Forwarded-For"].FirstOrDefault()
+            ?? httpContext.Connection.RemoteIpAddress?.ToString()
+            ?? "unknown_relay";
         return RateLimitPartition.GetFixedWindowLimiter(partitionKey, _ => new FixedWindowRateLimiterOptions
         {
-            PermitLimit = 120,
+            PermitLimit = 5000,
             Window = TimeSpan.FromMinutes(1),
             QueueLimit = 0
         });

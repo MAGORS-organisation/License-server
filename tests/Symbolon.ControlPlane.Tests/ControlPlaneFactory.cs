@@ -9,12 +9,13 @@ namespace Symbolon.ControlPlane.Tests;
 
 public sealed class ControlPlaneFactory : WebApplicationFactory<Program>
 {
-    private readonly SqliteConnection _connection;
+    private readonly string _connectionString = $"Data Source=controlplane_{Guid.NewGuid():N};Mode=Memory;Cache=Shared;Default Timeout=30";
+    private readonly SqliteConnection _keepAliveConnection;
 
     public ControlPlaneFactory()
     {
-        _connection = new SqliteConnection("Filename=:memory:");
-        _connection.Open();
+        _keepAliveConnection = new SqliteConnection(_connectionString);
+        _keepAliveConnection.Open();
     }
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
@@ -34,7 +35,7 @@ public sealed class ControlPlaneFactory : WebApplicationFactory<Program>
 
             services.AddDbContext<SymbolonDbContext>(options =>
             {
-                options.UseSqlite(_connection);
+                options.UseSqlite(_connectionString);
             });
         });
     }
@@ -44,7 +45,7 @@ public sealed class ControlPlaneFactory : WebApplicationFactory<Program>
         base.Dispose(disposing);
         if (disposing)
         {
-            _connection.Dispose();
+            _keepAliveConnection.Dispose();
         }
     }
 }
