@@ -159,6 +159,8 @@ public static class SetupWizard
                     "🛰️ 2. Vystaviť grant zo .symreq požiadavky na Control Plane (.symgrant)",
                     "🔍 3. Inšpektovať a overiť .symgrant alebo .symreq súbor",
                     "📥 4. Importovať .symgrant do offline relayu",
+                    "📱 5. Zobraziť ASCII QR Kód pre offline súbor alebo kľúč",
+                    "💾 6. USB Air-Gap Synchronizácia & Overenie Manifestu (manifest.sha256)",
                     "⬅️ Späť do hlavného menu"));
 
         if (subChoice.StartsWith("📝", StringComparison.Ordinal))
@@ -189,6 +191,39 @@ public static class SetupWizard
             string relayUrl = console.Prompt(new TextPrompt<string>("URL lokálneho Relay servera:").DefaultValue("http://localhost:5001"));
 
             await Commands.GrantCommands.HandleGrantAsync(["import", "--in", inFile, "--relay", relayUrl]).ConfigureAwait(false);
+        }
+        else if (subChoice.StartsWith("📱", StringComparison.Ordinal))
+        {
+            string mode = console.Prompt(new SelectionPrompt<string>()
+                .Title("Vyberte zdroj pre QR kód:")
+                .AddChoices("📄 Zo súboru (.symreq, .symgrant, .symlic)", "⌨️ Zadať text / licenčný kľúč priamo"));
+
+            if (mode.StartsWith("📄", StringComparison.Ordinal))
+            {
+                string inFile = console.Ask<string>("Cesta k súboru:");
+                await Commands.GrantCommands.HandleGrantAsync(["qr", "--in", inFile]).ConfigureAwait(false);
+            }
+            else
+            {
+                string text = console.Ask<string>("Zadajte text alebo kľúč:");
+                await Commands.GrantCommands.HandleGrantAsync(["qr", "--data", text]).ConfigureAwait(false);
+            }
+        }
+        else if (subChoice.StartsWith("💾", StringComparison.Ordinal))
+        {
+            string dir = console.Prompt(new TextPrompt<string>("Cesta k USB médiu alebo priečinku s licenciou:").DefaultValue("."));
+            string action = console.Prompt(new SelectionPrompt<string>()
+                .Title("Vyberte akciu USB manifestu:")
+                .AddChoices("🔍 Vytvoriť a podpísať nový manifest (manifest.sha256)", "🛡️ Overiť integritu existujúceho USB média"));
+
+            if (action.StartsWith("🔍", StringComparison.Ordinal))
+            {
+                await Commands.GrantCommands.HandleGrantAsync(["usb-digest", "--dir", dir, "--create-manifest"]).ConfigureAwait(false);
+            }
+            else
+            {
+                await Commands.GrantCommands.HandleGrantAsync(["usb-digest", "--dir", dir, "--verify"]).ConfigureAwait(false);
+            }
         }
     }
 }

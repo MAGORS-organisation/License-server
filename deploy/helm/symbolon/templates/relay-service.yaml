@@ -1,0 +1,19 @@
+{{- if .Values.relay.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "symbolon.fullname" . }}-relay
+  labels:
+    {{- include "symbolon.labels" . | nindent 4 }}
+    app.kubernetes.io/component: relay
+spec:
+  type: {{ .Values.relay.service.type | default "ClusterIP" }}
+  ports:
+    - port: {{ .Values.relay.service.port | default 8081 }}
+      targetPort: http
+      protocol: TCP
+      name: http
+  selector:
+    {{- include "symbolon.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: relay
+{{- end }}

@@ -1,0 +1,62 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: symbolon-production
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/MAGORS-organisation/License-server.git
+    targetRevision: master
+    path: deploy/helm/symbolon
+    helm:
+      valueFiles:
+        - values.yaml
+      values: |
+        replicaCount: 3
+        database:
+          host: "postgres-prod.internal"
+          existingSecret: "symbolon-db-credentials"
+        redis:
+          host: "redis-prod.internal"
+        serviceMonitor:
+          enabled: true
+        prometheusRule:
+          enabled: true
+        networkPolicy:
+          enabled: true
+        ingress:
+          enabled: true
+          className: "nginx"
+          annotations:
+            cert-manager.io/cluster-issuer: "letsencrypt-prod"
+          hosts:
+            - host: license.symbolon.dev
+              paths:
+                - path: /
+                  pathType: Prefix
+          tls:
+            - secretName: symbolon-tls-cert
+              hosts:
+                - license.symbolon.dev
+        relay:
+          enabled: true
+          replicaCount: 2
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: symbolon
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ApplyOutOfSyncOnly=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m

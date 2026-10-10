@@ -1,0 +1,56 @@
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: GitRepository
+metadata:
+  name: symbolon-repo
+  namespace: flux-system
+spec:
+  interval: 1m
+  url: https://github.com/MAGORS-organisation/License-server.git
+  ref:
+    branch: master
+---
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: symbolon
+  namespace: symbolon
+spec:
+  interval: 5m
+  chart:
+    spec:
+      chart: deploy/helm/symbolon
+      sourceRef:
+        kind: GitRepository
+        name: symbolon-repo
+        namespace: flux-system
+      interval: 1m
+  install:
+    remediation:
+      retries: 3
+  upgrade:
+    remediation:
+      retries: 3
+  values:
+    replicaCount: 3
+    database:
+      host: "postgres-prod.internal"
+      existingSecret: "symbolon-db-credentials"
+    redis:
+      host: "redis-prod.internal"
+    serviceMonitor:
+      enabled: true
+    prometheusRule:
+      enabled: true
+    networkPolicy:
+      enabled: true
+    ingress:
+      enabled: true
+      className: "nginx"
+      hosts:
+        - host: license.symbolon.dev
+          paths:
+            - path: /
+              pathType: Prefix
+    relay:
+      enabled: true
+      replicaCount: 2

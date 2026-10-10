@@ -1,0 +1,17 @@
+services:
+  toxiproxy:
+    image: ghcr.io/shopify/toxiproxy:2.9.0
+    container_name: symbolon-toxiproxy
+    command: ["-host=0.0.0.0", "-config=/config/toxiproxy-config.json"]
+    ports:
+      - "8474:8474" # Toxiproxy API
+      - "8082:8082" # Chaos ControlPlane HTTP Proxy
+      - "5433:5433" # Chaos PostgreSQL TCP Proxy
+    volumes:
+      - ./toxiproxy-config.json:/config/toxiproxy-config.json:ro
+    networks:
+      - symbolon-chaos-net
+
+networks:
+  symbolon-chaos-net:
+    driver: bridge

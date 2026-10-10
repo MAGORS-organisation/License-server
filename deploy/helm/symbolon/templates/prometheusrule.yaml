@@ -1,0 +1,76 @@
+{{- if and .Values.serviceMonitor.enabled .Values.prometheusRule.enabled }}
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: {{ include "symbolon.fullname" . }}-alerts
+  labels:
+    {{- include "symbolon.labels" . | nindent 4 }}
+    {{- with .Values.prometheusRule.additionalLabels }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+spec:
+  groups:
+    - name: symbolon.rules
+      rules:
+        - alert: SymbolonControlPlaneDown
+          expr: up{job=~".*symbolon.*"} == 0
+          for: 30s
+          labels:
+            severity: critical
+          annotations:
+            summary: "Symbolon Control Plane instance is down"
+            description: "Instance {{ "{{ $labels.instance }}" }} has been down for more than 30 seconds."
+
+        - alert: SymbolonRelayDown
+          expr: up{job=~".*symbolon-relay.*"} == 0
+          for: 1m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Symbolon Relay instance is down"
+            description: "Relay node {{ "{{ $labels.instance }}" }} is unreachable."
+
+        - alert: HighSeatUtilization
+          expr: (symbolon_seats_active / symbolon_seats_total) > 0.85
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "High seat pool utilization (>85%)"
+            description: "Seat utilization is currently {{ "{{ $value | humanizePercentage }}" }}."
+
+        - alert: CriticalSeatExhaustion
+          expr: (symbolon_seats_active / symbolon_seats_total) > 0.98
+          for: 2m
+          labels:
+            severity: critical
+          annotations:
+            summary: "Critical seat pool exhaustion (>98%)"
+            description: "Seat pool is nearly exhausted. Immediate capacity addition required."
+
+        - alert: HighLeaseDenialRate
+          expr: rate(symbolon_checkout_denied_total[5m]) > 5
+          for: 2m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Spike in license lease denials"
+            description: "More than 5 checkout requests per second are being rejected."
+
+        - alert: ClockSkewDetected
+          expr: increase(symbolon_clock_skew_detected_total[10m]) > 0
+          labels:
+            severity: warning
+          annotations:
+            summary: "Client clock skew or NTP tampering detected"
+            description: "Client timestamp drift detected on license leases."
+
+        - alert: RelaySeatGrantsExpiringSoon
+          expr: (symbolon_relay_active_grants > 0) and (time() - symbolon_relay_active_grants < 900)
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Relay upstream seat grants expiring within 15 minutes"
+            description: "Relay offline seat grants require upstream re-synchronization."
+{{- end }}

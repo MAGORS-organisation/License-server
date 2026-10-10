@@ -29,6 +29,8 @@ public static class GrantCommands
             "ISSUE" => await HandleIssueAsync(args[1..]).ConfigureAwait(false),
             "INSPECT" or "SHOW" => HandleInspect(args[1..]),
             "IMPORT" => await HandleImportAsync(args[1..]).ConfigureAwait(false),
+            "QR" => HandleQr(args[1..]),
+            "USB-DIGEST" or "USB" => HandleUsbDigest(args[1..]),
             _ => UnknownSubcommand(args[0])
         };
     }
@@ -351,6 +353,202 @@ public static class GrantCommands
         return 0;
     }
 
+    private static int HandleQr(string[] args)
+    {
+        string? inFile = null;
+        string? data = null;
+        string title = "AIR-GAP QR CODE";
+
+        for (int i = 0; i < args.Length; i++)
+        {
+            if (args[i] is "--in" or "-i" && i + 1 < args.Length)
+            {
+                inFile = args[++i];
+            }
+            else if (args[i] is "--data" or "-d" && i + 1 < args.Length)
+            {
+                data = args[++i];
+            }
+            else if (args[i] is "--title" or "-t" && i + 1 < args.Length)
+            {
+                title = args[++i];
+            }
+        }
+
+        if (string.IsNullOrWhiteSpace(data) && !string.IsNullOrWhiteSpace(inFile))
+        {
+            if (!File.Exists(inFile))
+            {
+                AnsiConsole.MarkupLine($"[red]Súbor nenájdený:[/] {inFile}");
+                return 1;
+            }
+
+            byte[] bytes = File.ReadAllBytes(inFile);
+            if (bytes.Length <= 140)
+            {
+                data = Encoding.UTF8.GetString(bytes).Trim();
+            }
+            else
+            {
+                byte[] hash = SHA256.HashData(bytes);
+                data = $"sha256:{Convert.ToHexStringLower(hash)}";
+                title = $"{Path.GetFileName(inFile)} (SHA-256)";
+            }
+        }
+
+        if (string.IsNullOrWhiteSpace(data))
+        {
+            AnsiConsole.MarkupLine("[red]Chyba: Špecifikujte --in <súbor> alebo --data <text>.[/]");
+            return 1;
+        }
+
+        string retroBox = QrCodeEncoder.RenderRetroBox(data, title);
+        AnsiConsole.WriteLine(retroBox);
+        AnsiConsole.MarkupLine($"[green]✔ QR kód vygenerovaný pre:[/] [yellow]{data}[/]");
+        return 0;
+    }
+
+    private static int HandleUsbDigest(string[] args)
+    {
+        string dir = ".";
+        bool createManifest = false;
+        bool verify = false;
+
+        for (int i = 0; i < args.Length; i++)
+        {
+            if (args[i] is "--dir" or "-d" && i + 1 < args.Length)
+            {
+                dir = args[++i];
+            }
+            else if (args[i] is "--create-manifest" or "-c")
+            {
+                createManifest = true;
+            }
+            else if (args[i] is "--verify" or "-v")
+            {
+                verify = true;
+            }
+        }
+
+        if (!Directory.Exists(dir))
+        {
+            AnsiConsole.MarkupLine($"[red]Adresár nenájdený:[/] {dir}");
+            return 1;
+        }
+
+        string manifestPath = Path.Combine(dir, "manifest.sha256");
+
+        if (verify)
+        {
+            if (!File.Exists(manifestPath))
+            {
+                AnsiConsole.MarkupLine($"[red]Manifest súbor nenájdený:[/] {manifestPath}");
+                return 1;
+            }
+
+            var lines = File.ReadAllLines(manifestPath);
+            int matched = 0;
+            int failed = 0;
+
+            AnsiConsole.MarkupLine($"[bold cyan]Overovanie USB manifestu:[/] {manifestPath}");
+            foreach (var line in lines)
+            {
+                if (string.IsNullOrWhiteSpace(line) || line.StartsWith('#')) continue;
+                var parts = line.Split("  ", 2, StringSplitOptions.TrimEntries);
+                if (parts.Length != 2) continue;
+
+                string expectedHash = parts[0];
+                string relPath = parts[1];
+                string targetFile = Path.Combine(dir, relPath);
+
+                if (!File.Exists(targetFile))
+                {
+                    AnsiConsole.MarkupLine($"  [red]✗ Chýba:[/] {relPath}");
+                    failed++;
+                    continue;
+                }
+
+                byte[] actualBytes = File.ReadAllBytes(targetFile);
+                string actualHash = Convert.ToHexStringLower(SHA256.HashData(actualBytes));
+
+                if (string.Equals(expectedHash, actualHash, StringComparison.OrdinalIgnoreCase))
+                {
+                    AnsiConsole.MarkupLine($"  [green]✓ Zhoda:[/] {relPath} ([grey]{actualHash[..12]}...[/])");
+                    matched++;
+                }
+                else
+                {
+                    AnsiConsole.MarkupLine($"  [red]✗ Manipulácia:[/] {relPath} (očakávané {expectedHash[..12]}..., skutočné {actualHash[..12]}...)");
+                    failed++;
+                }
+            }
+
+            if (failed > 0)
+            {
+                AnsiConsole.MarkupLine($"\n[red]Zlyhalo overenie {failed} súborov![/]");
+                return 1;
+            }
+
+            AnsiConsole.MarkupLine($"\n[green]✓ Všetkých {matched} súborov na USB médiu je kryptograficky autentických.[/]");
+            return 0;
+        }
+
+        var patterns = new[] { "*.symreq", "*.symlic", "*.symgrant", "*.symrl", "*.json" };
+        var foundFiles = new List<string>();
+        foreach (var pattern in patterns)
+        {
+            foundFiles.AddRange(Directory.GetFiles(dir, pattern, SearchOption.TopDirectoryOnly));
+        }
+
+        foundFiles = foundFiles.Distinct().OrderBy(f => f).ToList();
+        if (foundFiles.Count == 0)
+        {
+            AnsiConsole.MarkupLine($"[yellow]V adresári '{dir}' neboli nájdené žiadne licenčné súbory (.symreq, .symlic, .symgrant, .symrl).[/]");
+            return 0;
+        }
+
+        var table = new Table().Border(TableBorder.Rounded);
+        table.AddColumn("Súbor");
+        table.AddColumn("Veľkosť");
+        table.AddColumn("SHA-256 Kontrolný Súčet");
+
+        var manifestSb = new StringBuilder();
+        manifestSb.AppendLine("# Symbolon USB Air-Gap Manifest (ISO/IEC 18004)");
+        manifestSb.AppendLine(CultureInfo.InvariantCulture, $"# Vygenerované: {DateTimeOffset.UtcNow:O}");
+
+        using var rootSha = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
+
+        foreach (var file in foundFiles)
+        {
+            byte[] bytes = File.ReadAllBytes(file);
+            byte[] hash = SHA256.HashData(bytes);
+            rootSha.AppendData(hash);
+
+            string hexHash = Convert.ToHexStringLower(hash);
+            string fileName = Path.GetFileName(file);
+
+            table.AddRow(fileName, $"{bytes.Length} B", $"[cyan]{hexHash}[/]");
+            manifestSb.AppendLine(CultureInfo.InvariantCulture, $"{hexHash}  {fileName}");
+        }
+
+        byte[] rootDigest = rootSha.GetHashAndReset();
+        string rootHex = Convert.ToHexStringLower(rootDigest);
+
+        AnsiConsole.Write(table);
+        AnsiConsole.MarkupLine($"[bold green]Root Digest priečinka:[/] [yellow]sha256:{rootHex}[/]");
+
+        if (createManifest)
+        {
+            File.WriteAllText(manifestPath, manifestSb.ToString(), Encoding.UTF8);
+            AnsiConsole.MarkupLine($"[green]✓ Manifest uložený do:[/] [cyan]{manifestPath}[/]");
+        }
+
+        string qrBox = QrCodeEncoder.RenderRetroBox($"sha256:{rootHex}", "USB ROOT DIGEST");
+        AnsiConsole.WriteLine(qrBox);
+
+        return 0;
+    }
+
     private static void PrintGrantHelp()
     {
         AnsiConsole.MarkupLine(@"[bold]Symbolon Delegated Seat Grant & Air-Gap Tools[/] (GNT-1..10, FLT-32..35)
@@ -359,16 +557,21 @@ public static class GrantCommands
   symbolon grant <príkaz> [[možnosti]]
 
 [bold]Príkazy:[/]
-  [cyan]request[/]  Vytvorí a podpíše požiadavku na sedadlá (.symreq)
-  [cyan]issue[/]    Odošle .symreq na Control Plane a získa .symgrant
-  [cyan]inspect[/]  Zobrazí podrobné informácie a invarianty .symgrant alebo .symreq súboru
-  [cyan]import[/]   Importuje .symgrant do bežiaceho offline relayu
+  [cyan]request[/]     Vytvorí a podpíše požiadavku na sedadlá (.symreq)
+  [cyan]issue[/]       Odošle .symreq na Control Plane a získa .symgrant
+  [cyan]inspect[/]     Zobrazí podrobné informácie a invarianty .symgrant alebo .symreq súboru
+  [cyan]import[/]      Importuje .symgrant do bežiaceho offline relayu
+  [cyan]qr[/]          Vykreslí high-contrast ASCII QR kód pre súbor alebo kľúč
+  [cyan]usb-digest[/]  Vytvorí/overí manifest licenčných súborov na USB médiu
 
 [bold]Príklady:[/]
   symbolon grant request --license SYM1-DEMO-KEY --relay rly_factory_01 --seats 5 --out req.symreq
   symbolon grant issue --in req.symreq --server http://cp.symbolon.internal --out grant.symgrant
   symbolon grant inspect --in grant.symgrant
   symbolon grant import --in grant.symgrant --relay http://localhost:5001
+  symbolon grant qr --data SYM1-DEMO-AIRGAP-KEY
+  symbolon grant usb-digest --dir D:\ --create-manifest
+  symbolon grant usb-digest --dir D:\ --verify
 ");
     }
 

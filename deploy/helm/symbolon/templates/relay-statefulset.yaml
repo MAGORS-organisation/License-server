@@ -1,0 +1,102 @@
+{{- if .Values.relay.enabled }}
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "symbolon.fullname" . }}-relay
+  labels:
+    {{- include "symbolon.labels" . | nindent 4 }}
+    app.kubernetes.io/component: relay
+spec:
+  serviceName: {{ include "symbolon.fullname" . }}-relay
+  replicas: {{ .Values.relay.replicaCount | default 1 }}
+  selector:
+    matchLabels:
+      {{- include "symbolon.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: relay
+  template:
+    metadata:
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8081"
+        prometheus.io/path: "/metrics"
+        {{- with .Values.relay.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      labels:
+        {{- include "symbolon.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: relay
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: relay
+          image: "{{ .Values.relay.image.repository }}:{{ .Values.relay.image.tag | default .Values.image.tag | default "1.0.0" }}"
+          imagePullPolicy: {{ .Values.relay.image.pullPolicy | default .Values.image.pullPolicy }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+            readOnlyRootFilesystem: false
+          ports:
+            - name: http
+              containerPort: 8081
+              protocol: TCP
+          env:
+            - name: ASPNETCORE_ENVIRONMENT
+              value: "Production"
+            - name: ASPNETCORE_HTTP_PORTS
+              value: "8081"
+            - name: Relay__UpstreamControlPlaneUrl
+              value: {{ .Values.relay.upstreamControlPlaneUrl | quote }}
+            - name: Relay__StoragePath
+              value: "/data/symbolon-relay.db"
+            {{- if .Values.relay.upstreamApiKeySecret }}
+            - name: Relay__ApiKey
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.relay.upstreamApiKeySecret.name }}
+                  key: {{ .Values.relay.upstreamApiKeySecret.key | default "api-key" }}
+            {{- end }}
+          livenessProbe:
+            httpGet:
+              path: /health/live
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 3
+          readinessProbe:
+            httpGet:
+              path: /health/ready
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            timeoutSeconds: 3
+          volumeMounts:
+            - name: relay-data
+              mountPath: /data
+          resources:
+            {{- toYaml .Values.relay.resources | nindent 12 }}
+  {{- if .Values.relay.persistence.enabled }}
+  volumeClaimTemplates:
+    - metadata:
+        name: relay-data
+      spec:
+        accessModes:
+          - ReadWriteOnce
+        {{- if .Values.relay.persistence.storageClass }}
+        storageClassName: {{ .Values.relay.persistence.storageClass | quote }}
+        {{- end }}
+        resources:
+          requests:
+            storage: {{ .Values.relay.persistence.size | default "10Gi" }}
+  {{- else }}
+      volumes:
+        - name: relay-data
+          emptyDir: {}
+  {{- end }}
+{{- end }}

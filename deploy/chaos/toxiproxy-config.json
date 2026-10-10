@@ -1,0 +1,39 @@
+[
+  {
+    "name": "controlplane_http",
+    "listen": "0.0.0.0:8082",
+    "upstream": "controlplane:8080",
+    "enabled": true,
+    "toxics": [
+      {
+        "name": "wan_latency",
+        "type": "latency",
+        "stream": "downstream",
+        "toxicity": 1.0,
+        "attributes": {
+          "latency": 150,
+          "jitter": 50
+        }
+      }
+    ]
+  },
+  {
+    "name": "postgres_tcp",
+    "listen": "0.0.0.0:5433",
+    "upstream": "postgres:5432",
+    "enabled": true,
+    "toxics": [
+      {
+        "name": "packet_slicer",
+        "type": "slicer",
+        "stream": "upstream",
+        "toxicity": 0.5,
+        "attributes": {
+          "average_size": 100,
+          "size_variation": 20,
+          "delay": 10
+        }
+      }
+    ]
+  }
+]

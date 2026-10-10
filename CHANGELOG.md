@@ -10,6 +10,25 @@ a projekt striktne dodržiava [Sémantické Verziovanie (Semantic Versioning 2.0
 ## [Unreleased]
 
 ### Pridané (Added)
+- **Phase 18: Kubernetes Helm & GitOps, Air-Gap ASCII QR Kódy, Multi-Platform Packaging & Toxiproxy Chaos (§10.9, §11.4, §12.5)**:
+  - **Kubernetes Helm Chart & GitOps Balíček (`deploy/helm/symbolon/`, `deploy/gitops/`)**:
+    - Plnohodnotná podpora edge uzla `Symbolon.Relay` cez Kubernetes `StatefulSet` s perzistentnými diskami (PVC 10Gi) pre lokálnu SQLite cache a autonómnu offline prevádzku.
+    - Integrácia `PrometheusRule` alertingových pravidiel pre Prometheus Operator (`SymbolonControlPlaneDown`, `HighSeatUtilization`, `ClockSkewDetected` atď.).
+    - GitOps deklarácie pripravené na produkčné nasadenie: `deploy/gitops/argocd-symbolon.yaml` (ArgoCD s automated sync a self-heal) a `deploy/gitops/flux-symbolon.yaml` (FluxCD HelmRelease).
+  - **Air-Gapped USB Digest & ASCII QR Code v Retro TUI (`QrCodeEncoder`, `GrantCommands`, `SetupWizard`)**:
+    - Čistý, bez-závislostný ISO/IEC 18004 QR Code Model 2 generátor (`Symbolon.Format/QrCodeEncoder.cs`) s podporou Byte módu, Reed-Solomon samoopravných kódov nad GF(256) a 8 maskovacích vzorov.
+    - Renderovanie do Unicode pol-blokov (`▀`, `▄`, `█`, ` `) a dekoratívneho Retro DOS/FoxPro rámčeka (`RenderRetroBox`) pre okamžité zobrazenie v termináli a skenovanie cez smartfóny/čítačky.
+    - Nový príkaz `symbolon grant qr` pre zobrazenie QR kódu súborov alebo licenčných kľúčov.
+    - Nový príkaz `symbolon grant usb-digest` pre vytvorenie a verifikáciu USB manifestu (`manifest.sha256`) a výpočet kryptografického Root Digestu na detekciu manipulácie v Air-Gap zóne.
+    - Integrácia do interaktívneho Retro TUI sprievodcu `SetupWizard.cs` a nová testovacia sada `AirGapGrantCliTests.cs` (100% pass).
+  - **Packaging & Release Automatizácia pre Multi-Platform SDK**:
+    - .NET NuGet konfigurácia (`Directory.Build.props`): generovanie symbolových balíčkov `.snupkg`, deterministické buildy a XML dokumentácia.
+    - Automatizačné balíčkovacie skripty `deploy/scripts/pack-all.ps1` a `deploy/scripts/pack-all.sh` generujúce NuGet (.NET), npm tarball (`@symbolon/validator`) a SHA-256 kontrolné súčty.
+    - GitHub Actions release pipeline `.github/workflows/release-sdks.yml` pre automatizovanú publikáciu pri tagoch `v*`.
+  - **Toxiproxy Chaos Inžinierstvo & Idempotencia**:
+    - Nový in-process sieťový chaos delegujúci handler `ChaosDelegatingHandler` simulujúci toxiky: WAN latenciu s jitterom, mid-flight TCP socket resety a timeouty.
+    - Nový testovací suite `NetworkChaosAndIdempotencyTests.cs`: overenie heartbeat renew pod jitterom, odolnosť voči rozpadu TCP spojenia s opakovaným použitím `Idempotency-Key` (nulová duplicita pri kapacite 1 sedadla) a súbežné preteky identických kľúčov.
+    - Docker Compose konfigurácia Toxiproxy `deploy/chaos/docker-compose.toxiproxy.yml` s toxikami pre ControlPlane a PostgreSQL.
 - **Phase 17: Produkčná Orchestrácia, Prometheus & Grafana Observabilita a Záťažové Testy (§10.9, §11.2, §11.3)**:
   - **Docker & Produkčný Compose Stack (`docker-compose.yml`, `.dockerignore`, `deploy/scripts/`)**:
     - Multi-service orchestrácia: `postgres` 16, `redis` 7, `controlplane` (:8080), `relay` (:8081), `prometheus` (:9090) a `grafana` (:3000) so vstavanými periodickými `healthcheck` direktívami.

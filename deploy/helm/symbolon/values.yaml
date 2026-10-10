@@ -111,3 +111,45 @@ serviceMonitor:
   scrapeTimeout: 10s
   additionalLabels: {}
 
+# Prometheus Operator PrometheusRule Alerts
+prometheusRule:
+  enabled: false
+  additionalLabels: {}
+
+# Redis Caching & Distributed PubSub
+redis:
+  enabled: true
+  host: "redis-service"
+  port: 6379
+  password: ""
+  existingSecret: ""
+
+# Symbolon Relay Edge / Local Node (StatefulSet)
+relay:
+  enabled: false
+  replicaCount: 1
+  image:
+    repository: ghcr.io/magors-organisation/symbolon-relay
+    pullPolicy: IfNotPresent
+    tag: "1.0.0"
+  podAnnotations: {}
+  upstreamControlPlaneUrl: "http://symbolon-controlplane:8080"
+  upstreamApiKeySecret:
+    name: "symbolon-relay-secret"
+    key: "api-key"
+  service:
+    type: ClusterIP
+    port: 8081
+  resources:
+    limits:
+      cpu: 500m
+      memory: 256Mi
+    requests:
+      cpu: 50m
+      memory: 64Mi
+  persistence:
+    enabled: true
+    storageClass: ""
+    size: 10Gi
+
+
