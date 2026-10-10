@@ -6,7 +6,7 @@
   "module": "symbolon-validator.mjs",
   "types": "symbolon-validator.d.ts",
   "scripts": {
-    "test": "node --test tests/validator.test.js"
+    "test": "node --test tests/validator.test.js tests/edge_filter.test.js"
   },
   "keywords": [
     "symbolon",

@@ -30,6 +30,12 @@ public static class AdminEndpoints
         // Tenants
         group.MapPost("/tenants", CreateTenantAsync).WithName("CreateTenant");
         group.MapGet("/tenants", GetTenantsAsync).WithName("GetTenants");
+        group.MapGet("/tenants/{id}/branding", GetTenantBrandingAsync).WithName("GetTenantBranding");
+        group.MapPost("/tenants/{id}/branding", UpdateTenantBrandingAsync).WithName("UpdateTenantBranding");
+        group.MapPut("/tenants/{id}/branding", UpdateTenantBrandingAsync).WithName("PutTenantBranding");
+        group.MapGet("/tenants/{id}/departments", GetTenantDepartmentsAsync).WithName("GetTenantDepartments");
+        group.MapPost("/tenants/{id}/departments", SetTenantDepartmentQuotaAsync).WithName("SetTenantDepartmentQuota");
+        group.MapDelete("/tenants/{id}/departments/{deptName}", DeleteTenantDepartmentQuotaAsync).WithName("DeleteTenantDepartmentQuota");
 
         // Products
         group.MapPost("/products", CreateProductAsync).WithName("CreateProduct");
@@ -218,6 +224,270 @@ public static class AdminEndpoints
             .ToListAsync(ct)
             .ConfigureAwait(false);
         return TypedResults.Ok(single);
+    }
+
+    private static async Task<IResult> GetTenantBrandingAsync(
+        string id,
+        HttpContext context,
+        SymbolonDbContext db,
+        CancellationToken ct)
+    {
+        if (!IsSuperAdmin(context) && GetCallerTenantId(context) != id)
+        {
+            return TypedResults.Problem(
+                statusCode: StatusCodes.Status403Forbidden,
+                title: "Forbidden",
+                detail: "Nemáte oprávnenie pristupovať k tomuto tenantovi.",
+                type: Symbolon.Protocol.ProblemTypes.Forbidden);
+        }
+
+        var tenant = await db.Tenants.Include(t => t.Branding).FirstOrDefaultAsync(t => t.Id == id, ct).ConfigureAwait(false);
+        if (tenant is null)
+        {
+            return TypedResults.NotFound($"Tenant '{id}' not found.");
+        }
+
+        if (tenant.Branding is not null)
+        {
+            return TypedResults.Ok(new TenantBrandingDto(
+                tenant.Id,
+                tenant.Branding.CompanyName,
+                tenant.Branding.LogoUrl,
+                tenant.Branding.PrimaryColorHex,
+                tenant.Branding.AccentColorHex,
+                tenant.Branding.PortalTitle,
+                tenant.Branding.CustomCss,
+                tenant.Branding.UpdatedAt));
+        }
+
+        return TypedResults.Ok(new TenantBrandingDto(
+            tenant.Id,
+            tenant.Name,
+            null,
+            "#1E40AF",
+            "#3B82F6",
+            $"{tenant.Name} License Portal",
+            null,
+            tenant.CreatedAt));
+    }
+
+    private static async Task<IResult> UpdateTenantBrandingAsync(
+        string id,
+        UpdateTenantBrandingDto dto,
+        HttpContext context,
+        SymbolonDbContext db,
+        TimeProvider time,
+        CancellationToken ct)
+    {
+        if (!IsSuperAdmin(context) && GetCallerTenantId(context) != id)
+        {
+            return TypedResults.Problem(
+                statusCode: StatusCodes.Status403Forbidden,
+                title: "Forbidden",
+                detail: "Nemáte oprávnenie upravovať branding tohto tenanta.",
+                type: Symbolon.Protocol.ProblemTypes.Forbidden);
+        }
+
+        var tenant = await db.Tenants.Include(t => t.Branding).FirstOrDefaultAsync(t => t.Id == id, ct).ConfigureAwait(false);
+        if (tenant is null)
+        {
+            return TypedResults.NotFound($"Tenant '{id}' not found.");
+        }
+
+        var now = time.GetUtcNow();
+        if (tenant.Branding is null)
+        {
+            tenant.Branding = new TenantBrandingEntity
+            {
+                Id = $"brd_{Guid.NewGuid():N}",
+                TenantId = tenant.Id,
+                CompanyName = dto.CompanyName.Trim(),
+                LogoUrl = dto.LogoUrl,
+                PrimaryColorHex = string.IsNullOrWhiteSpace(dto.PrimaryColorHex) ? "#1E40AF" : dto.PrimaryColorHex.Trim(),
+                AccentColorHex = string.IsNullOrWhiteSpace(dto.AccentColorHex) ? "#3B82F6" : dto.AccentColorHex.Trim(),
+                PortalTitle = string.IsNullOrWhiteSpace(dto.PortalTitle) ? $"{dto.CompanyName.Trim()} License Portal" : dto.PortalTitle.Trim(),
+                CustomCss = dto.CustomCss,
+                UpdatedAt = now
+            };
+            db.TenantBrandings.Add(tenant.Branding);
+        }
+        else
+        {
+            tenant.Branding.CompanyName = dto.CompanyName.Trim();
+            if (dto.LogoUrl is not null) tenant.Branding.LogoUrl = dto.LogoUrl;
+            if (!string.IsNullOrWhiteSpace(dto.PrimaryColorHex)) tenant.Branding.PrimaryColorHex = dto.PrimaryColorHex.Trim();
+            if (!string.IsNullOrWhiteSpace(dto.AccentColorHex)) tenant.Branding.AccentColorHex = dto.AccentColorHex.Trim();
+            if (!string.IsNullOrWhiteSpace(dto.PortalTitle)) tenant.Branding.PortalTitle = dto.PortalTitle.Trim();
+            if (dto.CustomCss is not null) tenant.Branding.CustomCss = dto.CustomCss;
+            tenant.Branding.UpdatedAt = now;
+        }
+
+        await db.SaveChangesAsync(ct).ConfigureAwait(false);
+
+        return TypedResults.Ok(new TenantBrandingDto(
+            tenant.Id,
+            tenant.Branding.CompanyName,
+            tenant.Branding.LogoUrl,
+            tenant.Branding.PrimaryColorHex,
+            tenant.Branding.AccentColorHex,
+            tenant.Branding.PortalTitle,
+            tenant.Branding.CustomCss,
+            tenant.Branding.UpdatedAt));
+    }
+
+    private static async Task<IResult> GetTenantDepartmentsAsync(
+        string id,
+        HttpContext context,
+        SymbolonDbContext db,
+        TimeProvider time,
+        CancellationToken ct)
+    {
+        if (!IsSuperAdmin(context) && GetCallerTenantId(context) != id)
+        {
+            return TypedResults.Problem(
+                statusCode: StatusCodes.Status403Forbidden,
+                title: "Forbidden",
+                detail: "Nemáte oprávnenie pristupovať k tomuto tenantovi.",
+                type: Symbolon.Protocol.ProblemTypes.Forbidden);
+        }
+
+        var tenant = await db.Tenants.FirstOrDefaultAsync(t => t.Id == id, ct).ConfigureAwait(false);
+        if (tenant is null)
+        {
+            return TypedResults.NotFound($"Tenant '{id}' not found.");
+        }
+
+        var quotas = await db.TenantDepartmentQuotas
+            .Where(q => q.TenantId == id)
+            .OrderBy(q => q.DepartmentName)
+            .ToListAsync(ct)
+            .ConfigureAwait(false);
+
+        var now = time.GetUtcNow();
+        var activeDepartmentCounts = await db.Seats
+            .Where(s => s.License != null && s.License.TenantId == id && s.ExpiresAt > now && s.Department != null)
+            .GroupBy(s => s.Department!)
+            .Select(g => new { Department = g.Key, Count = g.Count() })
+            .ToDictionaryAsync(x => x.Department, x => x.Count, StringComparer.OrdinalIgnoreCase, ct)
+            .ConfigureAwait(false);
+
+        var dtoList = quotas.Select(q =>
+        {
+            activeDepartmentCounts.TryGetValue(q.DepartmentName, out int activeCount);
+            return new TenantDepartmentQuotaDto(
+                q.Id,
+                q.TenantId,
+                q.DepartmentName,
+                q.AllocatedSeats,
+                activeCount,
+                q.EnforceStrictQuota,
+                q.UpdatedAt);
+        }).ToList();
+
+        var summary = new DepartmentUsageSummaryDto(
+            tenant.Id,
+            dtoList.Sum(d => d.AllocatedSeats),
+            dtoList.Sum(d => d.ActiveSeats),
+            dtoList);
+
+        return TypedResults.Ok(summary);
+    }
+
+    private static async Task<IResult> SetTenantDepartmentQuotaAsync(
+        string id,
+        SetDepartmentQuotaDto dto,
+        HttpContext context,
+        SymbolonDbContext db,
+        TimeProvider time,
+        CancellationToken ct)
+    {
+        if (!IsSuperAdmin(context) && GetCallerTenantId(context) != id)
+        {
+            return TypedResults.Problem(
+                statusCode: StatusCodes.Status403Forbidden,
+                title: "Forbidden",
+                detail: "Nemáte oprávnenie spravovať kvóty tohto tenanta.",
+                type: Symbolon.Protocol.ProblemTypes.Forbidden);
+        }
+
+        var tenant = await db.Tenants.FirstOrDefaultAsync(t => t.Id == id, ct).ConfigureAwait(false);
+        if (tenant is null)
+        {
+            return TypedResults.NotFound($"Tenant '{id}' not found.");
+        }
+
+        var deptName = dto.DepartmentName.Trim();
+        var quota = await db.TenantDepartmentQuotas
+            .FirstOrDefaultAsync(q => q.TenantId == id && q.DepartmentName == deptName, ct)
+            .ConfigureAwait(false);
+
+        var now = time.GetUtcNow();
+        if (quota is null)
+        {
+            quota = new TenantDepartmentQuota
+            {
+                Id = $"tdq_{Guid.NewGuid():N}",
+                TenantId = id,
+                DepartmentName = deptName,
+                AllocatedSeats = dto.AllocatedSeats,
+                EnforceStrictQuota = dto.EnforceStrictQuota,
+                CreatedAt = now,
+                UpdatedAt = now
+            };
+            db.TenantDepartmentQuotas.Add(quota);
+        }
+        else
+        {
+            quota.AllocatedSeats = dto.AllocatedSeats;
+            quota.EnforceStrictQuota = dto.EnforceStrictQuota;
+            quota.UpdatedAt = now;
+        }
+
+        await db.SaveChangesAsync(ct).ConfigureAwait(false);
+
+        int activeCount = await db.Seats
+            .CountAsync(s => s.License != null && s.License.TenantId == id && s.ExpiresAt > now && s.Department == deptName, ct)
+            .ConfigureAwait(false);
+
+        return TypedResults.Ok(new TenantDepartmentQuotaDto(
+            quota.Id,
+            quota.TenantId,
+            quota.DepartmentName,
+            quota.AllocatedSeats,
+            activeCount,
+            quota.EnforceStrictQuota,
+            quota.UpdatedAt));
+    }
+
+    private static async Task<IResult> DeleteTenantDepartmentQuotaAsync(
+        string id,
+        string deptName,
+        HttpContext context,
+        SymbolonDbContext db,
+        CancellationToken ct)
+    {
+        if (!IsSuperAdmin(context) && GetCallerTenantId(context) != id)
+        {
+            return TypedResults.Problem(
+                statusCode: StatusCodes.Status403Forbidden,
+                title: "Forbidden",
+                detail: "Nemáte oprávnenie mazať kvóty tohto tenanta.",
+                type: Symbolon.Protocol.ProblemTypes.Forbidden);
+        }
+
+        var quota = await db.TenantDepartmentQuotas
+            .FirstOrDefaultAsync(q => q.TenantId == id && q.DepartmentName == deptName, ct)
+            .ConfigureAwait(false);
+
+        if (quota is null)
+        {
+            return TypedResults.NotFound($"Department quota for '{deptName}' not found.");
+        }
+
+        db.TenantDepartmentQuotas.Remove(quota);
+        await db.SaveChangesAsync(ct).ConfigureAwait(false);
+
+        return TypedResults.NoContent();
     }
 
     private static async Task<IResult> CreateProductAsync(

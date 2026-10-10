@@ -1,0 +1,85 @@
+global:
+  resolve_timeout: 5m
+  smtp_smarthost: 'mail.internal:25'
+  smtp_from: 'alertmanager@symbolon.internal'
+  smtp_require_tls: false
+
+route:
+  group_by: ['alertname', 'tenant_id', 'license_id', 'cluster']
+  group_wait: 10s
+  group_interval: 1m
+  repeat_interval: 4h
+  receiver: 'slack-licensing'
+  routes:
+    - match:
+        severity: critical
+      receiver: 'pagerduty-critical'
+      continue: true
+
+    - match:
+        category: security
+      receiver: 'slack-security-soc'
+      continue: false
+
+    - match:
+        category: aiops
+      receiver: 'slack-capacity-ops'
+      continue: false
+
+inhibit_rules:
+  - source_match:
+      severity: 'critical'
+    target_match:
+      severity: 'warning'
+    equal: ['alertname', 'license_id', 'tenant_id']
+
+receivers:
+  - name: 'slack-licensing'
+    slack_configs:
+      - channel: '#symbolon-alerts'
+        api_url: 'http://localhost:9093/webhook/slack/licensing'
+        send_resolved: true
+        title: '[[{{ .Status | toUpper }}]] {{ .CommonLabels.alertname }} ({{ .CommonLabels.tenant_id }})'
+        text: >-
+          {{ range .Alerts }}
+            *Alert:* {{ .Annotations.summary }}
+            *Popis:* {{ .Annotations.description }}
+            *Závažnosť:* `{{ .Labels.severity }}`
+            *Spustené:* {{ .StartsAt.Format "15:04:05 02.01.2006" }}
+          {{ end }}
+
+  - name: 'slack-security-soc'
+    slack_configs:
+      - channel: '#symbolon-soc'
+        api_url: 'http://localhost:9093/webhook/slack/soc'
+        send_resolved: true
+        title: '🚨 [[SECURITY]] {{ .CommonLabels.alertname }}'
+        text: >-
+          {{ range .Alerts }}
+            *Bezpečnostný incident:* {{ .Annotations.summary }}
+            *Detaily:* {{ .Annotations.description }}
+            *Akcia:* Vyžaduje okamžité prešetrenie SOC tímom.
+          {{ end }}
+
+  - name: 'slack-capacity-ops'
+    slack_configs:
+      - channel: '#symbolon-capacity'
+        api_url: 'http://localhost:9093/webhook/slack/capacity'
+        send_resolved: true
+        title: '📊 [[AIOps]] Prediktívna správa kapacity'
+        text: >-
+          {{ range .Alerts }}
+            *AIOps Model:* {{ .Annotations.summary }}
+            *Predpoveď:* {{ .Annotations.description }}
+          {{ end }}
+
+  - name: 'pagerduty-critical'
+    pagerduty_configs:
+      - service_key: 'symbolon-pagerduty-production-routing-key'
+        severity: 'critical'
+        send_resolved: true
+        description: '{{ .CommonLabels.alertname }}: {{ .CommonAnnotations.summary }}'
+        details:
+          tenant: '{{ .CommonLabels.tenant_id }}'
+          license: '{{ .CommonLabels.license_id }}'
+          description: '{{ .CommonAnnotations.description }}'

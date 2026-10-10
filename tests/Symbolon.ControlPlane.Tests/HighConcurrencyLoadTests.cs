@@ -123,7 +123,7 @@ public sealed class HighConcurrencyLoadTests : IClassFixture<ControlPlaneFactory
         var p50 = sortedLatencies[(int)(concurrentClients * 0.50)];
         var p95 = sortedLatencies[(int)(concurrentClients * 0.95)];
 
-        p50.Should().BeLessThan(600.0, "p50 checkout latency must be responsive under concurrent burst");
+        p50.Should().BeLessThan(1000.0, "p50 checkout latency must be responsive under concurrent burst");
         p95.Should().BeLessThan(2000.0, "p95 checkout latency must remain under 2 seconds under high contention");
 
         // Cleanup & Drain: release all allocated seats

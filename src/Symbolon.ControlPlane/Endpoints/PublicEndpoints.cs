@@ -105,6 +105,10 @@ public static class PublicEndpoints
             .WithName("GetSystemTelemetry")
             .WithSummary("Vráti živé systémové metriky servera (CPU, RAM, DISK, NET, IP, User).");
 
+        group.MapGet("/portal/branding", GetPortalBrandingAsync)
+            .WithName("GetPortalBranding")
+            .WithSummary("Vráti branding tenanta pre self-service portál.");
+
         return group;
     }
 
@@ -189,6 +193,32 @@ public static class PublicEndpoints
                     title: "User Not Authorized",
                     detail: $"User '{dto.UserId}' is not assigned to this named-user license.",
                     type: ProblemTypes.UserNotAuthorized);
+            }
+        }
+
+        // Department Seat Quota Enforcement (Phase 22, Goal 1)
+        if (!string.IsNullOrWhiteSpace(dto.Department))
+        {
+            var deptQuota = await db.TenantDepartmentQuotas
+                .FirstOrDefaultAsync(q => q.TenantId == license.TenantId && q.DepartmentName == dto.Department, ct)
+                .ConfigureAwait(false);
+
+            if (deptQuota is not null && deptQuota.EnforceStrictQuota)
+            {
+                int currentDeptSeats = await db.Seats
+                    .CountAsync(s => s.License != null && s.License.TenantId == license.TenantId && s.ExpiresAt > now && s.Department == dto.Department, ct)
+                    .ConfigureAwait(false);
+
+                int reqQty = dto.Quantity ?? 1;
+                if (currentDeptSeats + reqQty > deptQuota.AllocatedSeats)
+                {
+                    activity?.SetStatus(ActivityStatusCode.Error, "Department Quota Exceeded");
+                    return TypedResults.Problem(
+                        statusCode: StatusCodes.Status409Conflict,
+                        title: "Department Quota Exceeded",
+                        detail: $"Oddelenie '{dto.Department}' prekročilo svoju kvótu sedadiel ({currentDeptSeats}/{deptQuota.AllocatedSeats}).",
+                        type: ProblemTypes.QuotaExhausted);
+                }
             }
         }
 
@@ -426,7 +456,7 @@ public static class PublicEndpoints
             await alertService.CheckCapacityThresholdAsync(license.Id, activeSeats, license.MaxSeats, license.TenantId, ct).ConfigureAwait(false);
 
             var alloc = result.Allocations[0];
-            if (!string.IsNullOrWhiteSpace(dto.UserId) && !string.IsNullOrWhiteSpace(alloc.LeaseId))
+            if (!string.IsNullOrWhiteSpace(alloc.LeaseId) && (!string.IsNullOrWhiteSpace(dto.UserId) || !string.IsNullOrWhiteSpace(dto.Department)))
             {
                 var allocatedSeats = await db.Seats
                     .Where(s => s.LeaseId == alloc.LeaseId)
@@ -434,7 +464,14 @@ public static class PublicEndpoints
                     .ConfigureAwait(false);
                 foreach (var s in allocatedSeats)
                 {
-                    s.UserId = dto.UserId;
+                    if (!string.IsNullOrWhiteSpace(dto.UserId))
+                    {
+                        s.UserId = dto.UserId;
+                    }
+                    if (!string.IsNullOrWhiteSpace(dto.Department))
+                    {
+                        s.Department = dto.Department;
+                    }
                 }
                 await db.SaveChangesAsync(ct).ConfigureAwait(false);
             }
@@ -1039,6 +1076,7 @@ public static class PublicEndpoints
         seat.BorrowedUntil = null;
         seat.PossessionKey = null;
         seat.UserId = null;
+        seat.Department = null;
         seat.LeaseSeq = 0;
 
         await db.SaveChangesAsync(ct).ConfigureAwait(false);
@@ -1511,5 +1549,50 @@ public static class PublicEndpoints
     {
         var telemetry = Observability.TelemetryCollector.Collect(context, metrics.ActiveSeats);
         return TypedResults.Ok(telemetry);
+    }
+
+    private static async Task<IResult> GetPortalBrandingAsync(
+        HttpContext context,
+        SymbolonDbContext db,
+        CancellationToken ct)
+    {
+        string? tenantId = context.Request.Headers["X-Tenant-Id"].FirstOrDefault();
+        Tenant? tenant;
+        if (!string.IsNullOrWhiteSpace(tenantId))
+        {
+            tenant = await db.Tenants.Include(t => t.Branding).FirstOrDefaultAsync(t => t.Id == tenantId || t.Slug == tenantId, ct).ConfigureAwait(false);
+        }
+        else
+        {
+            tenant = await db.Tenants.Include(t => t.Branding).FirstOrDefaultAsync(ct).ConfigureAwait(false);
+        }
+
+        if (tenant is null)
+        {
+            return TypedResults.NotFound("Tenant not found.");
+        }
+
+        if (tenant.Branding is not null)
+        {
+            return TypedResults.Ok(new TenantBrandingDto(
+                tenant.Id,
+                tenant.Branding.CompanyName,
+                tenant.Branding.LogoUrl,
+                tenant.Branding.PrimaryColorHex,
+                tenant.Branding.AccentColorHex,
+                tenant.Branding.PortalTitle,
+                tenant.Branding.CustomCss,
+                tenant.Branding.UpdatedAt));
+        }
+
+        return TypedResults.Ok(new TenantBrandingDto(
+            tenant.Id,
+            tenant.Name,
+            null,
+            "#1E40AF",
+            "#3B82F6",
+            $"{tenant.Name} License Portal",
+            null,
+            tenant.CreatedAt));
     }
 }

@@ -10,6 +10,41 @@ a projekt striktne dodržiava [Sémantické Verziovanie (Semantic Versioning 2.0
 ## [Unreleased]
 
 ### Pridané (Added)
+- **Phase 22: Multi-Tenancy B2B Self-Service Portál & Tenant Branding, Produkčné Grafana Dashboardy & Alertmanager Pack, WASM Envoy & Cloudflare Edge Filtre, Chaos Monkey Runner & Zero-Trust WireGuard Mesh Tunnel (§9.8, §10.11, §11.6, §12.7, §13.3)**:
+  - **Multi-Tenancy B2B Self-Service Portál & Tenant Branding**:
+    - Entita `TenantDepartmentQuota` a `TenantBrandingEntity` v `src/Symbolon.Data/Entities/Entities.cs` a konfigurácia v `SymbolonDbContext.cs` pre riadenie oddelení (Engineering, QA, Sales) a vizuálnu identitu tenantov (názov, logo URL, primárne/sekundárne farby, kontaktný email, portálové správy).
+    - DTO modely v `src/Symbolon.ControlPlane/Models/AdminDtos.cs` (`TenantBrandingDto`, `UpdateTenantBrandingDto`, `TenantDepartmentQuotaDto`, `SetDepartmentQuotaDto`, `DepartmentUsageSummaryDto`).
+    - REST API endpointy v `AdminEndpoints.cs` (`GET/POST/PUT /admin/v1/tenants/{id}/branding`, `GET/POST/DELETE /admin/v1/tenants/{id}/departments`) a verejný portálový endpoint `GET /v1/portal/branding` v `PublicEndpoints.cs`.
+    - Striktná kontrola a vynucovanie departmánových kvót sedadiel v checkout pipeline (`/v1/leases`), priradenie oddelenia k sedadlám a dynamické uvoľnenie v `EfSeatStore.cs`.
+    - CLI správa: `symbolon tenant branding`, `symbolon tenant quotas` a `symbolon tenant departments` so Spectre.Console tabuľkami a JSON výstupom.
+    - Testovacie sady `TenantBrandingAndQuotaTests.cs` a `TenantCommandsTests.cs`.
+  - **Produkčné Grafana Dashboardy & Alertmanager Pack**:
+    - Oficiálne produkčné Grafana dashboardy v `deploy/grafana/dashboards/`:
+      - `symbolon-concurrency-aiops.json`: Sledovanie špičkového zaťaženia, Holt's linear trend forecast, čas do vyčerpania kapacity (`TimeToExhaustion`) a dynamický buffer sedadiel.
+      - `symbolon-pqc-hsm-health.json`: Pomer podpisov ML-DSA-65 vs RSA/ECDSA, zdravie PKCS#11 hardvérového modulu (HSM latency, operácie, výpadky), FIPS 140-3 súlad a hardvérová entropia.
+      - `symbolon-merkle-ebpf-security.json`: Merkle Signed Tree Head (STH) frekvencia a integrita, eBPF socket interceptor štatistiky a bezpečnostné porušenia z ringbuffera.
+    - Alertmanager konfigurácia v `deploy/alertmanager/alertmanager.yml` s PagerDuty critical routingom, Slack kanálmi (`#licensing-alerts`, `#security-audit`, `#aiops-capacity`) a inhibičnými pravidlami.
+    - Prometheus alerting pravidlá v `deploy/alertmanager/symbolon-alerts.yml` a `deploy/prometheus/alerts.yml` (90%/98% saturácia sedadiel, Merkle drift, HSM failover a nárast eBPF porušení).
+    - Integračné testy validácie JSON schém dashboardov a YAML pravidiel v `GrafanaAndAlertmanagerTests.cs`.
+  - **WebAssembly (WASM) Envoy Proxy & Cloudflare Worker Edge Token Validátory**:
+    - Envoy Edge Wasm/JS HTTP filter (`sdk/wasm/envoy/envoy-symbolon-filter.js`, `envoy.yaml`): Dekódovanie kompaktných tokenov priamo na sieťovom okraji (reverse proxy), offline overenie expirácie a vkladanie upstream hlavičiek (`x-symbolon-tenant`, `x-symbolon-subject`, `x-symbolon-tier`, `x-symbolon-edge-auth: verified`).
+    - Cloudflare Worker edge filter (`sdk/wasm/cloudflare/worker.js`, `worker.mjs`, `wrangler.toml`): Overenie tokenov na CDN edge s CORS podporou, blokovanie neplatných tokenov a prepúšťanie k origin serveru s bezpečnostným kontextom.
+    - Unit testy sady edge filtrov v `sdk/wasm/tests/edge_filter.test.js` (19/19 testov úspešných).
+  - **Integrovaný Chaos Monkey & Resilience Runner pre Stresové Testovanie**:
+    - Natívny testovací engine `ChaosMonkeyRunner` (`src/Symbolon.Domain/Chaos/ChaosMonkeyRunner.cs`) simulujúci produkčné poruchy v reálnom čase:
+      - `NetworkPartition`: Výpadok replikačného a heartbeat kanála, preverenie prepnutia do offline grace periódy.
+      - `ClockSkew`: Posun systémových hodín (drift ±10 minút) na preverenie odolnosti tokenov a ochranu pred manipuláciou s expiráciou.
+      - `HsmDisconnection`: Výpadok hardvérového HSM a automatický fallback na softvérový hybridný kľúč bez zamrznutia vydávania licencií.
+      - `SeatExhaustionStorm`: Búrka paralelného vyčerpania sedadiel (100 concurrent požiadaviek) s verifikáciou nulového prečerpania licenčného fondu (zero-overdraft).
+    - Výpočet `ResilienceScorecard` so skóre odolnosti (0-100), recovery latenciou a klasifikáciou SLA (GOLD / SILVER / BRONZE).
+    - CLI príkaz `symbolon chaos run [--scenario <name>] [--duration <sec>] [--format <table|json>]` v `ChaosCommands.cs`.
+    - Testovacie sady `ChaosMonkeyTests.cs` a `ChaosCommandsTests.cs`.
+  - **Zero-Trust WireGuard / mTLS P2P Klastrový Tunel**:
+    - Koordinačná služba `WireGuardMeshCoordinator` v `src/Symbolon.Protocol/Mesh/WireGuardMeshCoordinator.cs` pre správu distribuovaného P2P prekryvného meshu.
+    - Správa kľúčov Curve25519, generovanie konfigurácie `wg0.conf` pre peerov a rotácia privátnych/verejných kľúčov.
+    - Manažment a bezvýpadková rotácia X.509 certifikátov pre mTLS šifrovanie vnútroklastrovej komunikácie s podporou SAN mien uzlov a serializácie do PEM.
+    - CLI príkazy `symbolon mesh wireguard config`, `symbolon mesh wireguard status`, `symbolon mesh wireguard rotate` a `symbolon mesh mtls rotate` v `MeshCommands.cs`.
+    - Testovacie sady `WireGuardMeshTests.cs` a `WireGuardCliTests.cs`.
 - **Phase 21: Rust & Go SDK Parita, AI-Driven Prediktívne Prognózovanie Súbežnosti, Desktop Studio Applet, Active-Active Disaster Recovery Failover & eBPF Kernel Probe Loader (§9.7, §10.10, §11.5, §13.2)**:
   - **Rust & Go Natívne SDK Knižnice (`symbolon-rs` & `symbolon-go`)**:
     - Zero-allocation offline token validátory (`sdk/rust/symbolon/src/validator.rs`, `sdk/go/symbolon/validator.go`) umožňujúce okamžité rozdelenie kompaktných tokenov, overenie expirácie a prítomnosti feature flags bez nutnosti zaťažovania pamäťového alokátora.

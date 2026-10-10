@@ -16,6 +16,8 @@ public sealed class Tenant
     public ICollection<WebhookSubscriptionEntity> WebhookSubscriptions { get; set; } = new List<WebhookSubscriptionEntity>();
     public ICollection<TokenWalletEntity> TokenWallets { get; set; } = new List<TokenWalletEntity>();
     public ICollection<TokenRateEntity> TokenRates { get; set; } = new List<TokenRateEntity>();
+    public ICollection<TenantDepartmentQuota> DepartmentQuotas { get; set; } = new List<TenantDepartmentQuota>();
+    public TenantBrandingEntity? Branding { get; set; }
 }
 
 public sealed class Product
@@ -123,6 +125,7 @@ public sealed class SeatEntity
     public long LeaseSeq { get; set; }
     public string? ReservedFor { get; set; }
     public string? UserId { get; set; }
+    public string? Department { get; set; }
     public string? PossessionKey { get; set; }
 
     public LicenseEntity? License { get; set; }
@@ -567,4 +570,34 @@ public sealed class ExperimentMetricEntity
     public DateTimeOffset UpdatedAt { get; set; }
 
     public ExperimentEntity? Experiment { get; set; }
+}
+
+public sealed class TenantDepartmentQuota
+{
+    public string Id { get; set; } = string.Empty;
+    public string TenantId { get; set; } = string.Empty;
+    public string DepartmentName { get; set; } = string.Empty;
+    public int AllocatedSeats { get; set; }
+    public bool EnforceStrictQuota { get; set; } = true;
+    public DateTimeOffset CreatedAt { get; set; }
+    public DateTimeOffset UpdatedAt { get; set; }
+
+    public Tenant? Tenant { get; set; }
+}
+
+public sealed class TenantBrandingEntity
+{
+    public string Id { get; set; } = string.Empty;
+    public string TenantId { get; set; } = string.Empty;
+    public string CompanyName { get; set; } = string.Empty;
+#pragma warning disable CA1056 // URI-like properties should not be strings (EF Core column mapping)
+    public string? LogoUrl { get; set; }
+#pragma warning restore CA1056
+    public string PrimaryColorHex { get; set; } = "#1E40AF";
+    public string AccentColorHex { get; set; } = "#3B82F6";
+    public string PortalTitle { get; set; } = "Symbolon Self-Service License Portal";
+    public string? CustomCss { get; set; }
+    public DateTimeOffset UpdatedAt { get; set; }
+
+    public Tenant? Tenant { get; set; }
 }

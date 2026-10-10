@@ -71,6 +71,8 @@ internal static class Program
                 "TOP" or "MONITOR" => await Commands.TopCommand.HandleTopAsync(args[1..]).ConfigureAwait(false),
                 "AGENT" or "TRAY" or "DAEMON" => await Commands.AgentCommands.HandleAgentAsync(args[1..]).ConfigureAwait(false),
                 "DESKTOP" or "STUDIO" => await Commands.DesktopCommands.HandleDesktopAsync(args[1..]).ConfigureAwait(false),
+                "TENANT" or "BRANDING" => await Commands.TenantCommands.HandleTenantAsync(args[1..]).ConfigureAwait(false),
+                "CHAOS" or "RESILIENCE" => await Commands.ChaosCommands.HandleChaosAsync(args[1..]).ConfigureAwait(false),
                 _ => UnknownCommand(args[0])
             };
         }

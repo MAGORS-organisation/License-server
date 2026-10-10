@@ -289,6 +289,7 @@ public sealed class EfSeatStore(SymbolonDbContext db) : ISeatStore
             seat.BorrowedUntil = null;
             seat.PossessionKey = null;
             seat.UserId = null;
+            seat.Department = null;
             seat.LeaseSeq = 0;
         }
 
@@ -352,6 +353,7 @@ public sealed class EfSeatStore(SymbolonDbContext db) : ISeatStore
             seat.BorrowedUntil = null;
             seat.PossessionKey = null;
             seat.UserId = null;
+            seat.Department = null;
             seat.LeaseSeq = 0;
         }
 

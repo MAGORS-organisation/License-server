@@ -43,6 +43,8 @@ public class SymbolonDbContext : DbContext
     public DbSet<ActiveFeatureLeaseEntity> ActiveFeatureLeases => Set<ActiveFeatureLeaseEntity>();
     public DbSet<ExperimentEntity> Experiments => Set<ExperimentEntity>();
     public DbSet<ExperimentMetricEntity> ExperimentMetrics => Set<ExperimentMetricEntity>();
+    public DbSet<TenantDepartmentQuota> TenantDepartmentQuotas => Set<TenantDepartmentQuota>();
+    public DbSet<TenantBrandingEntity> TenantBrandings => Set<TenantBrandingEntity>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -566,6 +568,33 @@ public class SymbolonDbContext : DbContext
             b.Property(m => m.VariantId).HasMaxLength(64).IsRequired();
             b.HasIndex(m => new { m.ExperimentId, m.VariantId }).IsUnique();
             b.HasOne(m => m.Experiment).WithMany(e => e.Metrics).HasForeignKey(m => m.ExperimentId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // TenantDepartmentQuota
+        modelBuilder.Entity<TenantDepartmentQuota>(b =>
+        {
+            b.ToTable("tenant_department_quotas");
+            b.HasKey(q => q.Id);
+            b.Property(q => q.TenantId).HasMaxLength(64).IsRequired();
+            b.Property(q => q.DepartmentName).HasMaxLength(128).IsRequired();
+            b.HasIndex(q => new { q.TenantId, q.DepartmentName }).IsUnique();
+            b.HasOne(q => q.Tenant).WithMany(t => t.DepartmentQuotas).HasForeignKey(q => q.TenantId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // TenantBrandingEntity
+        modelBuilder.Entity<TenantBrandingEntity>(b =>
+        {
+            b.ToTable("tenant_brandings");
+            b.HasKey(br => br.Id);
+            b.Property(br => br.TenantId).HasMaxLength(64).IsRequired();
+            b.Property(br => br.CompanyName).HasMaxLength(256).IsRequired();
+            b.Property(br => br.LogoUrl).HasMaxLength(1024);
+            b.Property(br => br.PrimaryColorHex).HasMaxLength(32).IsRequired();
+            b.Property(br => br.AccentColorHex).HasMaxLength(32).IsRequired();
+            b.Property(br => br.PortalTitle).HasMaxLength(256).IsRequired();
+            b.Property(br => br.CustomCss).HasMaxLength(8000);
+            b.HasIndex(br => br.TenantId).IsUnique();
+            b.HasOne(br => br.Tenant).WithOne(t => t.Branding).HasForeignKey<TenantBrandingEntity>(br => br.TenantId).OnDelete(DeleteBehavior.Cascade);
         });
 
         if (Database.IsSqlite())

@@ -1,0 +1,7 @@
+name = "symbolon-edge-filter"
+main = "worker.js"
+compatibility_date = "2026-10-01"
+
+[vars]
+EXPECTED_AUDIENCE = "enterprise-suite"
+ORIGIN_URL = "https://controlplane.symbolon.internal"

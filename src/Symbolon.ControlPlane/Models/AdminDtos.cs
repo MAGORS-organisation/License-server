@@ -350,4 +350,47 @@ public sealed record PqcDecryptRequestDto(
 public sealed record PqcDecryptResponseDto(
     string PlaintextBase64);
 
+// ==========================================
+// Multi-Tenancy Self-Service & Branding DTOs (Phase 22, Goal 1)
+// ==========================================
+#pragma warning disable CA1054, CA1056 // URI-like properties should not be strings in JSON DTO contracts
+public sealed record TenantBrandingDto(
+    string TenantId,
+    string CompanyName,
+    string? LogoUrl,
+    string PrimaryColorHex,
+    string AccentColorHex,
+    string PortalTitle,
+    string? CustomCss,
+    DateTimeOffset UpdatedAt);
+
+public sealed record UpdateTenantBrandingDto(
+    [Required, MaxLength(256)] string CompanyName,
+    [MaxLength(1024)] string? LogoUrl = null,
+    [MaxLength(32)] string? PrimaryColorHex = null,
+    [MaxLength(32)] string? AccentColorHex = null,
+    [MaxLength(256)] string? PortalTitle = null,
+    [MaxLength(8000)] string? CustomCss = null);
+#pragma warning restore CA1054, CA1056
+
+public sealed record TenantDepartmentQuotaDto(
+    string Id,
+    string TenantId,
+    string DepartmentName,
+    int AllocatedSeats,
+    int ActiveSeats,
+    bool EnforceStrictQuota,
+    DateTimeOffset UpdatedAt);
+
+public sealed record SetDepartmentQuotaDto(
+    [Required, MaxLength(128)] string DepartmentName,
+    [Range(0, 1000000)] int AllocatedSeats,
+    bool EnforceStrictQuota = true);
+
+public sealed record DepartmentUsageSummaryDto(
+    string TenantId,
+    int TotalAllocatedSeats,
+    int TotalActiveSeats,
+    IReadOnlyList<TenantDepartmentQuotaDto> Departments);
+
 
