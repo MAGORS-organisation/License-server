@@ -11,6 +11,7 @@ public sealed class WebhookBackgroundService : BackgroundService
     private readonly IWebhookQueue _queue;
     private readonly IWebhookDispatcher _dispatcher;
     private readonly ILogger<WebhookBackgroundService> _logger;
+    private readonly TimeSpan _retryInterval = TimeSpan.FromSeconds(5);
 
     public WebhookBackgroundService(
         IWebhookQueue queue,
@@ -24,8 +25,19 @@ public sealed class WebhookBackgroundService : BackgroundService
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        _logger.LogInformation("WebhookBackgroundService started listening to IWebhookQueue.");
+        if (_logger.IsEnabled(LogLevel.Information))
+        {
+            _logger.LogInformation("WebhookBackgroundService started listening to IWebhookQueue and retry processor.");
+        }
 
+        var queueTask = ProcessQueueAsync(stoppingToken);
+        var retryTask = ProcessRetriesAsync(stoppingToken);
+
+        await Task.WhenAll(queueTask, retryTask).ConfigureAwait(false);
+    }
+
+    private async Task ProcessQueueAsync(CancellationToken stoppingToken)
+    {
         try
         {
             await foreach (var evt in _queue.ReadAllAsync(stoppingToken).ConfigureAwait(false))
@@ -43,6 +55,34 @@ public sealed class WebhookBackgroundService : BackgroundService
         catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
         {
             // Graceful shutdown
+        }
+    }
+
+    private async Task ProcessRetriesAsync(CancellationToken stoppingToken)
+    {
+        using var timer = new PeriodicTimer(_retryInterval);
+
+        while (!stoppingToken.IsCancellationRequested)
+        {
+            try
+            {
+                if (await timer.WaitForNextTickAsync(stoppingToken).ConfigureAwait(false))
+                {
+                    int retried = await _dispatcher.ProcessPendingRetriesAsync(stoppingToken).ConfigureAwait(false);
+                    if (retried > 0 && _logger.IsEnabled(LogLevel.Information))
+                    {
+                        _logger.LogInformation("Processed {Count} webhook retries.", retried);
+                    }
+                }
+            }
+            catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+            {
+                break;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error in webhook retry processor loop.");
+            }
         }
     }
 }

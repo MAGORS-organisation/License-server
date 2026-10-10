@@ -824,5 +824,23 @@ public sealed record TokenWalletBalanceResponseDto
     public required bool IsLowBalance { get; init; }
 }
 
+public sealed record AgentStatusDto(
+    [property: JsonPropertyName("status")] string Status,
+    [property: JsonPropertyName("licenseKey")] string? LicenseKey,
+    [property: JsonPropertyName("leaseId")] string? LeaseId,
+    [property: JsonPropertyName("seatNo")] int? SeatNo,
+    [property: JsonPropertyName("expiresAt")] DateTimeOffset? ExpiresAt,
+    [property: JsonPropertyName("machineId")] string MachineId,
+    [property: JsonPropertyName("offlineAllowed")] bool OfflineAllowed,
+    [property: JsonPropertyName("lastError")] string? LastError,
+    [property: JsonPropertyName("updatedAt")] DateTimeOffset UpdatedAt
+);
+
+public sealed record AgentActionResponseDto(
+    [property: JsonPropertyName("success")] bool Success,
+    [property: JsonPropertyName("message")] string Message,
+    [property: JsonPropertyName("leaseId")] string? LeaseId = null
+);
+
 
 

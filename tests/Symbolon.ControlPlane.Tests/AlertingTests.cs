@@ -29,6 +29,11 @@ public sealed class AlertingTests
         {
             return Task.FromResult<WebhookDeliveryDto?>(null);
         }
+
+        public Task<int> ProcessPendingRetriesAsync(CancellationToken ct = default)
+        {
+            return Task.FromResult(0);
+        }
     }
 
     [Fact]

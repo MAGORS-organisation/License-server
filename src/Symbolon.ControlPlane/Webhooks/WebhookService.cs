@@ -19,6 +19,22 @@ public interface IWebhookDispatcher
     Task PublishEventAsync(string eventType, object payload, string? tenantId = null, CancellationToken ct = default);
     Task<WebhookTestResultDto> TestPingAsync(string subscriptionId, CancellationToken ct = default);
     Task<WebhookDeliveryDto?> ReplayDeliveryAsync(string deliveryId, CancellationToken ct = default);
+    Task<int> ProcessPendingRetriesAsync(CancellationToken ct = default);
+}
+
+public static class WebhookBackoffHelper
+{
+    public const int MaxAttempts = 5;
+    private static readonly TimeSpan BaseDelay = TimeSpan.FromSeconds(2);
+    private static readonly TimeSpan MaxDelay = TimeSpan.FromSeconds(300);
+
+    public static TimeSpan CalculateBackoff(int attempt)
+    {
+        double exponentialSeconds = BaseDelay.TotalSeconds * Math.Pow(2, Math.Max(0, attempt - 1));
+        double cappedSeconds = Math.Min(exponentialSeconds, MaxDelay.TotalSeconds);
+        double jitterSeconds = RandomNumberGenerator.GetInt32(0, 1000) / 1000.0;
+        return TimeSpan.FromSeconds(cappedSeconds + jitterSeconds);
+    }
 }
 
 #pragma warning disable CA1054, CA1031 // Uri parameter and exception catching for resilient network resolution
@@ -261,14 +277,23 @@ public sealed class WebhookDispatcher : IWebhookDispatcher
                     {
                         delivery.Status = "delivered";
                         delivery.DeliveredAt = _timeProvider.GetUtcNow();
+                        delivery.NextAttemptAt = null;
                         sub.FailureCount = 0;
                         sub.LastDeliveredAt = delivery.DeliveredAt;
                     }
                     else
                     {
-                        delivery.Status = delivery.Attempts >= 3 ? "dead_letter" : "failed";
                         delivery.LastError = $"HTTP {(int)response.StatusCode}: {response.ReasonPhrase}";
-                        delivery.NextAttemptAt = _timeProvider.GetUtcNow().AddMinutes(1);
+                        if (delivery.Attempts >= WebhookBackoffHelper.MaxAttempts)
+                        {
+                            delivery.Status = "dead_letter";
+                            delivery.NextAttemptAt = null;
+                        }
+                        else
+                        {
+                            delivery.Status = "failed";
+                            delivery.NextAttemptAt = now + WebhookBackoffHelper.CalculateBackoff(delivery.Attempts);
+                        }
                         sub.FailureCount++;
                         if (sub.FailureCount >= 10) sub.IsActive = false;
                     }
@@ -277,9 +302,17 @@ public sealed class WebhookDispatcher : IWebhookDispatcher
                 {
                     sw.Stop();
                     delivery.DurationMs = sw.ElapsedMilliseconds;
-                    delivery.Status = delivery.Attempts >= 3 ? "dead_letter" : "failed";
                     delivery.LastError = ex.Message;
-                    delivery.NextAttemptAt = _timeProvider.GetUtcNow().AddMinutes(1);
+                    if (delivery.Attempts >= WebhookBackoffHelper.MaxAttempts)
+                    {
+                        delivery.Status = "dead_letter";
+                        delivery.NextAttemptAt = null;
+                    }
+                    else
+                    {
+                        delivery.Status = "failed";
+                        delivery.NextAttemptAt = now + WebhookBackoffHelper.CalculateBackoff(delivery.Attempts);
+                    }
                     sub.FailureCount++;
                     if (sub.FailureCount >= 10) sub.IsActive = false;
                     _logger.LogWarning(ex, "Failed to deliver webhook {DeliveryId} to {Url}", deliveryId, sub.Url);
@@ -453,6 +486,128 @@ public sealed class WebhookDispatcher : IWebhookDispatcher
 
         await db.SaveChangesAsync(ct).ConfigureAwait(false);
         return ToDeliveryDto(delivery);
+    }
+
+    public async Task<int> ProcessPendingRetriesAsync(CancellationToken ct = default)
+    {
+        try
+        {
+            using var scope = _scopeFactory.CreateScope();
+            var db = scope.ServiceProvider.GetRequiredService<SymbolonDbContext>();
+            var now = _timeProvider.GetUtcNow();
+
+            var pendingDeliveries = await db.WebhookDeliveries
+                .Include(d => d.Subscription)
+                .Where(d => d.Status == "failed" && d.NextAttemptAt != null && d.NextAttemptAt <= now && d.Attempts < WebhookBackoffHelper.MaxAttempts)
+                .OrderBy(d => d.NextAttemptAt)
+                .Take(50)
+                .ToListAsync(ct)
+                .ConfigureAwait(false);
+
+            if (pendingDeliveries.Count == 0) return 0;
+
+            int processed = 0;
+            foreach (var delivery in pendingDeliveries)
+            {
+                var sub = delivery.Subscription;
+                if (sub is null || !sub.IsActive)
+                {
+                    delivery.Status = "dead_letter";
+                    delivery.NextAttemptAt = null;
+                    delivery.LastError = "Subscription inactive or missing.";
+                    processed++;
+                    continue;
+                }
+
+                if (!WebhookSecurityValidator.IsSafeWebhookUrl(sub.Url, _isDevelopment, _allowLocalWebhooks))
+                {
+                    delivery.Status = "dead_letter";
+                    delivery.NextAttemptAt = null;
+                    delivery.LastError = "SSRF safety check failed for destination URL.";
+                    processed++;
+                    continue;
+                }
+
+                delivery.Attempts++;
+                var attemptTime = _timeProvider.GetUtcNow();
+                long unixSeconds = attemptTime.ToUnixTimeSeconds();
+                string signature = WebhookSecurity.ComputeSignature(sub.Secret, unixSeconds, delivery.PayloadJson);
+                string sigHeader = WebhookSecurity.BuildSignatureHeader(sub.Secret, unixSeconds, delivery.PayloadJson);
+
+                var sw = Stopwatch.StartNew();
+                try
+                {
+                    using var request = new HttpRequestMessage(HttpMethod.Post, sub.Url);
+                    request.Headers.Add("User-Agent", "Symbolon-Webhook/1.0");
+                    request.Headers.Add("X-Symbolon-Event", delivery.EventType);
+                    request.Headers.Add("X-Symbolon-Delivery", delivery.Id);
+                    request.Headers.Add("X-Symbolon-Attempt", delivery.Attempts.ToString(System.Globalization.CultureInfo.InvariantCulture));
+                    request.Headers.Add("X-Symbolon-Timestamp", unixSeconds.ToString(System.Globalization.CultureInfo.InvariantCulture));
+                    request.Headers.Add("X-Symbolon-Signature", sigHeader);
+                    request.Headers.Add("X-Symbolon-Signature-256", $"sha256={signature}");
+                    request.Content = new StringContent(delivery.PayloadJson, Encoding.UTF8, "application/json");
+
+                    using var response = await _httpClient.SendAsync(request, ct).ConfigureAwait(false);
+                    sw.Stop();
+                    delivery.DurationMs = sw.ElapsedMilliseconds;
+                    delivery.StatusCode = (int)response.StatusCode;
+
+                    if (response.IsSuccessStatusCode)
+                    {
+                        delivery.Status = "delivered";
+                        delivery.DeliveredAt = attemptTime;
+                        delivery.LastError = null;
+                        delivery.NextAttemptAt = null;
+                        sub.FailureCount = 0;
+                        sub.LastDeliveredAt = delivery.DeliveredAt;
+                    }
+                    else
+                    {
+                        delivery.LastError = $"HTTP {(int)response.StatusCode}: {response.ReasonPhrase}";
+                        if (delivery.Attempts >= WebhookBackoffHelper.MaxAttempts)
+                        {
+                            delivery.Status = "dead_letter";
+                            delivery.NextAttemptAt = null;
+                        }
+                        else
+                        {
+                            delivery.Status = "failed";
+                            delivery.NextAttemptAt = attemptTime + WebhookBackoffHelper.CalculateBackoff(delivery.Attempts);
+                        }
+                        sub.FailureCount++;
+                        if (sub.FailureCount >= 10) sub.IsActive = false;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    sw.Stop();
+                    delivery.DurationMs = sw.ElapsedMilliseconds;
+                    delivery.LastError = ex.Message;
+                    if (delivery.Attempts >= WebhookBackoffHelper.MaxAttempts)
+                    {
+                        delivery.Status = "dead_letter";
+                        delivery.NextAttemptAt = null;
+                    }
+                    else
+                    {
+                        delivery.Status = "failed";
+                        delivery.NextAttemptAt = attemptTime + WebhookBackoffHelper.CalculateBackoff(delivery.Attempts);
+                    }
+                    sub.FailureCount++;
+                    if (sub.FailureCount >= 10) sub.IsActive = false;
+                }
+
+                processed++;
+            }
+
+            await db.SaveChangesAsync(ct).ConfigureAwait(false);
+            return processed;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error processing pending webhook retries.");
+            return 0;
+        }
     }
 
     public static string ComputeSignature(string secret, long timestamp, string payloadJson)

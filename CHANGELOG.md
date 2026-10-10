@@ -10,6 +10,34 @@ a projekt striktne dodržiava [Sémantické Verziovanie (Semantic Versioning 2.0
 ## [Unreleased]
 
 ### Pridané (Added)
+- **Phase 19: Kryptografický Audit Hash Chain, Enterprise Identity Sync, Webhook DLQ, Retro NetWare Real-Time Monitor & Klientsky Tray Agent (§10.8, §10.9, §12.6)**:
+  - **Kryptografický Tamper-Proof Audit Hash Chain & Merkle Notarizácia (§10.8)**:
+    - Implementovaný `MerkleTreeHelper` (`Symbolon.Crypto/MerkleTreeHelper.cs`) v súlade s RFC 6962: SHA-256 separácia domén (`0x00` leaf, `0x01` interior node), generovanie vyvážených Merkle stromov, extrakcia auditných ciest (audit path) a verifikácia inklúznych dôkazov.
+    - Rozšírené rozhranie `IAuditLedger` a implementácie `InMemoryAuditLedger` a `EfAuditLedger` o metódy `VerifyChainAsync` (overenie SHA-256 hash reťazca a detekcia manipulácie) a `GenerateProofForEventAsync` (Merkle notársky dôkaz).
+    - REST API endpointy na ControlPlane: `GET /admin/v1/audit/chain-status` a `GET /admin/v1/audit/{id}/proof`.
+    - CLI príkazy `symbolon audit verify-chain`, `symbolon audit export-proof` a `symbolon audit list`.
+    - Testovacie sady `MerkleTreeHelperTests.cs` (61 testov) a `AuditHashChainTests.cs` (100% pass).
+  - **Enterprise Identity & Directory Sync (OIDC / SAML 2.0 SSO & SCIM Worker)**:
+    - Nová dedikovaná služba `ScimDirectorySyncWorker` (`Symbolon.ControlPlane/Services/ScimDirectorySyncWorker.cs`) bežiaca na pozadí: automatická rekonsiliácia deprovisionovaných používateľov, okamžité uvoľnenie floating sedadiel cez `LeaseEngine.ReleaseAsync`, odstránenie pomenovaných priradení (`LicenseUserEntity`), synchronizácia skupín a generovanie auditných záznamov.
+    - REST API endpointy `POST /admin/v1/sso/directory-sync`, `GET /admin/v1/sso/directory-sync/status` a `POST /auth/sso/oidc/exchange`.
+    - Nové DTO modely `DirectorySyncResultDto`, `OidcTokenExchangeRequestDto`, `OidcTokenExchangeResponseDto` integrované do `SymbolonProtocolJsonContext`.
+    - Testovacia sada `ScimWorkerAndOidcTests.cs`.
+  - **Spoľahlivý Webhook Engine s Exponenciálnym Backoffom & Dead Letter Queue (DLQ)**:
+    - Implementovaný pomocník `WebhookBackoffHelper` s exponenciálnym backoffom a plným jitterom (`MaxAttempts = 5`, báza 2s, strop 300s).
+    - Asynchrónny cyklus opakovania `ProcessPendingRetriesAsync` integrovaný do `WebhookBackgroundService` s automatickým presunom do stavu `dead_letter` po 5 neúspešných pokusoch.
+    - REST API endpointy pre správu DLQ: `GET /admin/v1/webhooks/dlq`, `POST /admin/v1/webhooks/dlq/{id}/replay`, `DELETE /admin/v1/webhooks/dlq/{id}` a `POST /admin/v1/webhooks/dlq/purge-all`.
+    - CLI subpríkazy `symbolon webhooks dlq [list|replay|purge --id|--all]`.
+    - Testovacia sada `WebhookDlqAndRetryTests.cs`.
+  - **Živý Retro FoxPro / Novell NetWare TUI Real-Time Monitor (`symbolon top`)**:
+    - Nový príkaz `symbolon top` (`TopCommand.cs`) s autentickým NetWare 3.12 / FoxPro 2.6 dvojitým rámovaním, Cyan-on-Navy bannerom, ASCII sparkline priepustnosťou (` ▂▃▄▅▆▇█`), živým prehliadačom floating sedadiel a interaktívnymi klávesovými skratkami (`[R]` Revocation, `[P]` Pause, `[H]` Pomoc, `[Q]` Ukončenie) a `--once` režimom pre CI skripty.
+    - REST API endpointy: `GET /admin/v1/system/top-stats`, `GET /admin/v1/leases/active` a `POST /admin/v1/leases/{id}/revoke`.
+    - Nové DTO modely `ActiveLeaseItemDto` a `TopSystemStatsDto`.
+    - Testovacie sady `TopCliTests.cs` a `TopEndpointsTests.cs`.
+  - **Klientsky Desktop / CLI Tray Agent (`symbolon-agent`)**:
+    - Implementovaný cross-platform HTTP IPC démon `SymbolonAgentDaemon` (`Symbolon.Client/Agent/SymbolonAgentDaemon.cs`) počúvajúci na `127.0.0.1:8189` s endpointmi `GET /health`, `GET /v1/status`, `GET /v1/token`, `POST /v1/acquire`, `POST /v1/release`, `POST /v1/borrow` a `POST /v1/stop`.
+    - Automatický heartbeat na pozadí, offline fallback s roamingovým borrow a samoopravná logika pri strate sieťového spojenia.
+    - CLI príkaz `symbolon agent [start|status|acquire|release|borrow|stop]`.
+    - Testovacie sady `AgentDaemonTests.cs` a `AgentCliTests.cs`.
 - **Phase 18: Kubernetes Helm & GitOps, Air-Gap ASCII QR Kódy, Multi-Platform Packaging & Toxiproxy Chaos (§10.9, §11.4, §12.5)**:
   - **Kubernetes Helm Chart & GitOps Balíček (`deploy/helm/symbolon/`, `deploy/gitops/`)**:
     - Plnohodnotná podpora edge uzla `Symbolon.Relay` cez Kubernetes `StatefulSet` s perzistentnými diskami (PVC 10Gi) pre lokálnu SQLite cache a autonómnu offline prevádzku.

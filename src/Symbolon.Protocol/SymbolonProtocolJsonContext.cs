@@ -55,6 +55,9 @@ namespace Symbolon.Protocol;
 [JsonSerializable(typeof(Symbolon.Protocol.Sso.SsoUserProfileDto))]
 [JsonSerializable(typeof(Symbolon.Protocol.Sso.SsoLoginInitiateResponseDto))]
 [JsonSerializable(typeof(Symbolon.Protocol.Sso.SsoSessionClaims))]
+[JsonSerializable(typeof(Symbolon.Protocol.Sso.DirectorySyncResultDto))]
+[JsonSerializable(typeof(Symbolon.Protocol.Sso.OidcTokenExchangeRequestDto))]
+[JsonSerializable(typeof(Symbolon.Protocol.Sso.OidcTokenExchangeResponseDto))]
 [JsonSerializable(typeof(Symbolon.Protocol.K8s.SymbolonClusterCustomResource))]
 [JsonSerializable(typeof(List<Symbolon.Protocol.K8s.SymbolonClusterCustomResource>))]
 [JsonSerializable(typeof(Symbolon.Protocol.K8s.SymbolonLicenseCustomResource))]
@@ -74,6 +77,9 @@ namespace Symbolon.Protocol;
 [JsonSerializable(typeof(List<Symbolon.Protocol.Reporting.DenialRecordDto>))]
 [JsonSerializable(typeof(Symbolon.Protocol.Reporting.DenialsAnalyticsResponseDto))]
 [JsonSerializable(typeof(Symbolon.Protocol.Reporting.AuditVerificationProofDto))]
+[JsonSerializable(typeof(Symbolon.Protocol.Reporting.ActiveLeaseItemDto))]
+[JsonSerializable(typeof(List<Symbolon.Protocol.Reporting.ActiveLeaseItemDto>))]
+[JsonSerializable(typeof(Symbolon.Protocol.Reporting.TopSystemStatsDto))]
 [JsonSerializable(typeof(PolicyRuleGroupDto))]
 [JsonSerializable(typeof(List<PolicyRuleGroupDto>))]
 [JsonSerializable(typeof(PolicyRuleItemDto))]
@@ -114,6 +120,8 @@ namespace Symbolon.Protocol;
 [JsonSerializable(typeof(RollbackTokensRequestDto))]
 [JsonSerializable(typeof(RollbackTokensResponseDto))]
 [JsonSerializable(typeof(TokenWalletBalanceResponseDto))]
+[JsonSerializable(typeof(AgentStatusDto))]
+[JsonSerializable(typeof(AgentActionResponseDto))]
 public sealed partial class SymbolonProtocolJsonContext : JsonSerializerContext
 {
 }

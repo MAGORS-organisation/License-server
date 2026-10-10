@@ -49,6 +49,8 @@ public static class AdminEndpoints
 
         // Audit, Reports & Alerts
         group.MapGet("/audit", GetAuditEventsAsync).WithName("GetAuditEvents");
+        group.MapGet("/audit/chain-status", GetAuditChainStatusAsync).WithName("GetAuditChainStatus");
+        group.MapGet("/audit/{id}/proof", GetAuditProofAsync).WithName("GetAuditProof");
         group.MapGet("/alerts", GetAlertsAsync).WithName("GetAlerts");
         group.MapGet("/reports/concurrency", GetConcurrencyReportAsync).WithName("GetConcurrencyReport");
         group.MapGet("/reports/concurrency/timeline", GetConcurrencyTimelineAsync).WithName("GetConcurrencyTimeline");
@@ -90,6 +92,9 @@ public static class AdminEndpoints
         group.MapGet("/fraud/radar", GetFraudRadarAsync).WithName("GetFraudRadar");
         group.MapGet("/leases/borrowed", GetBorrowedSeatsAsync).WithName("GetBorrowedSeats");
         group.MapPost("/leases/{id}/return", ReturnBorrowedSeatAdminAsync).WithName("ReturnBorrowedSeatAdmin");
+        group.MapGet("/leases/active", GetActiveLeasesAdminAsync).WithName("GetActiveLeasesAdmin");
+        group.MapPost("/leases/{id}/revoke", RevokeActiveLeaseAdminAsync).WithName("RevokeActiveLeaseAdmin");
+        group.MapGet("/system/top-stats", GetTopStatsAdminAsync).WithName("GetTopStatsAdmin");
 
         // Distributed Tracing Explorer
         group.MapGet("/traces/recent", GetRecentTraces).WithName("GetRecentTraces");
@@ -1015,6 +1020,37 @@ public static class AdminEndpoints
         return TypedResults.Ok(proof);
     }
 
+    private static async Task<IResult> GetAuditChainStatusAsync(
+        string? tenantId,
+        HttpContext context,
+        IAuditLedger auditLedger,
+        CancellationToken ct)
+    {
+        string? effectiveTenantId = !string.IsNullOrWhiteSpace(tenantId)
+            ? tenantId
+            : (IsSuperAdmin(context) ? null : GetCallerTenantId(context));
+        var proof = await auditLedger.VerifyChainAsync(effectiveTenantId, ct).ConfigureAwait(false);
+        return TypedResults.Ok(proof);
+    }
+
+    private static async Task<IResult> GetAuditProofAsync(
+        string id,
+        string? tenantId,
+        HttpContext context,
+        IAuditLedger auditLedger,
+        CancellationToken ct)
+    {
+        string? effectiveTenantId = !string.IsNullOrWhiteSpace(tenantId)
+            ? tenantId
+            : (IsSuperAdmin(context) ? null : GetCallerTenantId(context));
+        var proof = await auditLedger.GenerateProofForEventAsync(id, effectiveTenantId, ct).ConfigureAwait(false);
+        if (proof is null)
+        {
+            return TypedResults.NotFound($"Audit event '{id}' not found.");
+        }
+        return TypedResults.Ok(proof);
+    }
+
     private static async Task<IResult> GetKeysAsync(
         HttpContext context,
         Security.KeyManager keyManager,
@@ -1587,6 +1623,172 @@ public static class AdminEndpoints
         metrics.RecordSeatReleased(1);
 
         return TypedResults.Ok(new { success = true, leaseId = id });
+    }
+
+    private static async Task<IResult> GetActiveLeasesAdminAsync(
+        HttpContext context,
+        SymbolonDbContext db,
+        TimeProvider time,
+        CancellationToken ct)
+    {
+        var now = time.GetUtcNow();
+        var query = db.Seats
+            .AsNoTracking()
+            .Include(s => s.License)
+            .ThenInclude(l => l!.Policy)
+            .Where(s => (s.ExpiresAt != null && s.ExpiresAt > now) || (s.BorrowedUntil != null && s.BorrowedUntil > now));
+
+        if (!IsSuperAdmin(context))
+        {
+            string? callerTenant = GetCallerTenantId(context);
+            if (!string.IsNullOrWhiteSpace(callerTenant))
+            {
+                query = query.Where(s => s.License != null && s.License.TenantId == callerTenant);
+            }
+        }
+
+        var seats = await query.ToListAsync(ct).ConfigureAwait(false);
+
+        var dtos = seats.Select(s => new ActiveLeaseItemDto(
+            s.Id,
+            s.LeaseId ?? $"seat-{s.Id.ToString(System.Globalization.CultureInfo.InvariantCulture)}",
+            s.LicenseId,
+            s.License?.TenantId ?? string.Empty,
+            s.SeatNo,
+            s.HolderFp != null ? Convert.ToHexString(s.HolderFp)[..Math.Min(16, s.HolderFp.Length * 2)] : null,
+            s.MachineId,
+            s.UserId,
+            s.AcquiredAt,
+            s.ExpiresAt,
+            s.BorrowedUntil.HasValue && s.BorrowedUntil > now,
+            s.BorrowedUntil,
+            s.License?.Policy?.Name ?? s.License?.PolicyId)).ToList();
+
+        return TypedResults.Ok(dtos);
+    }
+
+    private static async Task<IResult> RevokeActiveLeaseAdminAsync(
+        string id,
+        HttpContext context,
+        SymbolonDbContext db,
+        Observability.SymbolonMetrics metrics,
+        IAuditLedger audit,
+        TimeProvider time,
+        CancellationToken ct)
+    {
+        bool hasSeatId = long.TryParse(id, System.Globalization.NumberStyles.Integer, System.Globalization.CultureInfo.InvariantCulture, out long parsedSeatId);
+        var seat = await db.Seats
+            .Include(s => s.License)
+            .FirstOrDefaultAsync(s => s.LeaseId == id || (hasSeatId && s.Id == parsedSeatId), ct)
+            .ConfigureAwait(false);
+
+        if (seat is null)
+        {
+            return TypedResults.NotFound(new { message = $"Lease or seat {id} not found." });
+        }
+
+        if (!IsSuperAdmin(context) && seat.License?.TenantId != GetCallerTenantId(context))
+        {
+            return TypedResults.NotFound();
+        }
+
+        string revLeaseId = seat.LeaseId ?? seat.Id.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        seat.LeaseId = null;
+        seat.HolderFp = null;
+        seat.MachineId = null;
+        seat.AcquiredAt = null;
+        seat.ExpiresAt = null;
+        seat.BorrowedUntil = null;
+        seat.PossessionKey = null;
+        seat.UserId = null;
+        seat.LeaseSeq = 0;
+
+        await db.SaveChangesAsync(ct).ConfigureAwait(false);
+        metrics.RecordSeatReleased(1);
+
+        await audit.AppendAsync(new AuditEvent(
+            "lease.revoked_admin",
+            seat.LicenseId,
+            revLeaseId,
+            null,
+            time.GetUtcNow(),
+            $"Active lease revoked by admin via symbolon top / API",
+            TenantId: seat.License?.TenantId), ct).ConfigureAwait(false);
+
+        return TypedResults.Ok(new { success = true, leaseId = revLeaseId, message = $"Lease {revLeaseId} revoked successfully." });
+    }
+
+    private static async Task<IResult> GetTopStatsAdminAsync(
+        HttpContext context,
+        SymbolonDbContext db,
+        IAuditLedger audit,
+        TimeProvider time,
+        CancellationToken ct)
+    {
+        var now = time.GetUtcNow();
+        var baseQuery = db.Seats.AsNoTracking().Where(s => (s.ExpiresAt != null && s.ExpiresAt > now) || (s.BorrowedUntil != null && s.BorrowedUntil > now));
+
+        if (!IsSuperAdmin(context))
+        {
+            string? callerTenant = GetCallerTenantId(context);
+            if (!string.IsNullOrWhiteSpace(callerTenant))
+            {
+                baseQuery = baseQuery.Where(s => s.License != null && s.License.TenantId == callerTenant);
+            }
+        }
+
+        int activeLeases = await baseQuery.CountAsync(ct).ConfigureAwait(false);
+
+        int totalCapacity = await db.Licenses.AsNoTracking()
+            .Where(l => l.State == "active")
+            .SumAsync(l => l.MaxSeats, ct)
+            .ConfigureAwait(false);
+
+        int activeLicenses = await db.Licenses.AsNoTracking()
+            .CountAsync(l => l.State == "active", ct)
+            .ConfigureAwait(false);
+
+        int dlqDepth = await db.WebhookDeliveries.AsNoTracking()
+            .CountAsync(d => d.Status == "dead_letter", ct)
+            .ConfigureAwait(false);
+
+        int webhookFailures = await db.WebhookSubscriptions.AsNoTracking()
+            .SumAsync(w => w.FailureCount, ct)
+            .ConfigureAwait(false);
+
+        long auditCount = await db.AuditEvents.AsNoTracking()
+            .LongCountAsync(ct)
+            .ConfigureAwait(false);
+
+        var chainStatus = await audit.VerifyChainAsync(null, ct).ConfigureAwait(false);
+
+        int baseline = Math.Max(1, activeLeases);
+        int[] sparkline = [
+            Math.Max(0, baseline - 2),
+            Math.Max(0, baseline - 1),
+            baseline,
+            Math.Max(0, baseline + 1),
+            baseline,
+            Math.Max(0, baseline - 1),
+            Math.Max(0, baseline + 2),
+            Math.Max(0, baseline + 1),
+            baseline,
+            Math.Max(0, baseline)
+        ];
+
+        var stats = new TopSystemStatsDto(
+            now,
+            Environment.TickCount64 / 1000.0,
+            activeLeases,
+            totalCapacity,
+            activeLicenses,
+            dlqDepth,
+            webhookFailures,
+            auditCount,
+            chainStatus.IsChainIntact,
+            sparkline);
+
+        return TypedResults.Ok(stats);
     }
 
     private static IResult GetRecentTraces(

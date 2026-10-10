@@ -67,6 +67,9 @@ internal static class Program
                 "PQC" or "POSTQUANTUM" or "QUANTUM" => await Commands.PqcCommands.HandlePqcAsync(args[1..]).ConfigureAwait(false),
                 "TRANSPARENCY" or "MERKLE" => await Commands.TransparencyCommands.HandleTransparencyAsync(args[1..]).ConfigureAwait(false),
                 "BILLING" or "STRIPE" or "PADDLE" or "LEMON" => await Commands.BillingCommands.HandleBillingAsync(args[1..]).ConfigureAwait(false),
+                "AUDIT" => await Commands.AuditCommands.HandleAuditAsync(args[1..]).ConfigureAwait(false),
+                "TOP" or "MONITOR" => await Commands.TopCommand.HandleTopAsync(args[1..]).ConfigureAwait(false),
+                "AGENT" or "TRAY" or "DAEMON" => await Commands.AgentCommands.HandleAgentAsync(args[1..]).ConfigureAwait(false),
                 _ => UnknownCommand(args[0])
             };
         }
@@ -830,6 +833,9 @@ internal static class Program
               pqc scan|profile|kem|verify              Post-Quantum Era suite, FIPS 203 ML-KEM, FIPS 204 ML-DSA, CNSA 2.0 readiness
               transparency root|sth|inclusion|consistency Merkle Transparency Log (RFC 6962, Sigstore Rekor, append-only proofs)
               billing webhook|test|verify-sig          Inbound billing gateway (Stripe, LemonSqueezy, Paddle webhook sync)
+              audit verify-chain|export-proof|list      Kryptograficky tamper-proof audit hash chain a Merkle notárske dôkazy (§10.8)
+              top [--server <url>] [--interval <sec>]   Živý Retro FoxPro / Novell NetWare TUI real-time monitor sedadiel a klastra
+              agent start|status|acquire|release|borrow Klientsky desktop a CLI tray agent (IPC démon na 127.0.0.1:8189)
             """);
     }
 }

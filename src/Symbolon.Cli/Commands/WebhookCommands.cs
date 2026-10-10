@@ -23,6 +23,7 @@ public static class WebhookCommands
             "TEST" => await HandleTestAsync(args[1..]).ConfigureAwait(false),
             "DELIVERIES" or "LOG" => await HandleDeliveriesAsync(args[1..]).ConfigureAwait(false),
             "REPLAY" => await HandleReplayAsync(args[1..]).ConfigureAwait(false),
+            "DLQ" => await HandleDlqAsync(args[1..]).ConfigureAwait(false),
             "LIFECYCLE" or "EXPIRING" => await HandleLifecycleAsync(args[1..]).ConfigureAwait(false),
             _ => UnknownSubcommand(args[0])
         };
@@ -358,6 +359,161 @@ public static class WebhookCommands
         }
     }
 
+    private static async Task<int> HandleDlqAsync(string[] args)
+    {
+        string sub = args.Length > 0 && !args[0].StartsWith('-') ? args[0].ToUpperInvariant() : "LIST";
+        string[] subArgs = args.Length > 0 && !args[0].StartsWith('-') ? args[1..] : args;
+
+        return sub switch
+        {
+            "LIST" => await HandleDlqListAsync(subArgs).ConfigureAwait(false),
+            "REPLAY" => await HandleDlqReplayAsync(subArgs).ConfigureAwait(false),
+            "PURGE" => await HandleDlqPurgeAsync(subArgs).ConfigureAwait(false),
+            _ => await HandleDlqListAsync(args).ConfigureAwait(false)
+        };
+    }
+
+    private static async Task<int> HandleDlqListAsync(string[] args)
+    {
+        string serverEndpoint = GetArg(args, "--server") ?? "http://localhost:8080";
+        string limit = GetArg(args, "--limit") ?? "50";
+
+        AnsiConsole.MarkupLine("[bold magenta]=== Symbolon Webhook Dead-Letter Queue (DLQ) ===[/]");
+        using var client = CreateClient(serverEndpoint);
+
+        try
+        {
+            var response = await client.GetAsync(new Uri($"/admin/v1/webhooks/dlq?limit={limit}", UriKind.Relative)).ConfigureAwait(false);
+            if (!response.IsSuccessStatusCode)
+            {
+                AnsiConsole.MarkupLine($"[red]Server vrátil kód: {response.StatusCode}[/]");
+                return 1;
+            }
+
+            var dlqItems = await response.Content.ReadFromJsonAsync<List<WebhookDeliveryCliDto>>().ConfigureAwait(false) ?? [];
+            if (dlqItems.Count == 0)
+            {
+                AnsiConsole.MarkupLine("[green]Dead-Letter Queue je prázdna. Žiadne zlyhané správy.[/]");
+                return 0;
+            }
+
+            var table = new Table().Border(TableBorder.Rounded);
+            table.AddColumn("[cyan]Delivery ID[/]");
+            table.AddColumn("[white]Sub ID[/]");
+            table.AddColumn("[yellow]Udalosť[/]");
+            table.AddColumn("[red]Pokusy[/]");
+            table.AddColumn("[grey]Posledná Chyba[/]");
+            table.AddColumn("[blue]Vytvorené[/]");
+
+            foreach (var d in dlqItems)
+            {
+                table.AddRow(
+                    $"[bold]{d.Id}[/]",
+                    Markup.Escape(d.SubscriptionId),
+                    Markup.Escape(d.EventType),
+                    d.Attempts.ToString(CultureInfo.InvariantCulture),
+                    Markup.Escape(d.LastError ?? "-"),
+                    d.CreatedAt.ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture));
+            }
+
+            AnsiConsole.Write(table);
+            return 0;
+        }
+        catch (Exception ex)
+        {
+            AnsiConsole.MarkupLine($"[red]Chyba pripojenia: {Markup.Escape(ex.Message)}[/]");
+            return 1;
+        }
+    }
+
+    private static async Task<int> HandleDlqReplayAsync(string[] args)
+    {
+        string serverEndpoint = GetArg(args, "--server") ?? "http://localhost:8080";
+        string? id = GetArg(args, "--id") ?? (args.Length > 0 && !args[0].StartsWith('-') ? args[0] : null);
+
+        if (string.IsNullOrWhiteSpace(id))
+        {
+            AnsiConsole.MarkupLine("[red]Chyba: Zadajte --id <deliveryId> pre zopakovanie správy z DLQ.[/]");
+            return 1;
+        }
+
+        AnsiConsole.MarkupLine($"[magenta]Replay DLQ správy {Markup.Escape(id)}...[/]");
+        using var client = CreateClient(serverEndpoint);
+
+        try
+        {
+            var response = await client.PostAsync(new Uri($"/admin/v1/webhooks/dlq/{id}/replay", UriKind.Relative), null).ConfigureAwait(false);
+            if (!response.IsSuccessStatusCode)
+            {
+                string err = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
+                AnsiConsole.MarkupLine($"[red]Replay zlyhal ({response.StatusCode}): {Markup.Escape(err)}[/]");
+                return 1;
+            }
+
+            var result = await response.Content.ReadFromJsonAsync<WebhookDeliveryCliDto>().ConfigureAwait(false);
+            if (string.Equals(result?.Status, "delivered", StringComparison.OrdinalIgnoreCase))
+            {
+                AnsiConsole.MarkupLine($"[green]✓ DLQ správa bola úspešne doručená! (HTTP {result?.StatusCode}, {result?.DurationMs} ms)[/]");
+                return 0;
+            }
+
+            AnsiConsole.MarkupLine($"[yellow]Správa zostáva v stave {result?.Status}: {Markup.Escape(result?.LastError ?? "Neznáma chyba")}[/]");
+            return 1;
+        }
+        catch (Exception ex)
+        {
+            AnsiConsole.MarkupLine($"[red]Chyba: {Markup.Escape(ex.Message)}[/]");
+            return 1;
+        }
+    }
+
+    private static async Task<int> HandleDlqPurgeAsync(string[] args)
+    {
+        string serverEndpoint = GetArg(args, "--server") ?? "http://localhost:8080";
+        bool purgeAll = args.Contains("--all", StringComparer.OrdinalIgnoreCase);
+        string? id = GetArg(args, "--id");
+
+        using var client = CreateClient(serverEndpoint);
+
+        try
+        {
+            if (purgeAll)
+            {
+                AnsiConsole.MarkupLine("[yellow]Prečisťujem celú Dead-Letter Queue...[/]");
+                var response = await client.PostAsync(new Uri("/admin/v1/webhooks/dlq/purge-all", UriKind.Relative), null).ConfigureAwait(false);
+                if (!response.IsSuccessStatusCode)
+                {
+                    AnsiConsole.MarkupLine($"[red]Purge zlyhal: {response.StatusCode}[/]");
+                    return 1;
+                }
+                AnsiConsole.MarkupLine("[green]✓ Všetky položky v DLQ boli úspešne prečistené.[/]");
+                return 0;
+            }
+
+            if (string.IsNullOrWhiteSpace(id))
+            {
+                AnsiConsole.MarkupLine("[red]Chyba: Zadajte buď --id <deliveryId> alebo prepínač --all pre prečistenie DLQ.[/]");
+                return 1;
+            }
+
+            AnsiConsole.MarkupLine($"[yellow]Odstraňujem DLQ správu {Markup.Escape(id)}...[/]");
+            var delResponse = await client.DeleteAsync(new Uri($"/admin/v1/webhooks/dlq/{id}", UriKind.Relative)).ConfigureAwait(false);
+            if (!delResponse.IsSuccessStatusCode)
+            {
+                AnsiConsole.MarkupLine($"[red]Odstránenie zlyhalo: {delResponse.StatusCode}[/]");
+                return 1;
+            }
+
+            AnsiConsole.MarkupLine($"[green]✓ DLQ správa {Markup.Escape(id)} bola odstránená.[/]");
+            return 0;
+        }
+        catch (Exception ex)
+        {
+            AnsiConsole.MarkupLine($"[red]Chyba: {Markup.Escape(ex.Message)}[/]");
+            return 1;
+        }
+    }
+
     private static HttpClient CreateClient(string serverEndpoint)
     {
         var client = new HttpClient { BaseAddress = new Uri(serverEndpoint) };
@@ -395,6 +551,7 @@ public static class WebhookCommands
         AnsiConsole.MarkupLine("  test                      Odoslanie testovacieho ping volania (--id <id>)");
         AnsiConsole.MarkupLine("  deliveries | log          História doručení a DLQ audit (--status, --limit)");
         AnsiConsole.MarkupLine("  replay                    Manuálne zopakovanie neúspešného doručenia z DLQ (--id <id>)");
+        AnsiConsole.MarkupLine("  dlq                       Správa Dead-Letter Queue (list, replay, purge --id|--all)");
         AnsiConsole.MarkupLine("  lifecycle | expiring      Vyhodnotenie životného cyklu licencií a odoslanie alertov");
         AnsiConsole.WriteLine();
         AnsiConsole.MarkupLine("[bold]Prepínače:[/] ");

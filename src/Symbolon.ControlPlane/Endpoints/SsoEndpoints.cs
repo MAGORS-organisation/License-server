@@ -4,6 +4,7 @@ using System.Security.Claims;
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using Symbolon.ControlPlane.Security.Sso;
+using Symbolon.ControlPlane.Services;
 using Symbolon.Data;
 using Symbolon.Data.Entities;
 using Symbolon.Domain;
@@ -27,6 +28,7 @@ public static class SsoEndpoints
         authGroup.MapGet("/saml/metadata", SamlMetadata).AllowAnonymous().WithName("SamlMetadata");
         authGroup.MapGet("/me", GetCurrentUserProfile).WithName("GetSsoMe");
         authGroup.MapPost("/logout", Logout).WithName("SsoLogout");
+        authGroup.MapPost("/oidc/exchange", OidcExchangeTokenAsync).AllowAnonymous().WithName("OidcExchangeToken");
 
         // Secured SSO administration routes
         var adminGroup = app.MapGroup("/admin/v1/sso").WithTags("SSO Administration").RequireAuthorization();
@@ -34,6 +36,8 @@ public static class SsoEndpoints
         adminGroup.MapGet("/configs", GetSsoConfigsAsync).WithName("GetSsoConfigs");
         adminGroup.MapPost("/configs", SaveSsoConfigAsync).WithName("SaveSsoConfig");
         adminGroup.MapDelete("/configs/{id}", DeleteSsoConfigAsync).WithName("DeleteSsoConfig");
+        adminGroup.MapPost("/directory-sync", TriggerDirectorySyncAsync).WithName("TriggerDirectorySync");
+        adminGroup.MapGet("/directory-sync/status", GetDirectorySyncStatusAsync).WithName("GetDirectorySyncStatus");
 
         return authGroup;
     }
@@ -608,4 +612,109 @@ public static class SsoEndpoints
 
     private static bool IsSuperAdmin(HttpContext context) =>
         context.User.IsInRole("admin:super");
+
+    private static async Task<IResult> TriggerDirectorySyncAsync(
+        string? tenantId,
+        HttpContext context,
+        IScimDirectorySyncWorker syncWorker,
+        CancellationToken ct)
+    {
+        string? effectiveTenantId = !string.IsNullOrWhiteSpace(tenantId)
+            ? tenantId
+            : (IsSuperAdmin(context) ? null : GetCallerTenantId(context));
+
+        var result = await syncWorker.RunSyncCycleAsync(effectiveTenantId, ct).ConfigureAwait(false);
+        return Results.Json(result, SymbolonProtocolJsonContext.Default.DirectorySyncResultDto);
+    }
+
+    private static IResult GetDirectorySyncStatusAsync(IScimDirectorySyncWorker syncWorker)
+    {
+        var result = syncWorker.GetLastResult();
+        if (result is null)
+        {
+            return Results.Ok(new { message = "No directory sync cycles have been executed yet." });
+        }
+        return Results.Json(result, SymbolonProtocolJsonContext.Default.DirectorySyncResultDto);
+    }
+
+    private static async Task<IResult> OidcExchangeTokenAsync(
+        OidcTokenExchangeRequestDto dto,
+        SymbolonDbContext db,
+        SsoEngine ssoEngine,
+        CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(dto.ProviderId) || string.IsNullOrWhiteSpace(dto.IdToken))
+        {
+            return Results.BadRequest(new { error = "ProviderId and IdToken are required." });
+        }
+
+        var provider = await db.SsoProviders.FindAsync([dto.ProviderId], ct).ConfigureAwait(false);
+        if (provider == null || !provider.IsEnabled)
+        {
+            return Results.NotFound(new { error = "SSO provider not found or disabled." });
+        }
+
+        string userId = string.Empty;
+        string userName = string.Empty;
+        string? email = null;
+        var userGroups = new List<string>();
+        string? directRole = null;
+
+        ExtractClaimsFromJwtPayload(dto.IdToken, ref userId, ref userName, ref email, userGroups, ref directRole);
+
+        if (string.IsNullOrWhiteSpace(userId))
+        {
+            return Results.BadRequest(new { error = "Could not extract valid subject/user claims from ID token." });
+        }
+
+        string role = directRole ?? provider.DefaultRole;
+        if (!string.IsNullOrWhiteSpace(provider.RoleMappingJson) && userGroups.Count > 0)
+        {
+            try
+            {
+                var roleMappings = JsonSerializer.Deserialize<Dictionary<string, string>>(provider.RoleMappingJson);
+                if (roleMappings != null)
+                {
+                    foreach (var g in userGroups)
+                    {
+                        if (roleMappings.TryGetValue(g, out var mappedRole))
+                        {
+                            role = mappedRole;
+                            break;
+                        }
+                    }
+                }
+            }
+            catch (JsonException)
+            {
+            }
+        }
+
+        string sessionToken = ssoEngine.SessionManager.CreateSessionToken(
+            userId,
+            userName,
+            email,
+            role,
+            provider.TenantId,
+            TimeSpan.FromHours(8));
+
+        var userProfile = new SsoUserProfileDto
+        {
+            IsAuthenticated = true,
+            UserId = userId,
+            UserName = userName,
+            Email = email,
+            Role = role,
+            TenantId = provider.TenantId,
+            ProviderType = provider.ProviderType
+        };
+
+        var response = new OidcTokenExchangeResponseDto
+        {
+            SessionToken = sessionToken,
+            User = userProfile
+        };
+
+        return Results.Json(response, SymbolonProtocolJsonContext.Default.OidcTokenExchangeResponseDto);
+    }
 }

@@ -121,3 +121,46 @@ public sealed record SsoSessionClaims
     [JsonPropertyName("exp")]
     public long Exp { get; init; }
 }
+
+public sealed record DirectorySyncResultDto
+{
+    [JsonPropertyName("timestamp")]
+    public DateTimeOffset Timestamp { get; init; }
+
+    [JsonPropertyName("inactiveUsersScanned")]
+    public int InactiveUsersScanned { get; init; }
+
+    [JsonPropertyName("reclaimedSeatsCount")]
+    public int ReclaimedSeatsCount { get; init; }
+
+    [JsonPropertyName("reclaimedAssignmentsCount")]
+    public int ReclaimedAssignmentsCount { get; init; }
+
+    [JsonPropertyName("synchronizedGroupsCount")]
+    public int SynchronizedGroupsCount { get; init; }
+
+    [JsonPropertyName("isSuccess")]
+    public bool IsSuccess { get; init; }
+
+    [JsonPropertyName("errorMessage")]
+    public string? ErrorMessage { get; init; }
+}
+
+public sealed record OidcTokenExchangeRequestDto
+{
+    [JsonPropertyName("providerId")]
+    public required string ProviderId { get; init; }
+
+    [JsonPropertyName("idToken")]
+    public required string IdToken { get; init; }
+}
+
+public sealed record OidcTokenExchangeResponseDto
+{
+    [JsonPropertyName("sessionToken")]
+    public required string SessionToken { get; init; }
+
+    [JsonPropertyName("user")]
+    public required SsoUserProfileDto User { get; init; }
+}
+

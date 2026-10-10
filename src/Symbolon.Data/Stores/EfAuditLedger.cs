@@ -4,6 +4,10 @@ using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using Symbolon.Data.Entities;
 using Symbolon.Domain;
+using Symbolon.Domain.Reporting;
+using Symbolon.Domain.Transparency;
+using Symbolon.Protocol;
+using Symbolon.Protocol.Reporting;
 
 namespace Symbolon.Data.Stores;
 
@@ -41,9 +45,9 @@ public sealed class EfAuditLedger(SymbolonDbContext db) : IAuditLedger
             var inputBytes = Encoding.UTF8.GetBytes($"{Convert.ToHexString(prevHash ?? [])}:{id}:{auditEvent.Type}:{auditEvent.LicenseId}:{auditEvent.Fingerprint}:{payload}:{canonicalTimestamp:O}");
             byte[] hash = SHA256.HashData(inputBytes);
 
-            // Find tenantId from license if possible, or from seat by leaseId, or first tenant
-            string? tenantId = null;
-            if (!string.IsNullOrEmpty(auditEvent.LicenseId) && auditEvent.LicenseId != "unknown")
+            // Find tenantId from auditEvent, or from license if possible, or from seat by leaseId, or first tenant
+            string? tenantId = auditEvent.TenantId;
+            if (string.IsNullOrEmpty(tenantId) && !string.IsNullOrEmpty(auditEvent.LicenseId) && auditEvent.LicenseId != "unknown")
             {
                 tenantId = await db.Licenses
                     .Where(l => l.Id == auditEvent.LicenseId)
@@ -87,4 +91,70 @@ public sealed class EfAuditLedger(SymbolonDbContext db) : IAuditLedger
             Lock.Release();
         }
     }
+
+    public async Task<AuditVerificationProofDto> VerifyChainAsync(string? tenantId = null, CancellationToken ct = default)
+    {
+        var query = db.AuditEvents.AsNoTracking();
+        if (!string.IsNullOrWhiteSpace(tenantId))
+        {
+            query = query.Where(a => a.TenantId == tenantId);
+        }
+
+        var events = await query
+            .OrderBy(a => a.TsServer)
+            .ThenBy(a => a.Id)
+            .ToListAsync(ct)
+            .ConfigureAwait(false);
+
+        var items = events.Select(a => new AuditRecordItem(
+            a.Id,
+            a.TsServer,
+            a.Type,
+            a.LicenseId,
+            a.Subject,
+            a.PayloadJson,
+            a.PrevHash,
+            a.Hash
+        )).ToList();
+
+        return AuditChainIntegrityVerifier.Verify(items, DateTimeOffset.UtcNow);
+    }
+
+    public async Task<TransparencyInclusionResponseDto?> GenerateProofForEventAsync(string eventId, string? tenantId = null, CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(eventId);
+
+        var query = db.AuditEvents.AsNoTracking();
+        if (!string.IsNullOrWhiteSpace(tenantId))
+        {
+            query = query.Where(a => a.TenantId == tenantId);
+        }
+
+        var events = await query
+            .OrderBy(a => a.TsServer)
+            .ThenBy(a => a.Id)
+            .Select(a => new { a.Id, a.Hash })
+            .ToListAsync(ct)
+            .ConfigureAwait(false);
+
+        int index = events.FindIndex(a => a.Id == eventId);
+        if (index < 0)
+        {
+            return null;
+        }
+
+        var leafHashes = events.Select(e => MerkleTree.HashLeaf(e.Hash)).ToList();
+        byte[] root = MerkleTree.ComputeRootHash(leafHashes);
+        var proof = MerkleTree.GenerateInclusionProof(leafHashes, index);
+        var steps = proof.Select(p => new TransparencyProofStepDto(p.Hash, p.Direction)).ToList();
+
+        return new TransparencyInclusionResponseDto(
+            eventId,
+            index,
+            leafHashes.Count,
+            Convert.ToHexStringLower(leafHashes[index]),
+            Convert.ToHexStringLower(root),
+            steps);
+    }
 }
+

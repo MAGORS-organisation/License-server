@@ -29,6 +29,10 @@ public static class WebhookEndpoints
         group.MapGet("/", GetWebhooksAsync).WithName("GetWebhooks");
         group.MapGet("/deliveries", GetAllWebhookDeliveriesAsync).WithName("GetAllWebhookDeliveries");
         group.MapPost("/deliveries/{id}/replay", ReplayWebhookDeliveryAsync).WithName("ReplayWebhookDelivery");
+        group.MapGet("/dlq", GetDeadLetterQueueAsync).WithName("GetDeadLetterQueue");
+        group.MapPost("/dlq/{id}/replay", ReplayWebhookDeliveryAsync).WithName("ReplayDlqDelivery");
+        group.MapDelete("/dlq/{id}", PurgeDlqDeliveryAsync).WithName("PurgeDlqDelivery");
+        group.MapPost("/dlq/purge-all", PurgeAllDlqDeliveriesAsync).WithName("PurgeAllDlqDeliveries");
         group.MapGet("/{id}", GetWebhookByIdAsync).WithName("GetWebhookById");
         group.MapDelete("/{id}", DeleteWebhookAsync).WithName("DeleteWebhook");
         group.MapPost("/{id}/test", TestWebhookAsync).WithName("TestWebhook");
@@ -325,4 +329,71 @@ public static class WebhookEndpoints
 
         return TypedResults.Ok(result);
     }
+
+    private static async Task<IResult> GetDeadLetterQueueAsync(
+        int? limit,
+        SymbolonDbContext db,
+        CancellationToken ct)
+    {
+        int max = Math.Clamp(limit ?? 50, 1, 200);
+        var list = await db.WebhookDeliveries.AsNoTracking()
+            .Where(d => d.Status == "dead_letter")
+            .OrderByDescending(d => d.CreatedAt)
+            .Take(max)
+            .Select(d => new WebhookDeliveryDto(
+                d.Id,
+                d.SubscriptionId,
+                d.EventType,
+                d.Status,
+                d.StatusCode,
+                d.Attempts,
+                d.DeliveredAt,
+                d.LastError,
+                d.CreatedAt,
+                d.DurationMs))
+            .ToListAsync(ct)
+            .ConfigureAwait(false);
+
+        return TypedResults.Ok(list);
+    }
+
+    private static async Task<IResult> PurgeDlqDeliveryAsync(
+        string id,
+        SymbolonDbContext db,
+        CancellationToken ct)
+    {
+        var delivery = await db.WebhookDeliveries
+            .FirstOrDefaultAsync(d => d.Id == id && d.Status == "dead_letter", ct)
+            .ConfigureAwait(false);
+
+        if (delivery is null)
+        {
+            return TypedResults.NotFound(new { message = $"Dead letter delivery {id} not found." });
+        }
+
+        db.WebhookDeliveries.Remove(delivery);
+        await db.SaveChangesAsync(ct).ConfigureAwait(false);
+
+        return TypedResults.Ok(new { message = $"Dead letter delivery {id} purged successfully." });
+    }
+
+    private static async Task<IResult> PurgeAllDlqDeliveriesAsync(
+        SymbolonDbContext db,
+        CancellationToken ct)
+    {
+        var deadLetters = await db.WebhookDeliveries
+            .Where(d => d.Status == "dead_letter")
+            .ToListAsync(ct)
+            .ConfigureAwait(false);
+
+        int count = deadLetters.Count;
+        if (count > 0)
+        {
+            db.WebhookDeliveries.RemoveRange(deadLetters);
+            await db.SaveChangesAsync(ct).ConfigureAwait(false);
+        }
+
+        return TypedResults.Ok(new { message = $"{count} dead-letter deliveries purged successfully.", count });
+    }
 }
+

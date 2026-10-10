@@ -94,3 +94,39 @@ public sealed record AuditVerificationProofDto(
     [property: JsonPropertyName("tamperReason")] string? TamperReason,
     [property: JsonPropertyName("verifiedAtUtc")] DateTimeOffset VerifiedAtUtc
 );
+
+/// <summary>
+/// Detail of an active lease or seat in the cluster for real-time monitoring (symbolon top).
+/// </summary>
+public sealed record ActiveLeaseItemDto(
+    [property: JsonPropertyName("seatId")] long SeatId,
+    [property: JsonPropertyName("leaseId")] string LeaseId,
+    [property: JsonPropertyName("licenseId")] string LicenseId,
+    [property: JsonPropertyName("tenantId")] string TenantId,
+    [property: JsonPropertyName("seatNo")] int SeatNo,
+    [property: JsonPropertyName("holderFingerprint")] string? HolderFingerprint,
+    [property: JsonPropertyName("machineId")] string? MachineId,
+    [property: JsonPropertyName("userId")] string? UserId,
+    [property: JsonPropertyName("acquiredAt")] DateTimeOffset? AcquiredAt,
+    [property: JsonPropertyName("expiresAt")] DateTimeOffset? ExpiresAt,
+    [property: JsonPropertyName("isBorrowed")] bool IsBorrowed,
+    [property: JsonPropertyName("borrowedUntil")] DateTimeOffset? BorrowedUntil,
+    [property: JsonPropertyName("productName")] string? ProductName
+);
+
+/// <summary>
+/// Cluster-wide telemetry snapshot for real-time console monitor (symbolon top).
+/// </summary>
+public sealed record TopSystemStatsDto(
+    [property: JsonPropertyName("serverTime")] DateTimeOffset ServerTime,
+    [property: JsonPropertyName("uptimeSeconds")] double UptimeSeconds,
+    [property: JsonPropertyName("activeLeases")] int ActiveLeases,
+    [property: JsonPropertyName("totalCapacity")] int TotalCapacity,
+    [property: JsonPropertyName("activeLicenses")] int ActiveLicenses,
+    [property: JsonPropertyName("dlqDepth")] int DlqDepth,
+    [property: JsonPropertyName("webhookFailures")] int WebhookFailures,
+    [property: JsonPropertyName("auditEventsTotal")] long AuditEventsTotal,
+    [property: JsonPropertyName("isAuditChainIntact")] bool IsAuditChainIntact,
+    [property: JsonPropertyName("throughputSparkline")] IReadOnlyList<int> ThroughputSparkline
+);
+
