@@ -10,6 +10,35 @@ a projekt striktne dodržiava [Sémantické Verziovanie (Semantic Versioning 2.0
 ## [Unreleased]
 
 ### Pridané (Added)
+- **Phase 17: Produkčná Orchestrácia, Prometheus & Grafana Observabilita a Záťažové Testy (§10.9, §11.2, §11.3)**:
+  - **Docker & Produkčný Compose Stack (`docker-compose.yml`, `.dockerignore`, `deploy/scripts/`)**:
+    - Multi-service orchestrácia: `postgres` 16, `redis` 7, `controlplane` (:8080), `relay` (:8081), `prometheus` (:9090) a `grafana` (:3000) so vstavanými periodickými `healthcheck` direktívami.
+    - Optimalizovaný koreňový `.dockerignore` pre elimináciu medzipamäťového balastu a Windows/Linux kolízií.
+    - Šablóny produkčných premenných `.env.example` v koreni aj v `deploy/`.
+    - Spúšťacie skripty `deploy/scripts/start.sh`, `deploy/scripts/start.ps1` a diagnostický `deploy/scripts/healthcheck.sh`.
+  - **Prometheus Metriky & Alerting Pravidlá (`SymbolonMetrics`, `deploy/prometheus/`)**:
+    - Rozšírené metriky na `ControlPlane`: `symbolon_seats_total`, `symbolon_checkout_success_total`, `symbolon_pqc_signatures_total{algorithm="mldsa65"|"es256"}`, `symbolon_tokens_consumed_total`, `symbolon_crypto_keys_total`, `symbolon_server_uptime_seconds`.
+    - Nový Prometheus endpoint `/metrics` na `Symbolon.Relay` pre monitorovanie delegovanej lokálnej kapacity (`symbolon_relay_seats_allocated`, `symbolon_relay_seats_total`, `symbolon_relay_active_grants`).
+    - Sada alertingových pravidiel `deploy/prometheus/alerts.yml` (výpadky inštancií, vyčerpanie sedadiel >85% a >98%, prudký nárast odmietnutí, NTP časový posun a blížiaca sa expirácia upstream grantov).
+    - Rozšírenie Grafana dashboardu na 10 ucelených monitorovacích panelov v `deploy/grafana/symbolon-dashboard.json`.
+  - **Záťažové Testy, Chaos Inžinierstvo & Benchmarking**:
+    - Nový vysoko-konkurenčný testovací suite `HighConcurrencyLoadTests.cs`: 100 paralelných checkoutov pri kapacite 20 sedadiel (presne 20 alokácií, 80 odmietnutí s 409 Conflict, 100% unikátne Lease ID, nulová nadmerná alokácia a okamžitá obnova fondu) a 100 súbežných heartbeatov bez chýb a deadlockov.
+    - Nový split-brain chaos test `RelaySplitBrainResilienceTests.cs`: autonómne fungovanie a vydávanie licencií v offline partícii odrezanej od siete bez prekročenia delegovanej kvóty.
+    - Výkonnostné záťažové generátory: `deploy/benchmarks/k6-load-test.js` (stúpajúci ramp-up na 50 VU s overovaním p95 < 500 ms a <5% chybovosti), `run-load-test.ps1` a `run-load-test.sh`.
+- **Phase 16: Viacjazyčná Lokalizácia Retro FoxPro / DOS TUI (SK / EN / DE) (§12.4)**:
+  - **TUI Jazykový Prepínač & Perzistencia**:
+    - Podpora slovenského (SK), anglického (EN) a nemeckého (DE) jazyka pre celú TUI konzolu a interaktívneho sprievodcu.
+    - Možnosť voľby jazyka v konfiguračnom menu s perzistenciou do lokálneho konfiguračného profilu (`symbolon_tui_config.json`).
+    - Zachovanie autentického Retro FoxPro / Norton Commander vizuálneho štýlu (dvojité rámiky, tieňované modálne okná, monochromatické/modré témy).
+- **Phase 15: Nezávislý Seniorný Architektonický a Vývojový Audit (Krypto, DB, API Guarding)**:
+  - **Kryptografická Odolnosť & Bočné Kanály**:
+    - Náhrada nekonštantných porovnaní za `CryptographicOperations.FixedTimeEquals` v Shamir's Secret Sharing (`ShamirSecretSharing.cs`), validácii offline roaming challenge nonce (`IReturnChallengeStore.cs`) a kontrole fingerprintu držiteľa v `EfSeatStore.cs` (obrana pred Timing Side-Channel útokmi).
+    - Dôsledné mazanie privátnych kľúčových materiálov z pamäte cez `CryptographicOperations.ZeroMemory` v obálkovom šifrovaní PBKDF2 (`EncryptedEnvelopeKeyStore.cs`) a výpočtoch Proof-of-Possession (`ProofOfPossessionEngine.cs`).
+  - **Databázová Optimalizácia & Index Seek**:
+    - Pridaný samostatný index na `licenses.KeyLookup` v `SymbolonDbContext.cs` eliminujúci Full Table Scan pri klientskych checkoutoch a prevádzajúci vyhľadávanie licencie z O(N) na O(1).
+    - Presun predikátu voľných sedadiel priamo do SQL dotazu Entity Frameworku (`Take(1)` / `Take(quantity)` namiesto načítavania celého fondu do RAM), čím sa eliminoval memory overhead a GC záťaž pri licenciách s tisíckami sedadiel.
+  - **Defenzívne Guarding API**:
+    - Odstránené potenciálne `NullReferenceException` pri prázdnych DTO a zavedené štandardizované RFC 7807 `ProblemDetails` s HTTP 400 Bad Request namiesto 500 Internal Server Error.
 - **Phase 14: Diagnostický Doctor Engine, PQC Readiness & Záťažová Súbežnosť (§10.9, §11.1, §13.5)**:
   - **Enterprise System Doctor & Operačná Diagnostika (`symbolon doctor`)**:
     - Samostatný a modulárny diagnostický engine `Symbolon.Cli/Commands/DoctorCommands.cs` s podporou volieb `--server <url>`, `--relay <url>`, `--pqc`, `--strict`, `--json`.
