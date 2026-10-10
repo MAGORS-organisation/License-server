@@ -70,6 +70,7 @@ internal static class Program
                 "AUDIT" => await Commands.AuditCommands.HandleAuditAsync(args[1..]).ConfigureAwait(false),
                 "TOP" or "MONITOR" => await Commands.TopCommand.HandleTopAsync(args[1..]).ConfigureAwait(false),
                 "AGENT" or "TRAY" or "DAEMON" => await Commands.AgentCommands.HandleAgentAsync(args[1..]).ConfigureAwait(false),
+                "DESKTOP" or "STUDIO" => await Commands.DesktopCommands.HandleDesktopAsync(args[1..]).ConfigureAwait(false),
                 _ => UnknownCommand(args[0])
             };
         }

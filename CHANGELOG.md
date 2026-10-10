@@ -10,6 +10,33 @@ a projekt striktne dodržiava [Sémantické Verziovanie (Semantic Versioning 2.0
 ## [Unreleased]
 
 ### Pridané (Added)
+- **Phase 21: Rust & Go SDK Parita, AI-Driven Prediktívne Prognózovanie Súbežnosti, Desktop Studio Applet, Active-Active Disaster Recovery Failover & eBPF Kernel Probe Loader (§9.7, §10.10, §11.5, §13.2)**:
+  - **Rust & Go Natívne SDK Knižnice (`symbolon-rs` & `symbolon-go`)**:
+    - Zero-allocation offline token validátory (`sdk/rust/symbolon/src/validator.rs`, `sdk/go/symbolon/validator.go`) umožňujúce okamžité rozdelenie kompaktných tokenov, overenie expirácie a prítomnosti feature flags bez nutnosti zaťažovania pamäťového alokátora.
+    - IPC klienti komunikujúci s lokálnym `symbolon-agent` (127.0.0.1:8189): `AgentIpcClient` v Rust SDK a `AgentClient` v Go SDK (`sdk/go/symbolon/agent_ipc.go`) pre metódy `get_status`, `acquire`, `release` a offline `borrow`.
+    - Unit testy v `sdk/go/symbolon/agent_test.go` a Rust test coverage.
+  - **AI-Driven Prediktívne Prognózovanie Súbežnosti & Anomálie (AIOps)**:
+    - Nový predikčný engine `PredictiveForecastingEngine` (`src/Symbolon.Domain/Analytics/PredictiveForecastingEngine.cs`) s implementáciou dvojitého exponenciálneho vyhladzovania (Holt's Linear Trend) a 95% intervalov spoľahlivosti.
+    - Automatický výpočet časového horizontu vyčerpania kapacity (`TimeToExhaustion`), predikovaného špičkového zaťaženia a odporúčanej rezervy sedadiel (`Headroom`).
+    - REST API endpointy `GET /admin/v1/analytics/forecast` a `GET /admin/v1/analytics/anomalies`.
+    - CLI príkaz `symbolon reports predict [--capacity <n>] [--horizon <h>]` s vykreslením Spectre.Console ASCII minibar grafov.
+    - Testovacie sady `PredictiveForecastingTests.cs` a `PredictiveAnalyticsApiTests.cs`.
+  - **Natívna Desktop Aplikácia & Process Inspector (`symbolon desktop` / `symbolon studio`)**:
+    - Nová skupina CLI príkazov `symbolon desktop [open|processes|inspect]` (`src/Symbolon.Cli/Commands/DesktopCommands.cs`).
+    - `open`: Otvorenie Symbolon Visualizera v natívnom desktopovom aplikačnom okne (Edge App Mode / systémový prehliadač).
+    - `processes`: Inšpekcia aktívnych lokálnych CAD/EDA procesov (AutoCAD, MATLAB, ANSYS, EDA tools) využívajúcich Symbolon a FlexNet sedadlá.
+    - `inspect`: Živý stav klientskeho agenta, offline roamingu a alokovaných sedadiel.
+    - Testovacia sada `DesktopCommandsTests.cs`.
+  - **Active-Active Multi-Region Disaster Recovery & Automated Failover**:
+    - Koordinátor zlyhania v `GeoReplicationEngine` (`FailoverAndReclaimPeerSeats`) pre automatické prevzatie disjoint rozsahov sedadiel zlyhaného regiónu a inkrementáciu vektorových hodín pre okamžité nastolenie kauzálneho líderstva bez výpadku licencií.
+    - REST API endpoint `POST /v1/replication/failover` spracovávajúci `DisasterRecoveryFailoverRequest` a vracajúci `DisasterRecoveryReport`.
+    - CLI príkaz `symbolon cluster failover --promote-region <id> --failed-region <id>`.
+    - Testovacie sady `DisasterRecoveryTests.cs` a `ReplicationFailoverApiTests.cs`.
+  - **eBPF Produkčný Kernel Loader & Socket Enforcement v Linuxe**:
+    - Pomocník `EbpfKernelLoader` (`src/Symbolon.Domain/Enforcement/EbpfKernelLoader.cs`) pre kontrolu kompatibility Linux jadra, BPF-FS a cgroup v2.
+    - Generátor C zdrojového kódu `symbolon_sock_filter.bpf.c` pre pripojenie k `cgroup/connect4` a blokovanie neautorizovaných TCP spojení pomocou BPF máp (`license_map`, `violation_ringbuf`).
+    - CLI subpríkazy `symbolon ebpf probe [--out <cesta>]` a `symbolon ebpf check`.
+    - Testovacia sada `EbpfLoaderTests.cs`.
 - **Phase 20: C/C++ Natívne SDK & FlexNet Drop-In Wrapper, Desktop GUI Tray Notifikátor, Real-Time Web Visualizer, Compliance Export Balíček & Hardvérové Podpisovanie PKCS#11 / HSM (§9.6, §10.8, §12.6, §13.1)**:
   - **C/C++ Natívna Knižnica & FlexNet Drop-In Wrapper (`libsymbolon` / `symbolon.dll`)**:
     - Komplexné C/C++ rozhranie v `sdk/c/include/symbolon.h` a `sdk/c/src/symbolon.c` s podporou IPC komunikácie s lokálnym `symbolon-agent` (127.0.0.1:8189) a priamym HTTP REST fallbackom.

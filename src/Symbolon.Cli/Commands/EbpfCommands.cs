@@ -19,6 +19,8 @@ public static class EbpfCommands
             "STATUS" => Task.FromResult(HandleStatus(args[1..])),
             "ATTACH" => Task.FromResult(HandleAttach(args[1..])),
             "VIOLATIONS" => Task.FromResult(HandleViolations(args[1..])),
+            "PROBE" or "GENERATE-PROBE" => Task.FromResult(HandleProbe(args[1..])),
+            "CHECK" or "COMPATIBILITY" => Task.FromResult(HandleCompatibility()),
             _ => Task.FromResult(UnknownSubcommand(args[0]))
         };
     }
@@ -162,15 +164,54 @@ public static class EbpfCommands
         return 1;
     }
 
+    private static int HandleProbe(string[] args)
+    {
+        string? outPath = GetArg(args, "--out") ?? "symbolon_sock_filter.bpf.c";
+        string code = EbpfKernelLoader.GenerateBpfSourceCode();
+
+        if (args.Contains("--print", StringComparer.OrdinalIgnoreCase))
+        {
+            AnsiConsole.WriteLine(code);
+            return 0;
+        }
+
+        File.WriteAllText(outPath, code);
+        AnsiConsole.MarkupLine($"[green]✓ Zdrojový kód eBPF socket filtru úspešne vygenerovaný do:[/] [bold cyan]{Markup.Escape(outPath)}[/]");
+        AnsiConsole.MarkupLine("[dim]Preklad pomocou Clang: clang -O2 -target bpf -c symbolon_sock_filter.bpf.c -o symbolon_sock_filter.bpf.o[/]");
+        return 0;
+    }
+
+    private static int HandleCompatibility()
+    {
+        var compat = EbpfKernelLoader.CheckCompatibility();
+
+        AnsiConsole.MarkupLine("[bold cyan]=== eBPF KERNEL KOMPATIBILITA & PROSTREDIE ===[/]");
+
+        var table = new Table().Border(TableBorder.Rounded);
+        table.AddColumn("[bold]Parameter[/]");
+        table.AddColumn("[bold]Hodnota[/]");
+
+        table.AddRow("Podporovaný OS (Linux)", compat.IsSupportedOs ? "[bold green]Áno[/]" : "[yellow]Nie (Emulácia / In-Process)[/]");
+        table.AddRow("Kernel Release", Markup.Escape(compat.KernelRelease));
+        table.AddRow("BPF Filesystem (/sys/fs/bpf)", compat.BpfFsMounted ? "[bold green]Pripojený[/]" : "[grey]Neprítomný[/]");
+        table.AddRow("Cgroup v2 Podpora", compat.CgroupV2Available ? "[bold green]Dostupná[/]" : "[grey]Nedostupná[/]");
+        table.AddRow("Odporúčaný BPF Hook", $"[cyan]{compat.RecommendedHook}[/]");
+
+        AnsiConsole.Write(table);
+        return 0;
+    }
+
     private static void PrintEbpfHelp()
     {
         AnsiConsole.WriteLine("""
-            Použitie: symbolon ebpf <status|attach|violations> [options]
+            Použitie: symbolon ebpf <status|attach|violations|probe|check> [options]
 
             Príkazy:
               status      [--cgroup <path>]           Zobrazí diagnostiku eBPF ovládača a BPF máp
               attach      --cgroup <path> [--ports]   Pripojí eBPF socket filter k zadanej cgroup
               violations                              Vypíše zoznam zablokovaných sieťových spojení z ring buffera
+              probe       [--out <path>] [--print]    Vygeneruje produkčný C eBPF kernel program pre socket filtering
+              check                                   Overí kompatibilitu hostiteľského jadra pre eBPF / BPF-FS
             """);
     }
 }

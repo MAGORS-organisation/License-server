@@ -5,6 +5,7 @@ using System.Net.Http;
 using System.Net.Http.Json;
 using System.Text;
 using Spectre.Console;
+using Symbolon.Domain.Analytics;
 using Symbolon.Protocol;
 using Symbolon.Protocol.Reporting;
 
@@ -28,6 +29,7 @@ public static class ReportCommands
             "TRUE-UP" or "TRUEUP" => await HandleTrueUpAsync(args[1..]).ConfigureAwait(false),
             "DENIALS" => await HandleDenialsAsync(args[1..]).ConfigureAwait(false),
             "VERIFY-AUDIT" or "VERIFY" => await HandleVerifyAuditAsync(args[1..]).ConfigureAwait(false),
+            "PREDICT" or "FORECAST" => await HandleForecastAsync(args[1..]).ConfigureAwait(false),
             _ => UnknownSubcommand(args[0])
         };
     }
@@ -388,6 +390,79 @@ public static class ReportCommands
         return 1;
     }
 
+    private static async Task<int> HandleForecastAsync(string[] args)
+    {
+        string server = GetArg(args, "--server") ?? "http://localhost:8080";
+        string? apiKey = GetArg(args, "--api-key");
+        int capacity = int.TryParse(GetArg(args, "--capacity"), out var c) ? c : 50;
+        int hours = int.TryParse(GetArg(args, "--horizon"), out var h) ? h : 24;
+
+        AnsiConsole.MarkupLine("[bold cyan]=== AI-Driven Prediktívne Prognózovanie Súbežnosti (AIOps Concurrency Forecast) ===[/]");
+
+        using var client = CreateClient(server, apiKey);
+        try
+        {
+            var res = await client.GetAsync(new Uri($"/admin/v1/analytics/forecast?capacity={capacity}&horizonHours={hours}", UriKind.Relative)).ConfigureAwait(false);
+            if (!res.IsSuccessStatusCode)
+            {
+                AnsiConsole.MarkupLine($"[bold red]Chyba servera pri generovaní predikcie:[/] HTTP {(int)res.StatusCode} {res.ReasonPhrase}");
+                return 1;
+            }
+
+            var result = await res.Content.ReadFromJsonAsync<ConcurrencyForecastResult>().ConfigureAwait(false);
+            if (result == null)
+            {
+                AnsiConsole.MarkupLine("[red]Neplatná odpoveď predikčného enginu.[/]");
+                return 1;
+            }
+
+            var table = new Table().Border(TableBorder.Rounded);
+            table.AddColumn("[bold]Metrika[/]");
+            table.AddColumn("[bold]Hodnota[/]");
+            table.AddRow("Celková Kapacita (Cap)", $"{result.TotalCapacity} sedadiel");
+            table.AddRow("Historická Špička (Peak)", $"{result.PeakObserved} sedadiel");
+            table.AddRow("Aktuálne Využitie", $"{result.CurrentUsage:F1} sedadiel ({result.CurrentUsage / result.TotalCapacity * 100:F1}%)");
+            table.AddRow("Predikovaná Špička (Horizon)", $"[bold yellow]{result.PredictedPeak:F1} sedadiel[/] ({result.PredictedPeak / result.TotalCapacity * 100:F1}%)");
+            table.AddRow("Týždenné Tempo Rastu", $"{result.WeeklyGrowthRatePercent:F2} % / týždeň");
+            table.AddRow("Odporúčaná Rezerva (Headroom)", $"[green]+{result.RecommendedCapacityBuffer} sedadiel[/]");
+
+            string exhaustionStr = result.TimeToExhaustion.HasValue
+                ? $"[bold red]⚠️ Vyčerpanie hrozí o {result.TimeToExhaustion.Value.TotalDays:F1} dní[/]"
+                : "[green]✓ Kapacita je stabilná (žiadne bezprostredné riziko vyčerpania)[/]";
+            table.AddRow("Stav Vyčerpania Kapacity", exhaustionStr);
+
+            AnsiConsole.Write(table);
+
+            if (result.ForecastPoints.Count > 0)
+            {
+                var chartTable = new Table().Border(TableBorder.Simple);
+                chartTable.AddColumn("[bold]Čas[/]");
+                chartTable.AddColumn("[bold]Predikcia[/]");
+                chartTable.AddColumn("[bold]95% Interval Spoľahlivosti[/]");
+                chartTable.AddColumn("[bold]Využitie[/]");
+
+                foreach (var pt in result.ForecastPoints.Take(8))
+                {
+                    double pct = pt.PredictedSeats / result.TotalCapacity * 100.0;
+                    chartTable.AddRow(
+                        pt.Timestamp.ToLocalTime().ToString("g", CultureInfo.InvariantCulture),
+                        $"{pt.PredictedSeats:F1}",
+                        $"{pt.LowerBound:F1} - {pt.UpperBound:F1}",
+                        RenderMiniBar(pct)
+                    );
+                }
+                AnsiConsole.Write(chartTable);
+            }
+
+            return 0;
+        }
+        catch (HttpRequestException ex)
+        {
+            AnsiConsole.MarkupLine($"[bold red]Chyba spojenia:[/] {Markup.Escape(ex.Message)}");
+            return 1;
+        }
+    }
+
     private static void PrintReportsHelp()
     {
         AnsiConsole.MarkupLine("[bold]Použitie:[/] symbolon reports <príkaz> [[prepínače]]");
@@ -397,7 +472,8 @@ public static class ReportCommands
         AnsiConsole.MarkupLine("  [cyan]true-up[/]         Enterprise True-Up compliance výkaz s vyhodnotením zmluvného stavu");
         AnsiConsole.MarkupLine("  [cyan]denials[/]         Analytika zamietnutí s kategorizáciou dôvodov a postihnutých strojov");
         AnsiConsole.MarkupLine("  [cyan]verify-audit[/]    Kryptografická verifikácia append-only reťazca SHA-256 hashov");
+        AnsiConsole.MarkupLine("  [cyan]predict[/]         AI-driven predikcia súbežnosti a výpočet headroomu (--horizon <h>)");
         AnsiConsole.WriteLine();
-        AnsiConsole.MarkupLine("[bold]Prepínače:[/] --server <url>, --license <id>, --from <iso>, --to <iso>, --bucket <hour|day|week>, --export <path>");
+        AnsiConsole.MarkupLine("[bold]Prepínače:[/] --server <url>, --license <id>, --from <iso>, --to <iso>, --bucket <hour|day|week>, --horizon <h>, --export <path>");
     }
 }

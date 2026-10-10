@@ -24,6 +24,10 @@ public static class ReplicationEndpoints
             .WithName("RegisterPeerRegion")
             .WithSummary("Zaregistruje nový región do geo-replikačnej topológie.");
 
+        group.MapPost("/failover", ExecuteFailover)
+            .WithName("ExecuteFailover")
+            .WithSummary("Spustí automatizovaný failover a rekultiváciu sedadiel zlyhaného regiónu.");
+
         return group;
     }
 
@@ -87,5 +91,16 @@ public static class ReplicationEndpoints
 
         engine.RegisterPeer(peer.RegionId, peer.Endpoint, peer.SeatRangeStart, peer.SeatRangeEnd);
         return TypedResults.Ok(new { message = $"Peer region '{peer.RegionId}' registered successfully." });
+    }
+
+    private static IResult ExecuteFailover(
+        [FromBody] DisasterRecoveryFailoverRequest request,
+        IGeoReplicationEngine engine,
+        TimeProvider time)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+
+        var report = engine.FailoverAndReclaimPeerSeats(request.FailedRegion, time.GetUtcNow());
+        return TypedResults.Ok(report);
     }
 }

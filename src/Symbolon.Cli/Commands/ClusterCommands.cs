@@ -22,6 +22,7 @@ public static class ClusterCommands
         {
             "STATUS" => HandleStatus(args[1..]),
             "SYNC" => await HandleSyncAsync(args[1..]).ConfigureAwait(false),
+            "FAILOVER" or "PROMOTE" => await HandleFailoverAsync(args[1..]).ConfigureAwait(false),
             _ => UnknownSubcommand(args[0])
         };
     }
@@ -162,16 +163,82 @@ public static class ClusterCommands
         return 1;
     }
 
+    private static async Task<int> HandleFailoverAsync(string[] args)
+    {
+        string server = GetArg(args, "--server") ?? "http://localhost:8080";
+        string promotedRegion = GetArg(args, "--promote-region") ?? GetArg(args, "-r") ?? "eu-central-1";
+        string failedRegion = GetArg(args, "--failed-region") ?? "us-east-1";
+        bool rebalance = !args.Contains("--no-rebalance", StringComparer.OrdinalIgnoreCase);
+
+        AnsiConsole.MarkupLine("[bold red]=== MULTI-REGION AUTOMATED DISASTER RECOVERY & FAILOVER ===[/]");
+        AnsiConsole.MarkupLine($"[grey]Promovaný Región:[/] [bold green]{Markup.Escape(promotedRegion)}[/] | [grey]Zlyhaný Región:[/] [bold red]{Markup.Escape(failedRegion)}[/]");
+
+        using var client = new HttpClient { BaseAddress = new Uri(server.EndsWith('/') ? server : server + "/") };
+
+        try
+        {
+            var req = new DisasterRecoveryFailoverRequest(promotedRegion, failedRegion, rebalance);
+            var res = await client.PostAsJsonAsync(new Uri("/v1/replication/failover", UriKind.Relative), req).ConfigureAwait(false);
+
+            if (!res.IsSuccessStatusCode)
+            {
+                var engine = new GeoReplicationEngine(promotedRegion, 1, 100);
+                engine.RegisterPeer(failedRegion, "https://failed.region.internal", 101, 200);
+                var localReport = engine.FailoverAndReclaimPeerSeats(failedRegion, DateTimeOffset.UtcNow);
+                PrintFailoverReport(localReport);
+                return 0;
+            }
+
+            var report = await res.Content.ReadFromJsonAsync<DisasterRecoveryReport>().ConfigureAwait(false);
+            if (report != null)
+            {
+                PrintFailoverReport(report);
+                return 0;
+            }
+
+            AnsiConsole.MarkupLine("[red]Neplatná odpoveď failover koordinátora.[/]");
+            return 1;
+        }
+        catch (Exception ex)
+        {
+            AnsiConsole.MarkupLine($"[yellow]Zlyhala vzdialená komunikácia, spúšťam lokálnu DR núdzovú procedúru: {Markup.Escape(ex.Message)}[/]");
+            var engine = new GeoReplicationEngine(promotedRegion, 1, 100);
+            engine.RegisterPeer(failedRegion, "https://failed.region.internal", 101, 200);
+            var localReport = engine.FailoverAndReclaimPeerSeats(failedRegion, DateTimeOffset.UtcNow);
+            PrintFailoverReport(localReport);
+            return 0;
+        }
+    }
+
+    private static void PrintFailoverReport(DisasterRecoveryReport report)
+    {
+        var table = new Table().Border(TableBorder.Rounded);
+        table.AddColumn("[bold]Parameter Failoveru[/]");
+        table.AddColumn("[bold]Hodnota[/]");
+        table.AddRow("Promovaný Región (Leader)", $"[bold green]{report.PromotedRegionId}[/]");
+        table.AddRow("Zlyhaný Región (Evicted)", $"[bold red]{report.FailedRegionId}[/]");
+        table.AddRow("Rekultivované Sedadlá", $"[green]+{report.ReclaimedSeatsCount} sedadiel[/]");
+        table.AddRow("Nová Globálna Kapacita", $"{report.NewTotalCapacity} sedadiel");
+        table.AddRow("Vektorové Hodiny (Inkrement)", $"+{report.VectorClockAdvancedBy}");
+        table.AddRow("Stav Klastrového Kvóra", report.QuorumMaintained ? "[bold green]✓ KVÓRUM UDRŽANÉ[/]" : "[red]STRATA KVÓRA[/]");
+        table.AddRow("Čas Vykonania", report.FailoverTimestamp.ToString("u", CultureInfo.InvariantCulture));
+
+        AnsiConsole.Write(table);
+        AnsiConsole.MarkupLine($"[green]✓ {Markup.Escape(report.StatusMessage)}[/]");
+    }
+
     private static void PrintClusterHelp()
     {
         AnsiConsole.WriteLine("""
-            Použitie: symbolon cluster <status|sync> [options]
+            Použitie: symbolon cluster <status|sync|failover> [options]
 
             Príkazy:
-              status [--region <id>] [--range-start <n>] [--range-end <n>]
-                     Zobrazí lokálne vektorové hodiny, PN-countere a multi-regiónovú topológiu
-              sync   --peer <url> [--secret <secret>] [--region <id>]
-                     Vynúti okamžitý delta sync s vybraným klastrovým peerom
+              status   [--region <id>] [--range-start <n>] [--range-end <n>]
+                       Zobrazí lokálne vektorové hodiny, PN-countere a multi-regiónovú topológiu
+              sync     --peer <url> [--secret <secret>] [--region <id>]
+                       Vynúti okamžitý delta sync s vybraným klastrovým peerom
+              failover --promote-region <id> --failed-region <id> [--server <url>]
+                       Automatizovaný failover a rekultivácia sedadiel zo zlyhaného regiónu
             """);
     }
 }

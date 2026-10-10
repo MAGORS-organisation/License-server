@@ -259,6 +259,7 @@ app.MapMigrationEndpoints();
 app.MapLicenseLifecycleEndpoints().RequireAuthorization().RequireRateLimiting("admin");
 app.MapBillingEndpoints();
 app.MapVisualizerEndpoints();
+app.MapAnalyticsEndpoints().RequireAuthorization().RequireRateLimiting("admin");
 
 // SPA Fallback
 app.MapFallbackToFile("index.html");

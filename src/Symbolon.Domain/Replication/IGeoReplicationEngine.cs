@@ -31,4 +31,6 @@ public interface IGeoReplicationEngine
     IReadOnlyList<ReplicatedSeatState> GetGlobalActiveSeats(string? licenseId = null, DateTimeOffset? now = null);
 
     ClusterStatusDto GetStatus(DateTimeOffset now);
+
+    DisasterRecoveryReport FailoverAndReclaimPeerSeats(string failedRegionId, DateTimeOffset now);
 }

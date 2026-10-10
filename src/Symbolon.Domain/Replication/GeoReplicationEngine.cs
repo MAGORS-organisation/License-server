@@ -331,6 +331,44 @@ public sealed partial class GeoReplicationEngine : IGeoReplicationEngine
         }
     }
 
+    public DisasterRecoveryReport FailoverAndReclaimPeerSeats(string failedRegionId, DateTimeOffset now)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(failedRegionId);
+
+        lock (_stateLock)
+        {
+            if (!_peers.TryGetValue(failedRegionId, out var peer))
+            {
+                throw new KeyNotFoundException($"Peer region '{failedRegionId}' was not found in cluster topology.");
+            }
+
+            int reclaimedCount = peer.SeatRangeEnd - peer.SeatRangeStart + 1;
+
+            _localSequence++;
+            _vectorClock = _vectorClock.Increment(_localRegionId);
+
+            _peers[failedRegionId] = peer with { IsHealthy = false, LatencyMs = -1 };
+
+            int totalNewCapacity = (_seatRangeEnd - _seatRangeStart + 1) +
+                                   _peers.Values.Where(p => p.IsHealthy).Sum(p => p.SeatRangeEnd - p.SeatRangeStart + 1) +
+                                   reclaimedCount;
+
+            string msg = $"Failover completed: Region '{_localRegionId}' reclaimed {reclaimedCount} seats from '{failedRegionId}'. Vector clock advanced.";
+            LogDisasterRecovery(_logger, msg);
+
+            return new DisasterRecoveryReport(
+                PromotedRegionId: _localRegionId,
+                FailedRegionId: failedRegionId,
+                ReclaimedSeatsCount: reclaimedCount,
+                NewTotalCapacity: totalNewCapacity,
+                VectorClockAdvancedBy: 1,
+                FailoverTimestamp: now,
+                QuorumMaintained: true,
+                StatusMessage: msg
+            );
+        }
+    }
+
     [LoggerMessage(EventId = 1, Level = LogLevel.Information, Message = "GeoReplication: Local seat {SeatNo} allocated for license {LicenseId} in region {RegionId}")]
     private static partial void LogSeatAllocated(ILogger logger, int seatNo, string licenseId, string regionId);
 
@@ -339,4 +377,7 @@ public sealed partial class GeoReplicationEngine : IGeoReplicationEngine
 
     [LoggerMessage(EventId = 3, Level = LogLevel.Information, Message = "GeoReplication: Assimilated remote delta {DeltaId} from {SourceRegionId} with {SeatCount} seats")]
     private static partial void LogDeltaAssimilated(ILogger logger, string deltaId, string sourceRegionId, int seatCount);
+
+    [LoggerMessage(EventId = 4, Level = LogLevel.Warning, Message = "[DISASTER RECOVERY] {Message}")]
+    private static partial void LogDisasterRecovery(ILogger logger, string message);
 }

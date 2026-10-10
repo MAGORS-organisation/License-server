@@ -1,14 +1,18 @@
 //! Official Rust client SDK for the Symbolon Floating & Enterprise License Server.
 
+pub mod agent_ipc;
 pub mod attestation;
 pub mod client;
 pub mod experiment;
 pub mod fingerprint;
 pub mod models;
 pub mod pqc;
+pub mod validator;
 
+pub use agent_ipc::{AgentActionResponse, AgentIpcClient, AgentStatus};
 pub use attestation::{EnclaveType, HardwareAttestationQuote, TpmQuoteGenerator, TpmQuoteVerifier};
 pub use client::{FeatureLease, SeatLease, SymbolonClient, TokenReservationScope};
+pub use validator::ParsedToken;
 pub use experiment::{
     calculate_bucket, calculate_two_proportion_z_test, calculate_welch_t_test,
     generate_statistical_report, route_experiment, Experiment, ExperimentCircuitBreaker,
