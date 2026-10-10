@@ -27,6 +27,7 @@ public sealed class VisualizerAndSseTests : IClassFixture<ControlPlaneFactory>
         html.Should().Contain("SYMBOLON LIVE CLUSTER & MERKLE VISUALIZER");
         html.Should().Contain("data-theme=\"retro\"");
         html.Should().Contain("CRT Phosphor");
+        html.Should().Contain("DOS");
         html.Should().Contain("Modern Dark");
         html.Should().Contain("Cyberpunk");
         html.Should().Contain("Apple iOS");

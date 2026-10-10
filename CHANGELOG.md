@@ -23,9 +23,10 @@ a projekt striktne dodržiava [Sémantické Verziovanie (Semantic Versioning 2.0
     - Apple Segmented Control prepínač režimov priamo na konfiguračnej karte aj s rýchlym prepínačom v hornej lište (`topbar`).
   - **Integrovaný Správca Tém (`theme-manager.js` & `themes.css`)**:
     - Centralizovaný manažér prepínania tém s perzistenciou v `localStorage` (`symbolon_theme`, `symbolon_apple_mode`).
-    - Interaktívna sekcia v **Konfigurácii** (`view-config`) s náhľadovými kartami pre všetky 4 dizajny: *Modern Enterprise*, *Retro FoxPro 2.6*, *Cyberpunk 2077* a *Apple iOS*.
-    - Rýchly prepínač tém v hornej lište (`#topbar-theme-switcher`), v modálnom dialógu nastavení (`modal-auth-config`) a v Retro topbare (`retro-tui.js`).
-    - Bezvýpadkový a plynulý prechod DOM medzi plnohodnotným Retro DOS TUI a moderným/cyber/apple webovým rozhraním bez reloadu.
+    - Interaktívna sekcia v **Konfigurácii** (`view-config`) s náhľadovými kartami pre všetky 4 dizajny: *Modern Enterprise*, *DOS (FoxPro 2.6 TUI)*, *Cyberpunk 2077* a *Apple iOS*.
+    - Zjednotenie názvoslovia témy na **DOS**: všade v UI (tlačidlo `💾 DOS` v hornej lište aj modálnom dialógu, karta `DOS (FoxPro 2.6 TUI)`, lišta `[ Téma: DOS | ... ]`, CRT vizualizér `DOS (CRT Phosphor)` a lokalizácie SK/EN/DE).
+    - Rýchly prepínač tém v hornej lište (`#topbar-theme-switcher`), v modálnom dialógu nastavení (`modal-auth-config`) a v DOS topbare (`retro-tui.js`).
+    - Bezvýpadkový a plynulý prechod DOM medzi plnohodnotným DOS TUI a moderným/cyber/apple webovým rozhraním bez reloadu.
     - Podpora všetkých 4 tém v Live Cluster Visualizeri (`/visualizer`, `visualizer.html`, `EmbeddedVisualizerHtml`).
     - Lokalizačná podpora pre témy a režimy v slovenčine, angličtine a nemčine (`i18n.js`).
     - Komplexné integračné testy v `WebUiTests.cs` a `VisualizerAndSseTests.cs`.

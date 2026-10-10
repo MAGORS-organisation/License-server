@@ -296,7 +296,7 @@ public static class VisualizerEndpoints
       <small>Real-Time Cluster Topology & Transparency Log Inspector</small>
     </div>
     <div>
-      <button class="theme-btn" id="themeToggle" onclick="toggleTheme()">◒ Prepni Tému (CRT Phosphor / Modern Dark / Cyberpunk / Apple iOS)</button>
+      <button class="theme-btn" id="themeToggle" onclick="toggleTheme()">◒ Prepni Tému (DOS / CRT Phosphor / Modern Dark / Cyberpunk / Apple iOS)</button>
     </div>
   </header>
 
@@ -343,14 +343,14 @@ public static class VisualizerEndpoints
   <script>
     const themes = ['retro', 'modern', 'cyberpunk', 'apple'];
     const themeLabels = {
-      retro: 'CRT Phosphor (Retro)',
+      retro: 'DOS (CRT Phosphor)',
       modern: 'Modern Dark',
       cyberpunk: 'Cyberpunk 2077 HUD',
       apple: 'Apple iOS Glass'
     };
     function updateThemeButton(theme) {
       const btn = document.getElementById('themeToggle');
-      if (btn) btn.innerText = `◒ Téma: ${themeLabels[theme] || theme} (CRT Phosphor / Modern Dark / Cyberpunk / Apple iOS)`;
+      if (btn) btn.innerText = `◒ Téma: ${themeLabels[theme] || theme} (DOS / CRT Phosphor / Modern Dark / Cyberpunk / Apple iOS)`;
     }
     function toggleTheme() {
       const html = document.documentElement;

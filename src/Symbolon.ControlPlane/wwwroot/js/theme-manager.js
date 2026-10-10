@@ -3,7 +3,7 @@
  * Symbolon Control Plane - Multi-Theme Manager
  * Controls switching between:
  *  - Modern Enterprise (Dark Slate)
- *  - Retro FoxPro 2.6 / DOS TUI
+ *  - DOS (FoxPro 2.6 TUI)
  *  - Cyberpunk 2077 HUD (Neon Cyan/Pink/Yellow)
  *  - Apple iOS (Human Interface Glassmorphism with Day/Night/System regime)
  * ==============================================================================

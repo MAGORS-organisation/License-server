@@ -209,14 +209,14 @@
   <script>
     const themes = ['retro', 'modern', 'cyberpunk', 'apple'];
     const themeLabels = {
-      retro: 'CRT Phosphor (Retro)',
+      retro: 'DOS (CRT Phosphor)',
       modern: 'Modern Dark',
       cyberpunk: 'Cyberpunk 2077 HUD',
       apple: 'Apple iOS Glass'
     };
     function updateThemeButton(theme) {
       const btn = document.getElementById('themeToggle');
-      if (btn) btn.innerText = `◒ Téma: ${themeLabels[theme] || theme} (CRT Phosphor / Modern Dark / Cyberpunk / Apple iOS)`;
+      if (btn) btn.innerText = `◒ Téma: ${themeLabels[theme] || theme} (DOS / CRT Phosphor / Modern Dark / Cyberpunk / Apple iOS)`;
     }
     function toggleTheme() {
       const html = document.documentElement;
