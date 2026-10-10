@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <RootNamespace>Achilles.Format</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Achilles.Crypto\Achilles.Crypto.csproj" />
+  </ItemGroup>
+
+</Project>

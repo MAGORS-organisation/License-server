@@ -1,6 +1,6 @@
 # Zoznam Zmien (Changelog)
 
-Všetky podstatné zmeny v projekte **Symbolon Enterprise Floating License Server** sú dokumentované v tomto súbore.
+Všetky podstatné zmeny v projekte **Achilles Enterprise Floating License Server** (pôvodne *Symbolon*) sú dokumentované v tomto súbore.
 
 Formát vychádza zo špecifikácie [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 a projekt striktne dodržiava [Sémantické Verziovanie (Semantic Versioning 2.0.0)](https://semver.org/spec/v2.0.0.html).
@@ -10,6 +10,34 @@ a projekt striktne dodržiava [Sémantické Verziovanie (Semantic Versioning 2.0
 ## [Unreleased]
 
 ### Pridané (Added)
+- **Kompletné Premenovanie Celého Ekosystému zo Symbolon na Achilles**:
+  - **Architektúra a Solution**:
+    - Premenovanie riešenia `Symbolon.slnx` na `Achilles.slnx`.
+    - Premenovanie všetkých 10 projektových adresárov (`src/Symbolon.*` na `src/Achilles.*`) a ich 10 testovacích projektov (`tests/Symbolon.*.Tests` na `tests/Achilles.*.Tests`).
+    - Premenovanie všetkých 20 `.csproj` súborov na `Achilles.*.csproj`.
+    - Migrácia všetkých C# menných priestorov na `Achilles.*` a usings naprieč viac ako 430 zdrojovými súbormi.
+    - Premenovanie primárnych tried: `AchillesDbContext`, `AchillesClient`, `AchillesKeyRing`, `AchillesJsonContext`, `AchillesMetrics`, `AchillesTracing`, `AchillesTraceBuffer`, `AchillesServerResolver`.
+  - **CLI, Inštalačný Sprievodca & Konfigurácia**:
+    - Nový názov a figlet banner v CLI: `achilles` s uvítaním *„Ďakujeme, že používate Achilles!“*.
+    - Premenné prostredia `ACHILLES_LICENSE_SERVER`, `ACHILLES_ADMIN_API_KEY`, `ACHILLES_PQC_PROFILE` s automatickým fallbackom na `SYMBOLON_*` pre plynulú spätnú kompatibilitu.
+    - `AchillesServerResolver` s obojsmerným forwarding shimom `SymbolonServerResolver`.
+  - **Web UI & Lokalizácia**:
+    - Aktualizácia titulkov Web Dashboardu a vizualizéra na **Achilles Control Plane** a **Achilles Live Cluster & Merkle Visualizer**.
+    - Aktualizácia kľúčov úložiska v prehliadači: `achilles_theme`, `achilles_apple_mode`, `achilles_lang`.
+    - Aktualizácia lokalizačných slovníkov (SK, EN, DE) a zachovanie spätnej kompatibility pri dispatchovaní udalostí (`achilles:languageChanged` aj `symbolon:languageChanged`).
+  - **Multiplatformové SDK a Integrácie**:
+    - Migrácia Python SDK do `sdk/python/achilles` so zachovaním aliasu `from symbolon import ...` pre existujúce inštalácie.
+    - Migrácia Go SDK do `sdk/go/achilles` a Rust crate do `sdk/rust/achilles`.
+    - Pridanie hlavičkového súboru `sdk/c/include/achilles.h` s podporou kompatibility pre `symbolon.h`.
+    - Zachovanie klientskych validačných shimov `symbolon-validator.js`, `envoy-symbolon-filter.js` a `symbolon-alerts.yml`.
+  - **DevOps, Kontajnery & Helm**:
+    - Aktualizácia `deploy/docker/Dockerfile.controlplane` a `deploy/docker/Dockerfile.relay` na zostavovanie projektov `Achilles.*` a entrypointy `Achilles.ControlPlane.dll` a `Achilles.Relay.dll`.
+    - Aktualizácia `docker-compose.yml` s kontajnermi `achilles-controlplane`, `achilles-relay`, `achilles-postgres`, `achilles-prometheus`, `achilles-grafana` a predvolenými credentials.
+    - Aktualizácia `.env.example` a Helm chartu v `deploy/helm/achilles/` (`Chart.yaml`, `values.yaml`).
+  - **Testovacia Verifikácia**:
+    - 656/656 testov v .NET 10 prechádza so 100% úspešnosťou pri striktnom `TreatWarningsAsErrors=true` (0 warnings).
+    - 19/19 testov vo WebAssembly / Node.js prechádza so 100% úspešnosťou.
+    - 53/53 testov v Python SDK prechádza so 100% úspešnosťou.
 - **Phase 23: Multi-Theme Engine: Cyberpunk 2077 HUD & Apple iOS Glassmorphism s Denným / Nočným / Systémovým Režimom**:
   - **Dizajnová Schéma Cyberpunk 2077 HUD**:
     - Futuristické neónové rozhranie v štýle Night City so žiarivým azúrovým (`#00f0ff`), purpurovým (`#ff0055`) a kybernetickým žltým (`#fcee0a`) akcentom.

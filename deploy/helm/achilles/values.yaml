@@ -1,0 +1,155 @@
+replicaCount: 2
+
+image:
+  repository: ghcr.io/magors-organisation/achilles-controlplane
+  pullPolicy: IfNotPresent
+  tag: "1.0.0"
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
+serviceAccount:
+  create: true
+  annotations: {}
+  name: ""
+
+podAnnotations:
+  prometheus.io/scrape: "true"
+  prometheus.io/port: "8080"
+  prometheus.io/path: "/metrics"
+
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 1654
+
+securityContext:
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop:
+    - ALL
+  readOnlyRootFilesystem: true
+
+service:
+  type: ClusterIP
+  port: 8080
+  targetPort: 8080
+
+ingress:
+  enabled: false
+  className: ""
+  annotations: {}
+  hosts:
+    - host: achilles.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls: []
+
+resources:
+  limits:
+    cpu: 1000m
+    memory: 512Mi
+  requests:
+    cpu: 100m
+    memory: 128Mi
+
+autoscaling:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 75
+  targetMemoryUtilizationPercentage: 80
+
+database:
+  host: "postgres-service"
+  port: 5432
+  name: "achilles"
+  username: "achilles"
+  existingSecret: ""
+  password: "achilles_change_me_secret"
+
+env:
+  ASPNETCORE_ENVIRONMENT: "Production"
+  ASPNETCORE_HTTP_PORTS: "8080"
+
+livenessProbe:
+  httpGet:
+    path: /health/live
+    port: 8080
+  initialDelaySeconds: 10
+  periodSeconds: 10
+  timeoutSeconds: 3
+  failureThreshold: 3
+
+readinessProbe:
+  httpGet:
+    path: /health/ready
+    port: 8080
+  initialDelaySeconds: 5
+  periodSeconds: 5
+  timeoutSeconds: 3
+  failureThreshold: 3
+
+nodeSelector: {}
+tolerations: []
+affinity: {}
+
+# High Availability PodDisruptionBudget
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1
+
+# Zero-Trust NetworkPolicy
+networkPolicy:
+  enabled: false
+
+# Prometheus Operator ServiceMonitor
+serviceMonitor:
+  enabled: false
+  interval: 15s
+  scrapeTimeout: 10s
+  additionalLabels: {}
+
+# Prometheus Operator PrometheusRule Alerts
+prometheusRule:
+  enabled: false
+  additionalLabels: {}
+
+# Redis Caching & Distributed PubSub
+redis:
+  enabled: true
+  host: "redis-service"
+  port: 6379
+  password: ""
+  existingSecret: ""
+
+# Achilles Relay Edge / Local Node (StatefulSet)
+relay:
+  enabled: false
+  replicaCount: 1
+  image:
+    repository: ghcr.io/magors-organisation/achilles-relay
+    pullPolicy: IfNotPresent
+    tag: "1.0.0"
+  podAnnotations: {}
+  upstreamControlPlaneUrl: "http://achilles-controlplane:8080"
+  upstreamApiKeySecret:
+    name: "achilles-relay-secret"
+    key: "api-key"
+  service:
+    type: ClusterIP
+    port: 8081
+  resources:
+    limits:
+      cpu: 500m
+      memory: 256Mi
+    requests:
+      cpu: 50m
+      memory: 64Mi
+  persistence:
+    enabled: true
+    storageClass: ""
+    size: 10Gi
+
+

@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <RootNamespace>Achilles.Protocol.Tests</RootNamespace>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+    <NoWarn>$(NoWarn);SYSLIB5006</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="xunit" />
+    <PackageReference Include="xunit.runner.visualstudio" />
+    <PackageReference Include="FluentAssertions" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Achilles.Crypto\Achilles.Crypto.csproj" />
+    <ProjectReference Include="..\..\src\Achilles.Format\Achilles.Format.csproj" />
+    <ProjectReference Include="..\..\src\Achilles.Protocol\Achilles.Protocol.csproj" />
+  </ItemGroup>
+
+</Project>

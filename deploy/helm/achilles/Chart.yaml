@@ -1,0 +1,14 @@
+apiVersion: v2
+name: achilles
+description: Helm chart for Achilles Enterprise Licensing Server (ControlPlane)
+type: application
+version: 1.0.0
+appVersion: "1.0.0"
+keywords:
+  - licensing
+  - achilles
+  - symbolon
+  - controlplane
+  - enterprise
+maintainers:
+  - name: MAGORS-organisation

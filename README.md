@@ -1,15 +1,15 @@
-# Symbolon — Open-Source Cloud & On-Premise Licenčný Server
+# Achilles — Open-Source Cloud & On-Premise Licenčný Server
 
 [![Platform](https://img.shields.io/badge/.NET-10.0%20LTS-512BD4?logo=dotnet)](https://dotnet.microsoft.com/)
 [![Language](https://img.shields.io/badge/C%23-14.0-239120?logo=csharp)](https://learn.microsoft.com/dotnet/csharp/)
-[![Tests](https://img.shields.io/badge/tests-553%20passed%20(+53%20Python%2C%20+12%20Wasm%2C%20+13%20Java%2C%20+11%20Go%2C%20+6%20Rust)-brightgreen)](#výsledky-testovania)
+[![Tests](https://img.shields.io/badge/tests-656%20passed%20(+53%20Python%2C%20+19%20Wasm%2C%20+13%20Java%2C%20+11%20Go%2C%20+6%20Rust)-brightgreen)](#výsledky-testovania)
 [![License: AGPL-3.0](https://img.shields.io/badge/license-AGPL--3.0-blue.svg)](LICENSE)
 [![License: Apache-2.0](https://img.shields.io/badge/client%20SDK-Apache--2.0-blue.svg)](LICENSES/Apache-2.0.txt)
 [![CRA Compliant](https://img.shields.io/badge/CRA%20Compliance-EU%202024%2F2847-success)](SECURITY.md)
 [![SBOM: CycloneDX v1.6](https://img.shields.io/badge/SBOM-CycloneDX%20v1.6-blue)](spec/README.md)
 [![Crypto](https://img.shields.io/badge/cryptography-ES256%20%2B%20ML--DSA--65%20(PQC)-orange)](#kryptografia)
 
-**Symbolon** je podnikový licenčný server navrhnutý pre nezávislých dodávateľov softvéru (ISV), ktorí predávajú softvér nasadzovaný v cloude, on-premise, na desktope, v priemyselných zariadeniach alebo v striktne izolovaných (air-gapped) prostrediach.
+**Achilles** (pôvodne *Symbolon*) je moderný podnikový licenčný server navrhnutý pre nezávislých dodávateľov softvéru (ISV), ktorí predávajú softvér nasadzovaný v cloude, on-premise, na desktope, v priemyselných zariadeniach alebo v striktne izolovaných (air-gapped) prostrediach.
 
 Rieši to, čo dnešné cloud-first platformy ponúkajú iba ako obmedzený doplnok: **vysokovýkonné plávajúce (concurrent / floating) licencie**, deterministické účtovanie sedadiel bez distribuovaných zámkov, lokálne on-premise relay uzly s delegovanou kapacitou, offline validáciu a **post-kvantovú kryptografiu** (FIPS 204).
 
@@ -190,42 +190,43 @@ Rieši to, čo dnešné cloud-first platformy ponúkajú iba ako obmedzený dopl
 Celé riešenie je postavené na **.NET 10 LTS** v súlade s normatívnou [špecifikáciou](spec/README.md) a rozdelené do modulárnych projektov:
 
 ```
-Symbolon.slnx
+Achilles.slnx
 ├── src/
-│   ├── Symbolon.Crypto         (Apache-2.0)  - ES256, ML-DSA-65 (FIPS 204), KeyRing, JWK/JWKS (RFC 9964)
-│   ├── Symbolon.Format         (Apache-2.0)  - symlic/1 JWS, Crockford Base32 + CRC-32C, PEM Armor, LIC-34
-│   ├── Symbolon.Protocol       (Apache-2.0)  - symlease+jwt, SHA-256 fingerprint kanonizácia, DTO kontrakty
-│   ├── Symbolon.Domain         (AGPL-3.0)    - LeaseEngine, ISeatStore, IAuditLedger, stavové automaty, idempotencia
-│   ├── Symbolon.Relay          (AGPL-3.0)    - Samostatný on-premise relay server (SQLite WAL, Minimal API)
-│   ├── Symbolon.Client         (Apache-2.0)  - Klientske ISV SDK, IAsyncDisposable SeatLease, automatický heartbeat
-│   ├── Symbolon.Cli            (AGPL-3.0)    - CLI nástroj pre správu kľúčov, vydávanie licencií, SBOM a diagnostiku
-│   ├── Symbolon.Data           (AGPL-3.0)    - EF Core 10, Npgsql 10, multi-tenancy, materializované sedadlá, ledger
-│   ├── Symbolon.Operator       (AGPL-3.0)    - Kubernetes Operator, CRDs, reconcilery, manifest generátory
-│   └── Symbolon.ControlPlane   (AGPL-3.0)    - Centrálny server (Public, Admin, Relay, Compliance, /metrics, Retro TUI)
+│   ├── Achilles.Crypto         (Apache-2.0)  - ES256, ML-DSA-65 (FIPS 204), KeyRing, JWK/JWKS (RFC 9964)
+│   ├── Achilles.Format         (Apache-2.0)  - symlic/1 JWS, Crockford Base32 + CRC-32C, PEM Armor, LIC-34
+│   ├── Achilles.Protocol       (Apache-2.0)  - symlease+jwt, SHA-256 fingerprint kanonizácia, DTO kontrakty
+│   ├── Achilles.Domain         (AGPL-3.0)    - LeaseEngine, ISeatStore, IAuditLedger, stavové automaty, idempotencia
+│   ├── Achilles.Relay          (AGPL-3.0)    - Samostatný on-premise relay server (SQLite WAL, Minimal API)
+│   ├── Achilles.Client         (Apache-2.0)  - Klientske ISV SDK, IAsyncDisposable SeatLease, automatický heartbeat
+│   ├── Achilles.Cli            (AGPL-3.0)    - CLI nástroj pre správu kľúčov, vydávanie licencií, SBOM a diagnostiku
+│   ├── Achilles.Data           (AGPL-3.0)    - EF Core 10, Npgsql 10, multi-tenancy, materializované sedadlá, ledger
+│   ├── Achilles.Operator       (AGPL-3.0)    - Kubernetes Operator, CRDs, reconcilery, manifest generátory
+│   └── Achilles.ControlPlane   (AGPL-3.0)    - Centrálny server (Public, Admin, Relay, Compliance, /metrics, Web TUI)
 ├── deploy/
 │   ├── config/                               - Vzorové konfiguračné súbory a mapovania z FlexNetu (.opt -> policy.json)
 │   ├── docker/                               - Multi-stage Dockerfile pre ControlPlane a Relay
 │   ├── docker-compose.yml                    - Kompletný stack: Postgres 17, ControlPlane, Relay, Prometheus, Grafana
 │   ├── prometheus/                           - Prometheus konfigurácia zberu metrík
-│   ├── grafana/                              - Provisioning a predkonfigurovaný dashboard
-│   ├── helm/symbolon/                        - Kubernetes Helm Chart (Deployment, Service, Ingress, PDB, NetworkPolicy, ServiceMonitor)
+│   ├── grafana/                              - Provisioning a predkonfigurované dashboardy
+│   ├── helm/achilles/                        - Kubernetes Helm Chart (Deployment, Service, Ingress, PDB, NetworkPolicy, ServiceMonitor)
 │   └── systemd/                              - Tvrdený Linux systemd unit pre on-premise Relay
 ├── sdk/
-│   ├── wasm/                                 - WebAssembly & WebCrypto JS/TS SDK (@symbolon/validator, 100% offline)
-│   ├── python/symbolon/                      - Python SDK (pip installable, context manager, daemon heartbeat)
-│   ├── rust/symbolon/                        - Rust crate (Tokio async, RAII Drop pattern)
-│   └── c_cpp/                                - C99 / C++17 single-header knižnica (ScopedLease RAII)
+│   ├── wasm/                                 - WebAssembly & WebCrypto JS/TS SDK (@achilles/validator, 100% offline)
+│   ├── python/achilles/                      - Python SDK (pip installable, context manager, daemon heartbeat)
+│   ├── rust/achilles/                        - Rust crate (Tokio async, RAII Drop pattern)
+│   ├── go/achilles/                          - Go SDK (Heartbeat goroutine, context cancel)
+│   └── c/                                    - C99 / C++17 knižnica (ScopedLease RAII)
 └── tests/
-    ├── Symbolon.Crypto.Tests                 - Testy kryptografických primitív a hybridných podpisov
-    ├── Symbolon.Format.Tests                 - Validácia formátu symlic/1, Crockford Base32 a PEM obálky
-    ├── Symbolon.Protocol.Tests               - Serializácia DTO a kanonizácia hardvérového fingerprintu
-    ├── Symbolon.Domain.Tests                 - Testy LeaseEngine, TTL expirácie a idempotencie
-    ├── Symbolon.Relay.Tests                  - Integračné testy on-premise Relay servera
-    ├── Symbolon.Client.Tests                 - Testy ISV SDK, automatického obnovovania a jitteru
-    ├── Symbolon.Cli.Tests                    - Testy príkazového riadka
-    ├── Symbolon.Data.Tests                   - Testy PostgreSQL / SQLite úložiska sedadiel a auditného reťazca
-    ├── Symbolon.Operator.Tests               - Testy Kubernetes Operatora, reconcilerov a manifestov
-    └── Symbolon.ControlPlane.Tests           - Komplexné testy API, metrík, CRA reportov a CycloneDX SBOM
+    ├── Achilles.Crypto.Tests                 - Testy kryptografických primitív a hybridných podpisov
+    ├── Achilles.Format.Tests                 - Validácia formátu symlic/1, Crockford Base32 a PEM obálky
+    ├── Achilles.Protocol.Tests               - Serializácia DTO a kanonizácia hardvérového fingerprintu
+    ├── Achilles.Domain.Tests                 - Testy LeaseEngine, TTL expirácie a idempotencie
+    ├── Achilles.Relay.Tests                  - Integračné testy on-premise Relay servera
+    ├── Achilles.Client.Tests                 - Testy ISV SDK, automatického obnovovania a jitteru
+    ├── Achilles.Cli.Tests                    - Testy príkazového riadka
+    ├── Achilles.Data.Tests                   - Testy PostgreSQL / SQLite úložiska sedadiel a auditného reťazca
+    ├── Achilles.Operator.Tests               - Testy Kubernetes Operatora, reconcilerov a manifestov
+    └── Achilles.ControlPlane.Tests           - Komplexné testy API, metrík, CRA reportov a CycloneDX SBOM
 ```
 
 ---
@@ -345,36 +346,36 @@ git clone https://github.com/MAGORS-organisation/License-server.git
 cd License-server
 
 # Zostavenie celého solution
-dotnet build Symbolon.slnx
+dotnet build Achilles.slnx
 
 # Spustenie testov naprieč všetkými 10 .NET projektmi a klientskymi SDK (656 testov)
-dotnet test Symbolon.slnx
-python -m unittest discover sdk/python/symbolon/tests
+dotnet test Achilles.slnx
+python -m unittest discover sdk/python/achilles/tests
 node --test sdk/wasm/tests/validator.test.js
 
 # Diagnostika prostredia, PQC pripravenosti a sond serverov (Doctor)
-dotnet run --project src/Symbolon.Cli/Symbolon.Cli.csproj -- doctor
+dotnet run --project src/Achilles.Cli/Achilles.Cli.csproj -- doctor
 ```
 
 ### 2. Spustenie celého prostredia cez Docker Compose
 
-Spustí naraz **PostgreSQL 17**, **ControlPlane** (s Retro Web TUI), **Relay**, **Prometheus** a **Grafanu**:
+Spustí naraz **PostgreSQL 17**, **ControlPlane** (s Web TUI), **Relay**, **Prometheus** a **Grafanu**:
 
 ```bash
-docker compose -f deploy/docker-compose.yml up -d
+docker compose up -d
 ```
 
 Dostupné služby:
-- **Symbolon Retro Web UI & ControlPlane API:** `http://localhost:8080`
-  - Retro TUI Konzola pre správu: `http://localhost:8080/`
+- **Achilles Web UI & ControlPlane API:** `http://localhost:8080`
+  - Konzola pre správu: `http://localhost:8080/`
   - CycloneDX v1.6 SBOM: `http://localhost:8080/v1/compliance/sbom`
   - Cyber Resilience Act (CRA) report: `http://localhost:8080/v1/compliance/cra`
   - OpenAPI 3.1 dokumentácia: `http://localhost:8080/openapi/v1.json`
   - Health check: `http://localhost:8080/health/ready`
   - Prometheus metriky: `http://localhost:8080/metrics`
-- **Symbolon On-Premise Relay:** `http://localhost:8081`
+- **Achilles On-Premise Relay:** `http://localhost:8081`
 - **Prometheus UI:** `http://localhost:9090`
-- **Grafana Dashboard:** `http://localhost:3000` (prihlásenie: `admin` / `admin`)
+- **Grafana Dashboard:** `http://localhost:3000` (prihlásenie: `admin` / `achilles_grafana_secure_admin_2026`)
 
 ---
 
@@ -384,13 +385,13 @@ Podrobný návod krok za krokom nájdete v **[Integration Quickstart Guide](docs
 
 ### C# (.NET 10)
 ```csharp
-using Symbolon.Client;
+using Achilles.Client;
 
-var options = new SymbolonClientOptions {
+var options = new AchillesClientOptions {
     ServerUri = new Uri("http://localhost:8080"),
-    LicenseKey = "SYM-9ABC-DEF2-3456-7890"
+    LicenseKey = "ACH-9ABC-DEF2-3456-7890"
 };
-using var client = new SymbolonClient(options);
+using var client = new AchillesClient(options);
 
 await using var lease = await client.AcquireSeatAsync(["cad-core", "rendering"]);
 if (lease.Acquired) {
@@ -402,52 +403,52 @@ if (lease.Acquired) {
 
 ### Python (3.10+)
 ```python
-from symbolon import SymbolonClient
+from achilles import AchillesClient
 
-client = SymbolonClient("http://localhost:8080", product_code="cad-pro")
-with client.acquire_seat("SYM-9ABC-DEF2-3456-7890", features=["cad-core"]) as lease:
+client = AchillesClient("http://localhost:8080", product_code="cad-pro")
+with client.acquire_seat("ACH-9ABC-DEF2-3456-7890", features=["cad-core"]) as lease:
     print(f"Sedadlo #{lease.seat_number} alokované. Aplikácia beží...")
-# Automatické uvoľnenie po opustení bloku with
+# Automatické uvoľnenie po opustení bloku with (dostupný aj spätný import from symbolon import ...)
 ```
 
 ### Rust (2021 Edition)
 ```rust
-use symbolon_client::SymbolonClient;
+use achilles_client::AchillesClient;
 
-let client = SymbolonClient::new("http://localhost:8080", "cad-pro");
-let lease = client.acquire_seat("SYM-9ABC-DEF2-3456-7890")?;
+let client = AchillesClient::new("http://localhost:8080", "cad-pro");
+let lease = client.acquire_seat("ACH-9ABC-DEF2-3456-7890")?;
 println!("Sedadlo #{} alokované!", lease.seat_number());
 // Pri opustení scope sa vďaka RAII Drop sedadlo okamžite vráti do fondu.
 ```
 
 ### C99 & C++17
 ```cpp
-#include "symbolon.h"
+#include "achilles.h"
 
-symbolon_client_t* client = nullptr;
-symbolon_client_create("http://localhost:8080", "cad-pro", &client);
+achilles_client_t* client = nullptr;
+achilles_client_create("http://localhost:8080", "cad-pro", &client);
 
-symbolon_lease_t* raw_lease = nullptr;
-if (symbolon_acquire_seat(client, "SYM-9ABC-DEF2-3456-7890", &raw_lease) == SYMBOLON_OK) {
-    symbolon::ScopedLease lease(raw_lease); // C++ RAII wrapper
+achilles_lease_t* raw_lease = nullptr;
+if (achilles_acquire_seat(client, "ACH-9ABC-DEF2-3456-7890", &raw_lease) == ACHILLES_OK) {
+    achilles::ScopedLease lease(raw_lease); // C++ RAII wrapper
     // ... výkonný kód aplikácie ...
 }
-symbolon_client_destroy(client);
+achilles_client_destroy(client);
 ```
 
 ---
 
-## Ako Používať `Symbolon.Cli`
+## Ako Používať `Achilles.Cli`
 
 ```bash
 # 1. Spustenie interaktívneho inštalačného sprievodcu (TUI Wizard)
-dotnet run --project src/Symbolon.Cli -- setup
+dotnet run --project src/Achilles.Cli -- setup
 
 # 2. Vygenerovanie nového páru podpisových kľúčov (ES256 alebo hybrid ML-DSA-65)
-dotnet run --project src/Symbolon.Cli -- key gen -a es256 -o ./my-keys
+dotnet run --project src/Achilles.Cli -- key gen -a es256 -o ./my-keys
 
 # 3. Vydanie licenčného súboru .symlic
-dotnet run --project src/Symbolon.Cli -- lic issue \
+dotnet run --project src/Achilles.Cli -- lic issue \
   --product "cad-pro" \
   --customer "Acme Corporation" \
   --seats 10 \
@@ -456,13 +457,13 @@ dotnet run --project src/Symbolon.Cli -- lic issue \
   --out license.symlic
 
 # 4. Export SBOM v štandarde CycloneDX v1.6
-dotnet run --project src/Symbolon.Cli -- sbom --out sbom.json
+dotnet run --project src/Achilles.Cli -- sbom --out sbom.json
 
 # 5. Overenie integrity binárneho artefaktu
-dotnet run --project src/Symbolon.Cli -- verify-artifact --file app.dll --expected-hash <sha256>
+dotnet run --project src/Achilles.Cli -- verify-artifact --file app.dll --expected-hash <sha256>
 
 # 6. Diagnostika prostredia (Doctor)
-dotnet run --project src/Symbolon.Cli -- doctor --file license.symlic --key ./my-keys/public.jwk
+dotnet run --project src/Achilles.Cli -- doctor --file license.symlic --key ./my-keys/public.jwk
 ```
 
 ---
@@ -527,28 +528,28 @@ dotnet run --project src/Symbolon.Cli -- doctor --file license.symlic --key ./my
 
 ## Výsledky Testovania
 
-Všetkých 10 testovacích projektov má 100% úspešnosť testov bez zlyhania:
+Všetkých 10 testovacích projektov má 100% úspešnosť testov bez zlyhania (656 testov v .NET 10):
 
 ```text
-Passed!  - Failed: 0, Passed:  57, Skipped: 0, Total:  57 - Symbolon.Crypto.Tests.dll
-Passed!  - Failed: 0, Passed:  61, Skipped: 0, Total:  61 - Symbolon.Format.Tests.dll
-Passed!  - Failed: 0, Passed:  24, Skipped: 0, Total:  24 - Symbolon.Protocol.Tests.dll
-Passed!  - Failed: 0, Passed: 127, Skipped: 0, Total: 127 - Symbolon.Domain.Tests.dll
-Passed!  - Failed: 0, Passed:  16, Skipped: 0, Total:  16 - Symbolon.Relay.Tests.dll
-Passed!  - Failed: 0, Passed:  39, Skipped: 0, Total:  39 - Symbolon.Client.Tests.dll
-Passed!  - Failed: 0, Passed:  66, Skipped: 0, Total:  66 - Symbolon.Cli.Tests.dll
-Passed!  - Failed: 0, Passed:  24, Skipped: 0, Total:  24 - Symbolon.Data.Tests.dll
-Passed!  - Failed: 0, Passed:   8, Skipped: 0, Total:   8 - Symbolon.Operator.Tests.dll
-Passed!  - Failed: 0, Passed: 131, Skipped: 0, Total: 131 - Symbolon.ControlPlane.Tests.dll
+Passed!  - Failed: 0, Passed:  57, Skipped: 0, Total:  57 - Achilles.Crypto.Tests.dll
+Passed!  - Failed: 0, Passed:  61, Skipped: 0, Total:  61 - Achilles.Format.Tests.dll
+Passed!  - Failed: 0, Passed:  24, Skipped: 0, Total:  24 - Achilles.Protocol.Tests.dll
+Passed!  - Failed: 0, Passed: 127, Skipped: 0, Total: 127 - Achilles.Domain.Tests.dll
+Passed!  - Failed: 0, Passed:  16, Skipped: 0, Total:  16 - Achilles.Relay.Tests.dll
+Passed!  - Failed: 0, Passed:  39, Skipped: 0, Total:  39 - Achilles.Client.Tests.dll
+Passed!  - Failed: 0, Passed:  66, Skipped: 0, Total:  66 - Achilles.Cli.Tests.dll
+Passed!  - Failed: 0, Passed:  24, Skipped: 0, Total:  24 - Achilles.Data.Tests.dll
+Passed!  - Failed: 0, Passed:   8, Skipped: 0, Total:   8 - Achilles.Operator.Tests.dll
+Passed!  - Failed: 0, Passed: 234, Skipped: 0, Total: 234 - Achilles.ControlPlane.Tests.dll
 
 Viacjazyčné SDK & WebAssembly testovacie sady:
 Passed!  - Failed: 0, Passed:  53, Skipped: 0, Total:  53 - Python SDK (unittest)
-Passed!  - Failed: 0, Passed:  12, Skipped: 0, Total:  12 - WebAssembly / WebCrypto SDK (node:test)
+Passed!  - Failed: 0, Passed:  19, Skipped: 0, Total:  19 - WebAssembly / WebCrypto SDK (node:test)
 Passed!  - Failed: 0, Passed:  13, Skipped: 0, Total:  13 - Java SDK (JUnit 5)
 Passed!  - Failed: 0, Passed:  11, Skipped: 0, Total:  11 - Go SDK (testing)
-Passed!  - Failed: 0, Passed:   6, Skipped: 0, Total:   6 - Rust SDK (cargo test suite)
+Passed!  - Failed: 0, Passed:  12, Skipped: 0, Total:  12 - Rust SDK (cargo test suite)
 
-Celkovo: 648 úspešných automatizovaných testov (553 .NET + 53 Python + 12 Node/Wasm + 13 Java + 11 Go + 6 Rust), 0 zlyhaní, 0 chýb.
+Celkovo: 764 úspešných automatizovaných testov (656 .NET + 53 Python + 19 Node/Wasm + 13 Java + 11 Go + 12 Rust), 0 zlyhaní, 0 chýb.
 ```
 
 ---
@@ -581,8 +582,8 @@ Projekt využíva **rozdelené licencovanie** podľa architektonického rozhodnu
 
 | Komponent | Cesta | Licencia | Účel |
 |---|---|---|---|
-| **Klientske SDK & Knižnice** | `src/Symbolon.{Client,Format,Crypto,Protocol}`, `sdk/` | **Apache-2.0** | Umožňuje bezpečné statické aj dynamické linkovanie do proprietárnych komerčných aplikácií ISV dodávateľov. |
-| **Server & Infraštruktúra** | `src/Symbolon.{ControlPlane,Relay,Data,Domain,Cli}`, `deploy/` | **AGPL-3.0-only** | Zabezpečuje, že vylepšenia infraštruktúry a servera zostávajú open-source pod OSI licenciou. |
+| **Klientske SDK & Knižnice** | `src/Achilles.{Client,Format,Crypto,Protocol}`, `sdk/` | **Apache-2.0** | Umožňuje bezpečné statické aj dynamické linkovanie do proprietárnych komerčných aplikácií ISV dodávateľov. |
+| **Server & Infraštruktúra** | `src/Achilles.{ControlPlane,Relay,Data,Domain,Cli}`, `deploy/` | **AGPL-3.0-only** | Zabezpečuje, že vylepšenia infraštruktúry a servera zostávajú open-source pod OSI licenciou. |
 | **Otvorená Špecifikácia** | `spec/` | **CC BY 4.0** | Umožňuje komukoľvek nezávisle implementovať licenčné formáty a protokol. |
 
 Podrobnosti o autorských právach a pravidlách pre prispievanie nájdete v súbore **[LICENSING.md](LICENSING.md)**.

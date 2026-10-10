@@ -1,8 +1,8 @@
 {
   "$schema": "https://raw.githubusercontent.com/stryker-mutator/stryker-net/master/src/Stryker.Core/Stryker.Core/Mutators/stryker-config-schema.json",
   "stryker-config": {
-    "solution": "Symbolon.slnx",
-    "project": "Symbolon.Crypto.csproj",
+    "solution": "Achilles.slnx",
+    "project": "Achilles.Crypto.csproj",
     "thresholds": {
       "high": 90,
       "low": 85,

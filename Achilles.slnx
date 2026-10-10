@@ -1,0 +1,26 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Achilles.Cli/Achilles.Cli.csproj" />
+    <Project Path="src/Achilles.Client/Achilles.Client.csproj" />
+    <Project Path="src/Achilles.ControlPlane/Achilles.ControlPlane.csproj" />
+    <Project Path="src/Achilles.Crypto/Achilles.Crypto.csproj" />
+    <Project Path="src/Achilles.Data/Achilles.Data.csproj" />
+    <Project Path="src/Achilles.Domain/Achilles.Domain.csproj" />
+    <Project Path="src/Achilles.Format/Achilles.Format.csproj" />
+    <Project Path="src/Achilles.Protocol/Achilles.Protocol.csproj" />
+    <Project Path="src/Achilles.Operator/Achilles.Operator.csproj" />
+    <Project Path="src/Achilles.Relay/Achilles.Relay.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Achilles.Cli.Tests/Achilles.Cli.Tests.csproj" />
+    <Project Path="tests/Achilles.Client.Tests/Achilles.Client.Tests.csproj" />
+    <Project Path="tests/Achilles.ControlPlane.Tests/Achilles.ControlPlane.Tests.csproj" />
+    <Project Path="tests/Achilles.Crypto.Tests/Achilles.Crypto.Tests.csproj" />
+    <Project Path="tests/Achilles.Data.Tests/Achilles.Data.Tests.csproj" />
+    <Project Path="tests/Achilles.Domain.Tests/Achilles.Domain.Tests.csproj" />
+    <Project Path="tests/Achilles.Format.Tests/Achilles.Format.Tests.csproj" />
+    <Project Path="tests/Achilles.Operator.Tests/Achilles.Operator.Tests.csproj" />
+    <Project Path="tests/Achilles.Protocol.Tests/Achilles.Protocol.Tests.csproj" />
+    <Project Path="tests/Achilles.Relay.Tests/Achilles.Relay.Tests.csproj" />
+  </Folder>
+</Solution>

@@ -4,22 +4,22 @@ WORKDIR /app
 
 # Copy configuration files and csproj files for layer caching
 COPY Directory.Build.props Directory.Packages.props ./
-COPY src/Symbolon.Crypto/Symbolon.Crypto.csproj src/Symbolon.Crypto/
-COPY src/Symbolon.Format/Symbolon.Format.csproj src/Symbolon.Format/
-COPY src/Symbolon.Protocol/Symbolon.Protocol.csproj src/Symbolon.Protocol/
-COPY src/Symbolon.Domain/Symbolon.Domain.csproj src/Symbolon.Domain/
-COPY src/Symbolon.Relay/Symbolon.Relay.csproj src/Symbolon.Relay/
+COPY src/Achilles.Crypto/Achilles.Crypto.csproj src/Achilles.Crypto/
+COPY src/Achilles.Format/Achilles.Format.csproj src/Achilles.Format/
+COPY src/Achilles.Protocol/Achilles.Protocol.csproj src/Achilles.Protocol/
+COPY src/Achilles.Domain/Achilles.Domain.csproj src/Achilles.Domain/
+COPY src/Achilles.Relay/Achilles.Relay.csproj src/Achilles.Relay/
 
-RUN dotnet restore src/Symbolon.Relay/Symbolon.Relay.csproj
+RUN dotnet restore src/Achilles.Relay/Achilles.Relay.csproj
 
 # Copy source files
-COPY src/Symbolon.Crypto/ src/Symbolon.Crypto/
-COPY src/Symbolon.Format/ src/Symbolon.Format/
-COPY src/Symbolon.Protocol/ src/Symbolon.Protocol/
-COPY src/Symbolon.Domain/ src/Symbolon.Domain/
-COPY src/Symbolon.Relay/ src/Symbolon.Relay/
+COPY src/Achilles.Crypto/ src/Achilles.Crypto/
+COPY src/Achilles.Format/ src/Achilles.Format/
+COPY src/Achilles.Protocol/ src/Achilles.Protocol/
+COPY src/Achilles.Domain/ src/Achilles.Domain/
+COPY src/Achilles.Relay/ src/Achilles.Relay/
 
-RUN dotnet publish src/Symbolon.Relay/Symbolon.Relay.csproj \
+RUN dotnet publish src/Achilles.Relay/Achilles.Relay.csproj \
     -c Release \
     -o /out \
     --no-restore
@@ -37,8 +37,8 @@ COPY --from=build /out .
 
 ENV ASPNETCORE_HTTP_PORTS=8081 \
     ASPNETCORE_ENVIRONMENT=Production \
-    Database__ConnectionString="Data Source=/app/data/symbolon-relay.db"
+    Database__ConnectionString="Data Source=/app/data/achilles-relay.db"
 
 EXPOSE 8081
 
-ENTRYPOINT ["dotnet", "Symbolon.Relay.dll"]
+ENTRYPOINT ["dotnet", "Achilles.Relay.dll"]

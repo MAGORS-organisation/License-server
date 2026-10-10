@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <RootNamespace>Achilles.Relay.Tests</RootNamespace>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+    <NoWarn>$(NoWarn);SYSLIB5006</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" />
+    <PackageReference Include="xunit" />
+    <PackageReference Include="xunit.runner.visualstudio" />
+    <PackageReference Include="FluentAssertions" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Achilles.Crypto\Achilles.Crypto.csproj" />
+    <ProjectReference Include="..\..\src\Achilles.Format\Achilles.Format.csproj" />
+    <ProjectReference Include="..\..\src\Achilles.Protocol\Achilles.Protocol.csproj" />
+    <ProjectReference Include="..\..\src\Achilles.Domain\Achilles.Domain.csproj" />
+    <ProjectReference Include="..\..\src\Achilles.Relay\Achilles.Relay.csproj" />
+  </ItemGroup>
+
+</Project>

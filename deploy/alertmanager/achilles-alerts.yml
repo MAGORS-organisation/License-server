@@ -1,0 +1,65 @@
+# ==============================================================================
+# Symbolon Production Alertmanager & Prometheus Alerting Rules Pack (Phase 22)
+# ==============================================================================
+groups:
+  - name: symbolon_production_enterprise_alerts
+    rules:
+      - alert: SymbolonSeatSaturationWarning
+        expr: (symbolon_active_seats / symbolon_capacity_seats) > 0.90
+        for: 5m
+        labels:
+          severity: warning
+          category: capacity
+        annotations:
+          summary: "Využitie plávajúcich licencií prekročilo 90%"
+          description: "Tenant {{ $labels.tenant_id }} má obsadených viac ako 90% kapacity sedadiel."
+
+      - alert: SymbolonSeatSaturationCritical
+        expr: (symbolon_active_seats / symbolon_capacity_seats) >= 0.98
+        for: 2m
+        labels:
+          severity: critical
+          category: capacity
+        annotations:
+          summary: "Kritická saturácia plávajúcich licencií (>= 98%)"
+          description: "Pool sedadiel pre licenciu {{ $labels.license_id }} je takmer vyčerpaný. Hrozí odmietanie klientov."
+
+      - alert: SymbolonAIOpsPredictedExhaustion
+        expr: symbolon_time_to_exhaustion_minutes > 0 and symbolon_time_to_exhaustion_minutes < 30
+        for: 3m
+        labels:
+          severity: warning
+          category: aiops
+        annotations:
+          summary: "AIOps predpovedá vyčerpanie kapacity do 30 minút"
+          description: "Holtov lineárny trend indikuje vyčerpanie dostupných sedadiel za menej než 30 minút."
+
+      - alert: SymbolonMerkleDriftAlert
+        expr: increase(symbolon_merkle_tree_drift_detected_total[5m]) > 0
+        for: 0m
+        labels:
+          severity: critical
+          category: security
+        annotations:
+          summary: "Detegovaný Merkle Tree drift alebo narušenie integrity logu"
+          description: "Audit ledger zistil nezhodu STH hashov alebo pokus o neoprávnenú zmenu histórie."
+
+      - alert: SymbolonHsmHardwareDegradation
+        expr: symbolon_hsm_healthy == 0 or increase(symbolon_hsm_software_enclave_fallback_total[5m]) > 0
+        for: 1m
+        labels:
+          severity: critical
+          category: security
+        annotations:
+          summary: "Výpadok HSM modulu / Failover do softvérového enclave"
+          description: "Kryptografický hardvér (PKCS#11) je nedostupný alebo prepol kľúče do softvérovej emulácie."
+
+      - alert: SymbolonEbpfEnforcementSpike
+        expr: rate(symbolon_ebpf_unauthorized_probes_blocked_total[1m]) > 0.16
+        for: 1m
+        labels:
+          severity: warning
+          category: security
+        annotations:
+          summary: "Nárast zablokovaných neautorizovaných sond eBPF jadrom"
+          description: "eBPF socket filter (cgroup/connect4) zachytil a zablokoval zvýšené množstvo neoprávnených pokusov."

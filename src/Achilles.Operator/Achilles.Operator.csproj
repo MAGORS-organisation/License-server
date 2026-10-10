@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <RootNamespace>Achilles.Operator</RootNamespace>
+    <NoWarn>$(NoWarn);CA1716</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Achilles.Operator.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Achilles.Crypto\Achilles.Crypto.csproj" />
+    <ProjectReference Include="..\Achilles.Format\Achilles.Format.csproj" />
+    <ProjectReference Include="..\Achilles.Protocol\Achilles.Protocol.csproj" />
+  </ItemGroup>
+
+</Project>

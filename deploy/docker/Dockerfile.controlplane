@@ -4,24 +4,24 @@ WORKDIR /app
 
 # Copy configuration files and csproj files for layer caching
 COPY Directory.Build.props Directory.Packages.props ./
-COPY src/Symbolon.Crypto/Symbolon.Crypto.csproj src/Symbolon.Crypto/
-COPY src/Symbolon.Format/Symbolon.Format.csproj src/Symbolon.Format/
-COPY src/Symbolon.Protocol/Symbolon.Protocol.csproj src/Symbolon.Protocol/
-COPY src/Symbolon.Domain/Symbolon.Domain.csproj src/Symbolon.Domain/
-COPY src/Symbolon.Data/Symbolon.Data.csproj src/Symbolon.Data/
-COPY src/Symbolon.ControlPlane/Symbolon.ControlPlane.csproj src/Symbolon.ControlPlane/
+COPY src/Achilles.Crypto/Achilles.Crypto.csproj src/Achilles.Crypto/
+COPY src/Achilles.Format/Achilles.Format.csproj src/Achilles.Format/
+COPY src/Achilles.Protocol/Achilles.Protocol.csproj src/Achilles.Protocol/
+COPY src/Achilles.Domain/Achilles.Domain.csproj src/Achilles.Domain/
+COPY src/Achilles.Data/Achilles.Data.csproj src/Achilles.Data/
+COPY src/Achilles.ControlPlane/Achilles.ControlPlane.csproj src/Achilles.ControlPlane/
 
-RUN dotnet restore src/Symbolon.ControlPlane/Symbolon.ControlPlane.csproj
+RUN dotnet restore src/Achilles.ControlPlane/Achilles.ControlPlane.csproj
 
 # Copy source files
-COPY src/Symbolon.Crypto/ src/Symbolon.Crypto/
-COPY src/Symbolon.Format/ src/Symbolon.Format/
-COPY src/Symbolon.Protocol/ src/Symbolon.Protocol/
-COPY src/Symbolon.Domain/ src/Symbolon.Domain/
-COPY src/Symbolon.Data/ src/Symbolon.Data/
-COPY src/Symbolon.ControlPlane/ src/Symbolon.ControlPlane/
+COPY src/Achilles.Crypto/ src/Achilles.Crypto/
+COPY src/Achilles.Format/ src/Achilles.Format/
+COPY src/Achilles.Protocol/ src/Achilles.Protocol/
+COPY src/Achilles.Domain/ src/Achilles.Domain/
+COPY src/Achilles.Data/ src/Achilles.Data/
+COPY src/Achilles.ControlPlane/ src/Achilles.ControlPlane/
 
-RUN dotnet publish src/Symbolon.ControlPlane/Symbolon.ControlPlane.csproj \
+RUN dotnet publish src/Achilles.ControlPlane/Achilles.ControlPlane.csproj \
     -c Release \
     -o /out \
     --no-restore
@@ -40,4 +40,4 @@ ENV ASPNETCORE_HTTP_PORTS=8080 \
 
 EXPOSE 8080
 
-ENTRYPOINT ["dotnet", "Symbolon.ControlPlane.dll"]
+ENTRYPOINT ["dotnet", "Achilles.ControlPlane.dll"]

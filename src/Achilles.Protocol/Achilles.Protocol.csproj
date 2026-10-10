@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <RootNamespace>Achilles.Protocol</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Achilles.Crypto\Achilles.Crypto.csproj" />
+    <ProjectReference Include="..\Achilles.Format\Achilles.Format.csproj" />
+  </ItemGroup>
+
+</Project>

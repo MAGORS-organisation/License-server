@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <PackageLicenseExpression>AGPL-3.0-only</PackageLicenseExpression>
+    <NoWarn>$(NoWarn);CA1515;CA1819;CA1002;CA2227;CA1716;CA1724</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.EntityFrameworkCore" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" />
+    <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Achilles.Domain\Achilles.Domain.csproj" />
+    <ProjectReference Include="..\Achilles.Protocol\Achilles.Protocol.csproj" />
+    <ProjectReference Include="..\Achilles.Format\Achilles.Format.csproj" />
+    <ProjectReference Include="..\Achilles.Crypto\Achilles.Crypto.csproj" />
+  </ItemGroup>
+
+</Project>

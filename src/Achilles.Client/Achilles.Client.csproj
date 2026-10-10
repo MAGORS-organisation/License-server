@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <RootNamespace>Achilles.Client</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Achilles.Client.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Achilles.Crypto\Achilles.Crypto.csproj" />
+    <ProjectReference Include="..\Achilles.Format\Achilles.Format.csproj" />
+    <ProjectReference Include="..\Achilles.Protocol\Achilles.Protocol.csproj" />
+  </ItemGroup>
+
+</Project>

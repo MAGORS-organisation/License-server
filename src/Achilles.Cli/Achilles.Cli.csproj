@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <RootNamespace>Achilles.Cli</RootNamespace>
+    <!-- Suppress SYSLIB5006 for experimental ML-DSA in CLI, plus style rules for TUI wizard -->
+    <NoWarn>$(NoWarn);SYSLIB5006;CA1303;CA1849;CA1308;CA1031;CA1515;CA2007;CA1062;CA1056</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Achilles.Cli.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Spectre.Console" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Achilles.Crypto\Achilles.Crypto.csproj" />
+    <ProjectReference Include="..\Achilles.Format\Achilles.Format.csproj" />
+    <ProjectReference Include="..\Achilles.Protocol\Achilles.Protocol.csproj" />
+    <ProjectReference Include="..\Achilles.Client\Achilles.Client.csproj" />
+    <ProjectReference Include="..\Achilles.Domain\Achilles.Domain.csproj" />
+    <ProjectReference Include="..\Achilles.Operator\Achilles.Operator.csproj" />
+  </ItemGroup>
+
+</Project>

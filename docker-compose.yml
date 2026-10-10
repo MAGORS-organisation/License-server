@@ -1,23 +1,23 @@
 # ==============================================================================
-# Symbolon Production & Staging Docker Compose Stack
+# Achilles Production & Staging Docker Compose Stack
 # Usage: docker compose up -d --build
 # ==============================================================================
 
 services:
   postgres:
     image: postgres:17-alpine
-    container_name: symbolon-postgres
+    container_name: achilles-postgres
     restart: unless-stopped
     environment:
-      POSTGRES_DB: ${POSTGRES_DB:-symbolon}
-      POSTGRES_USER: ${POSTGRES_USER:-symbolon}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-symbolon_secret_dev}
+      POSTGRES_DB: ${POSTGRES_DB:-achilles}
+      POSTGRES_USER: ${POSTGRES_USER:-achilles}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-achilles_secret_dev}
     ports:
       - "${POSTGRES_PORT:-5432}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-symbolon} -d ${POSTGRES_DB:-symbolon}"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-achilles} -d ${POSTGRES_DB:-achilles}"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -26,17 +26,20 @@ services:
     build:
       context: .
       dockerfile: deploy/docker/Dockerfile.controlplane
-    container_name: symbolon-controlplane
+    container_name: achilles-controlplane
     restart: unless-stopped
     depends_on:
       postgres:
         condition: service_healthy
     environment:
-      ConnectionStrings__SymbolonDb: "Host=postgres;Port=5432;Database=${POSTGRES_DB:-symbolon};Username=${POSTGRES_USER:-symbolon};Password=${POSTGRES_PASSWORD:-symbolon_secret_dev}"
+      ConnectionStrings__AchillesDb: "Host=postgres;Port=5432;Database=${POSTGRES_DB:-achilles};Username=${POSTGRES_USER:-achilles};Password=${POSTGRES_PASSWORD:-achilles_secret_dev}"
+      ConnectionStrings__SymbolonDb: "Host=postgres;Port=5432;Database=${POSTGRES_DB:-achilles};Username=${POSTGRES_USER:-achilles};Password=${POSTGRES_PASSWORD:-achilles_secret_dev}"
       ASPNETCORE_ENVIRONMENT: "${CONTROLPLANE_ENV:-Production}"
       ASPNETCORE_HTTP_PORTS: "8080"
-      Symbolon__AdminApiKey: "${SYMBOLON_ADMIN_API_KEY:-sym_adm_master_2026}"
-      Symbolon__PqcProfile: "${SYMBOLON_PQC_PROFILE:-hybrid-v1}"
+      Achilles__AdminApiKey: "${ACHILLES_ADMIN_API_KEY:-${SYMBOLON_ADMIN_API_KEY:-ach_adm_master_2026}}"
+      Achilles__PqcProfile: "${ACHILLES_PQC_PROFILE:-${SYMBOLON_PQC_PROFILE:-hybrid-v1}}"
+      Symbolon__AdminApiKey: "${ACHILLES_ADMIN_API_KEY:-${SYMBOLON_ADMIN_API_KEY:-ach_adm_master_2026}}"
+      Symbolon__PqcProfile: "${ACHILLES_PQC_PROFILE:-${SYMBOLON_PQC_PROFILE:-hybrid-v1}}"
     ports:
       - "${CONTROLPLANE_HTTP_PORT:-8080}:8080"
     healthcheck:
@@ -49,14 +52,14 @@ services:
     build:
       context: .
       dockerfile: deploy/docker/Dockerfile.relay
-    container_name: symbolon-relay
+    container_name: achilles-relay
     restart: unless-stopped
     depends_on:
       - controlplane
     environment:
       ASPNETCORE_ENVIRONMENT: "Production"
       ASPNETCORE_HTTP_PORTS: "8081"
-      Database__ConnectionString: "Data Source=/app/data/symbolon-relay.db"
+      Database__ConnectionString: "Data Source=/app/data/achilles-relay.db"
       Upstream__Url: "http://controlplane:8080"
     ports:
       - "${RELAY_HTTP_PORT:-8081}:8081"
@@ -70,7 +73,7 @@ services:
 
   prometheus:
     image: prom/prometheus:v2.54.1
-    container_name: symbolon-prometheus
+    container_name: achilles-prometheus
     restart: unless-stopped
     volumes:
       - ./deploy/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
@@ -84,7 +87,7 @@ services:
 
   grafana:
     image: grafana/grafana:11.2.0
-    container_name: symbolon-grafana
+    container_name: achilles-grafana
     restart: unless-stopped
     environment:
       GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}

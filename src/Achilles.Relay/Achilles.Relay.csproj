@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <RootNamespace>Achilles.Relay</RootNamespace>
+    <!-- Relay is designed to support Native AOT -->
+    <PublishAot>false</PublishAot>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Achilles.Relay.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Data.Sqlite" />
+    <PackageReference Include="SQLitePCLRaw.bundle_e_sqlite3" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Achilles.Crypto\Achilles.Crypto.csproj" />
+    <ProjectReference Include="..\Achilles.Format\Achilles.Format.csproj" />
+    <ProjectReference Include="..\Achilles.Protocol\Achilles.Protocol.csproj" />
+    <ProjectReference Include="..\Achilles.Domain\Achilles.Domain.csproj" />
+  </ItemGroup>
+
+</Project>
