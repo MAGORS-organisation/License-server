@@ -771,7 +771,7 @@ Achilles ponúka 4 jedinečné dizajnové prostredia prispôsobené preferenciá
 <ol>
     <li><strong>💼 Modern Enterprise:</strong> Čisté, responzívne webové rozhranie v štýle moderných cloudových platforiem s tmavým bridlicovým pozadím a azúrovými akcentmi.</li>
     <li><strong>💾 DOS (FoxPro 2.6 TUI):</strong> Autentická retro textová estetika DOS/FoxPro s kaskádovými oknami, pravouhlými tieňmi, CRT phosphor filtrom a žltými akcelerátormi.</li>
-    <li><strong>⚡ Cyberpunk 2077 HUD:</strong> Futuristické neónové rozhranie v štýle Night City so žiarivým azúrovým (<code>#00f0ff</code>), purpurovým (<code>#ff0055</code>) a neónovo žltým akcentom s kybernetickými prvkami.</li>
+    <li><strong>⚡ Cyberpunk 2077 HUD:</strong> Autentické neónové rozhranie v štýle videohry Cyberpunk 2077 so žiarivou Cyber žltou (<code>#fcee0a</code>), elektrickou modrou (<code>#00f0ff</code>), výstražnou neónovou červenou (<code>#ff003c</code>), skosenými rohmi (chamfer clip-path) a nočnou HUD estetikou.</li>
     <li><strong>🍎 Apple iOS Glassmorphism:</strong> Jemná elegancia podľa Apple Human Interface Guidelines s polopriehľadným frosted glass efektom (<code>backdrop-filter: blur(25px)</code>) a trojrežimovým systémom:
         <ul>
             <li>🌓 <strong>Systémový (Auto):</strong> Automatická adaptácia na nastavenie operačného systému cez <code>prefers-color-scheme</code>.</li>

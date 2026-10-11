@@ -144,162 +144,219 @@
 
 /* ------------------------------------------------------------------------------
  * 1. CYBERPUNK 2077 HUD THEME (html[data-theme="cyberpunk"])
+ * Authentic in-game video game UI: Cyber Yellow, Electric Cyan, Neon Red, Chamfers
  * ------------------------------------------------------------------------------ */
 html[data-theme="cyberpunk"] {
-  --bg-primary: #07070f;
-  --bg-secondary: #0e091e;
-  --bg-tertiary: #191032;
-  --bg-card: #120b24;
-  --border-color: #3b1b63;
-  --text-primary: #00f0ff;
-  --text-secondary: #ff77a8;
-  --text-muted: #8352a8;
+  --bg-primary: #0b0c10;
+  --bg-secondary: #10121a;
+  --bg-tertiary: #161922;
+  --bg-card: #13151f;
+  --border-color: #00f0ff;
+  --text-primary: #fcee0a;
+  --text-secondary: #00f0ff;
+  --text-muted: #5c6b84;
   --accent-blue: #00f0ff;
-  --accent-blue-hover: #00c2cf;
+  --accent-blue-hover: #4df6ff;
   --accent-emerald: #00ff66;
   --accent-amber: #fcee0a;
-  --accent-rose: #ff0055;
-  --accent-purple: #b026ff;
+  --accent-rose: #ff003c;
+  --accent-purple: #00f0ff;
   --cyber-cyan: #00f0ff;
   --cyber-yellow: #fcee0a;
-  --cyber-pink: #ff0055;
-  --cyber-purple: #9d00ff;
-  --cyber-border-glow: 0 0 10px rgba(0, 240, 255, 0.4);
-  --cyber-text-glow: 0 0 6px rgba(0, 240, 255, 0.5);
+  --cyber-pink: #ff003c;
+  --cyber-purple: #03d8f3;
+  --cyber-border-glow: 0 0 14px rgba(0, 240, 255, 0.45);
+  --cyber-text-glow: 0 0 8px rgba(252, 238, 10, 0.7);
 }
 
 html[data-theme="cyberpunk"] body {
   background-color: var(--bg-primary);
-  color: var(--text-primary);
+  color: #e0f8ff;
   font-family: 'Rajdhani', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, monospace, sans-serif;
   background-image: 
-    linear-gradient(rgba(0, 240, 255, 0.03) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(0, 240, 255, 0.03) 1px, transparent 1px);
-  background-size: 30px 30px;
+    linear-gradient(rgba(0, 240, 255, 0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0, 240, 255, 0.05) 1px, transparent 1px);
+  background-size: 32px 32px;
 }
 
 html[data-theme="cyberpunk"] .sidebar {
   background-color: var(--bg-secondary);
-  border-right: 2px solid var(--cyber-pink);
-  box-shadow: 4px 0 20px rgba(255, 0, 85, 0.15);
+  border-right: 2px solid var(--cyber-yellow);
+  box-shadow: 4px 0 24px rgba(252, 238, 10, 0.2);
 }
 
 html[data-theme="cyberpunk"] .brand-icon {
-  background: linear-gradient(135deg, var(--cyber-cyan), var(--cyber-pink));
-  color: #07070f;
+  background: var(--cyber-yellow);
+  color: #000000;
   font-weight: 900;
-  box-shadow: 0 0 12px var(--cyber-cyan);
+  box-shadow: 0 0 16px var(--cyber-yellow);
+  clip-path: polygon(0 0, calc(100% - 6px) 0, 100% 6px, 100% 100%, 6px 100%, 0 calc(100% - 6px));
 }
 
 html[data-theme="cyberpunk"] .brand-title {
   color: var(--cyber-yellow);
-  text-shadow: 0 0 8px rgba(252, 238, 10, 0.6);
-  letter-spacing: 1px;
+  text-shadow: 0 0 10px rgba(252, 238, 10, 0.8), 0 0 20px rgba(252, 238, 10, 0.4);
+  letter-spacing: 2px;
+  font-weight: 900;
+  text-transform: uppercase;
 }
 
 html[data-theme="cyberpunk"] .nav-link {
-  color: #ff77a8;
-  border-radius: 4px;
+  color: var(--cyber-cyan);
+  border-radius: 0;
+  text-transform: uppercase;
+  font-weight: 700;
+  letter-spacing: 1px;
+  margin-bottom: 4px;
+  border: 1px solid transparent;
+  clip-path: polygon(0 0, calc(100% - 8px) 0, 100% 8px, 100% 100%, 8px 100%, 0 calc(100% - 8px));
+  transition: all 0.15s ease-in-out;
 }
 
 html[data-theme="cyberpunk"] .nav-link:hover {
-  background: rgba(0, 240, 255, 0.1);
-  color: var(--cyber-cyan);
-  text-shadow: 0 0 6px var(--cyber-cyan);
-}
-
-html[data-theme="cyberpunk"] .nav-link.active {
-  background: rgba(0, 240, 255, 0.18);
-  color: var(--cyber-cyan);
-  border-left: 3px solid var(--cyber-cyan);
-  box-shadow: inset 0 0 12px rgba(0, 240, 255, 0.2);
+  background: rgba(0, 240, 255, 0.15);
+  color: #ffffff;
+  border-color: var(--cyber-cyan);
   text-shadow: 0 0 8px var(--cyber-cyan);
 }
 
+html[data-theme="cyberpunk"] .nav-link.active {
+  background: var(--cyber-yellow);
+  color: #000000 !important;
+  font-weight: 900;
+  border-color: var(--cyber-yellow);
+  box-shadow: 0 0 14px rgba(252, 238, 10, 0.7);
+  text-shadow: none;
+}
+
 html[data-theme="cyberpunk"] .topbar {
-  background-color: rgba(14, 9, 30, 0.95);
+  background-color: rgba(11, 12, 16, 0.95);
   border-bottom: 2px solid var(--cyber-cyan);
-  box-shadow: 0 4px 15px rgba(0, 240, 255, 0.12);
+  box-shadow: 0 4px 20px rgba(0, 240, 255, 0.2);
 }
 
 html[data-theme="cyberpunk"] .page-title {
-  color: var(--cyber-cyan);
-  text-shadow: 0 0 10px rgba(0, 240, 255, 0.7);
-  letter-spacing: 0.5px;
+  color: var(--cyber-yellow);
+  text-shadow: 0 0 10px rgba(252, 238, 10, 0.7);
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  font-weight: 900;
 }
 
+/* Chamfered Cards (Angled polygon corners inspired by Cyberpunk 2077 HUD) */
 html[data-theme="cyberpunk"] .kpi-card,
 html[data-theme="cyberpunk"] .table-card,
 html[data-theme="cyberpunk"] .modal-box {
   background-color: var(--bg-card);
-  border: 1px solid var(--border-color);
-  border-left: 3px solid var(--cyber-cyan);
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.6), 0 0 10px rgba(0, 240, 255, 0.1);
+  border: 1px solid var(--cyber-cyan);
+  border-top: 3px solid var(--cyber-cyan);
+  border-radius: 0;
+  clip-path: polygon(0 0, calc(100% - 14px) 0, 100% 14px, 100% 100%, 14px 100%, 0 calc(100% - 14px));
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.8), 0 0 14px rgba(0, 240, 255, 0.25);
 }
 
 html[data-theme="cyberpunk"] .kpi-value {
   color: var(--cyber-yellow) !important;
-  text-shadow: 0 0 8px rgba(252, 238, 10, 0.5);
-  font-family: monospace;
+  text-shadow: 0 0 12px rgba(252, 238, 10, 0.8);
+  font-family: 'Rajdhani', monospace, sans-serif;
+  font-weight: 900;
+  letter-spacing: 1px;
+}
+
+html[data-theme="cyberpunk"] .kpi-card .kpi-label {
+  color: var(--cyber-cyan);
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  font-size: 11px;
 }
 
 html[data-theme="cyberpunk"] .table-title {
   color: var(--cyber-yellow);
-  text-shadow: 0 0 6px rgba(252, 238, 10, 0.4);
+  text-shadow: 0 0 8px rgba(252, 238, 10, 0.6);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  font-weight: 900;
 }
 
 html[data-theme="cyberpunk"] table th {
   background-color: var(--bg-tertiary);
-  color: var(--cyber-cyan);
-  border-bottom: 2px solid var(--cyber-pink);
+  color: var(--cyber-yellow);
+  border-bottom: 2px solid var(--cyber-cyan);
   text-transform: uppercase;
-  letter-spacing: 0.5px;
+  letter-spacing: 1px;
   font-size: 11px;
+  font-weight: 800;
 }
 
 html[data-theme="cyberpunk"] table td {
-  border-bottom: 1px solid #231640;
-  color: #e0d0f5;
+  border-bottom: 1px solid rgba(0, 240, 255, 0.15);
+  color: #e0f8ff;
 }
 
 html[data-theme="cyberpunk"] table tr:hover td {
-  background-color: rgba(0, 240, 255, 0.06);
+  background-color: rgba(0, 240, 255, 0.12);
+  color: #ffffff;
 }
 
+/* Screaming Cyberpunk Yellow Primary Button */
 html[data-theme="cyberpunk"] .btn-primary {
-  background: var(--cyber-cyan);
-  color: #07070f;
-  font-weight: 800;
+  background: var(--cyber-yellow);
+  color: #000000;
+  font-weight: 900;
   border: none;
-  box-shadow: 0 0 14px rgba(0, 240, 255, 0.6);
-  letter-spacing: 0.5px;
+  border-radius: 0;
+  clip-path: polygon(0 0, calc(100% - 10px) 0, 100% 10px, 100% 100%, 10px 100%, 0 calc(100% - 10px));
+  box-shadow: 0 0 16px rgba(252, 238, 10, 0.7);
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  transition: all 0.15s ease-in-out;
 }
 
 html[data-theme="cyberpunk"] .btn-primary:hover {
-  background: #4df6ff;
-  box-shadow: 0 0 20px rgba(0, 240, 255, 0.85);
+  background: #ffffff;
+  color: #000000;
+  box-shadow: 0 0 24px rgba(252, 238, 10, 0.95);
 }
 
+/* Electric Cyan Secondary Button */
 html[data-theme="cyberpunk"] .btn-secondary {
-  background: rgba(255, 0, 85, 0.1);
-  color: var(--cyber-pink);
-  border: 1px solid var(--cyber-pink);
-  box-shadow: 0 0 8px rgba(255, 0, 85, 0.25);
+  background: rgba(0, 240, 255, 0.08);
+  color: var(--cyber-cyan);
+  border: 1.5px solid var(--cyber-cyan);
+  border-radius: 0;
+  clip-path: polygon(0 0, calc(100% - 8px) 0, 100% 8px, 100% 100%, 8px 100%, 0 calc(100% - 8px));
+  box-shadow: 0 0 10px rgba(0, 240, 255, 0.3);
+  font-weight: 800;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  transition: all 0.15s ease-in-out;
 }
 
 html[data-theme="cyberpunk"] .btn-secondary:hover {
-  background: rgba(255, 0, 85, 0.25);
-  color: #ffffff;
-  box-shadow: 0 0 14px rgba(255, 0, 85, 0.5);
+  background: var(--cyber-cyan);
+  color: #000000;
+  box-shadow: 0 0 18px rgba(0, 240, 255, 0.85);
 }
 
 html[data-theme="cyberpunk"] .badge {
-  box-shadow: 0 0 6px currentColor;
+  border-radius: 0;
+  font-family: monospace;
+  font-weight: 800;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  border: 1px solid currentColor;
+  box-shadow: 0 0 8px currentColor;
+}
+
+html[data-theme="cyberpunk"] .theme-choice-card {
+  border-radius: 0;
+  clip-path: polygon(0 0, calc(100% - 12px) 0, 100% 12px, 100% 100%, 12px 100%, 0 calc(100% - 12px));
 }
 
 html[data-theme="cyberpunk"] .theme-choice-card.border-active {
-  border-color: var(--cyber-cyan);
-  box-shadow: 0 0 16px rgba(0, 240, 255, 0.35);
+  border-color: var(--cyber-yellow) !important;
+  box-shadow: 0 0 20px rgba(252, 238, 10, 0.5) !important;
 }
 
 /* ------------------------------------------------------------------------------
@@ -517,50 +574,63 @@ html[data-theme="apple"][data-apple-effective-theme="light"] .theme-choice-card.
 html[data-theme="cyberpunk"] .help-header-card,
 html[data-theme="cyberpunk"] .help-toc-card,
 html[data-theme="cyberpunk"] .help-content-card {
-  border-left: 3px solid var(--cyber-cyan);
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.6), 0 0 12px rgba(0, 240, 255, 0.15);
+  border: 1px solid var(--cyber-cyan);
+  border-left: 4px solid var(--cyber-yellow);
+  border-radius: 0;
+  clip-path: polygon(0 0, calc(100% - 12px) 0, 100% 12px, 100% 100%, 12px 100%, 0 calc(100% - 12px));
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.7), 0 0 14px rgba(0, 240, 255, 0.25);
 }
 
 html[data-theme="cyberpunk"] .help-pill {
   font-family: monospace;
-  border-color: rgba(0, 240, 255, 0.3);
-  color: #ff77a8;
+  border-radius: 0;
+  clip-path: polygon(0 0, calc(100% - 6px) 0, 100% 6px, 100% 100%, 6px 100%, 0 calc(100% - 6px));
+  border-color: rgba(0, 240, 255, 0.4);
+  color: var(--cyber-cyan);
+  font-weight: 700;
+  text-transform: uppercase;
 }
 
 html[data-theme="cyberpunk"] .help-pill:hover {
-  border-color: var(--cyber-cyan);
-  color: var(--cyber-cyan);
-  box-shadow: 0 0 8px rgba(0, 240, 255, 0.4);
+  border-color: var(--cyber-yellow);
+  color: var(--cyber-yellow);
+  box-shadow: 0 0 10px rgba(252, 238, 10, 0.5);
 }
 
 html[data-theme="cyberpunk"] .help-pill.active {
-  background: var(--cyber-cyan);
-  color: #0a0416;
-  border-color: var(--cyber-cyan);
-  box-shadow: 0 0 12px var(--cyber-cyan);
-  font-weight: 700;
+  background: var(--cyber-yellow);
+  color: #000000;
+  border-color: var(--cyber-yellow);
+  box-shadow: 0 0 14px rgba(252, 238, 10, 0.8);
+  font-weight: 900;
+}
+
+html[data-theme="cyberpunk"] .help-toc-item {
+  border-radius: 0;
 }
 
 html[data-theme="cyberpunk"] .help-toc-item:hover {
-  background: rgba(0, 240, 255, 0.1);
+  background: rgba(0, 240, 255, 0.15);
   border-color: var(--cyber-cyan);
 }
 
 html[data-theme="cyberpunk"] .help-toc-item.active {
-  background: rgba(255, 0, 127, 0.15);
-  border-color: var(--cyber-pink);
-  border-left: 3px solid var(--cyber-pink);
-  box-shadow: 0 0 10px rgba(255, 0, 127, 0.3);
+  background: rgba(252, 238, 10, 0.15);
+  border-color: var(--cyber-yellow);
+  border-left: 3px solid var(--cyber-yellow);
+  box-shadow: 0 0 12px rgba(252, 238, 10, 0.4);
 }
 
 html[data-theme="cyberpunk"] .help-toc-item.active .help-toc-badge {
-  background: var(--cyber-pink);
-  color: #ffffff;
+  background: var(--cyber-yellow);
+  color: #000000;
+  font-weight: 900;
 }
 
 html[data-theme="cyberpunk"] .help-article-body pre {
   border: 1px solid var(--cyber-cyan);
-  box-shadow: 0 0 10px rgba(0, 240, 255, 0.2);
+  border-radius: 0;
+  box-shadow: 0 0 12px rgba(0, 240, 255, 0.3);
 }
 
 /* Apple iOS Theme */
