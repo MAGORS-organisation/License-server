@@ -295,3 +295,123 @@ public sealed record AchillesLicenseCustomResource
     [JsonPropertyName("status")]
     public SymbolonLicenseStatus? Status { get; init; }
 }
+
+public sealed record AchillesSeatClaimSpec
+{
+    [JsonPropertyName("licenseRef")]
+    public required string LicenseRef { get; init; }
+
+    [JsonPropertyName("machineId")]
+    public required string MachineId { get; init; }
+
+    [JsonPropertyName("userId")]
+    public string? UserId { get; init; }
+
+    [JsonPropertyName("department")]
+    public string? Department { get; init; }
+
+    [JsonPropertyName("features")]
+    public IReadOnlyList<string>? Features { get; init; }
+
+    [JsonPropertyName("durationMinutes")]
+    public int DurationMinutes { get; init; } = 60;
+
+    [JsonPropertyName("allowQueue")]
+    public bool AllowQueue { get; init; } = true;
+}
+
+public sealed record AchillesSeatClaimStatus
+{
+    [JsonPropertyName("phase")]
+    public string Phase { get; init; } = "Pending";
+
+    [JsonPropertyName("leaseId")]
+    public string? LeaseId { get; init; }
+
+    [JsonPropertyName("seatNo")]
+    public int? SeatNo { get; init; }
+
+    [JsonPropertyName("expiresAt")]
+    public DateTimeOffset? ExpiresAt { get; init; }
+
+    [JsonPropertyName("lastReconciledAt")]
+    public DateTimeOffset? LastReconciledAt { get; init; }
+
+    [JsonPropertyName("conditions")]
+    public IReadOnlyList<K8sCondition> Conditions { get; init; } = [];
+}
+
+public sealed record AchillesSeatClaimCustomResource
+{
+    [JsonPropertyName("apiVersion")]
+    public string ApiVersion { get; init; } = "licensing.achilles.io/v1alpha1";
+
+    [JsonPropertyName("kind")]
+    public string Kind { get; init; } = "AchillesSeatClaim";
+
+    [JsonPropertyName("metadata")]
+    public K8sObjectMeta Metadata { get; init; } = new();
+
+    [JsonPropertyName("spec")]
+    public AchillesSeatClaimSpec Spec { get; init; } = null!;
+
+    [JsonPropertyName("status")]
+    public AchillesSeatClaimStatus? Status { get; init; }
+}
+
+public sealed record AchillesRelaySpec
+{
+    [JsonPropertyName("upstreamServer")]
+    public required string UpstreamServer { get; init; }
+
+    [JsonPropertyName("localSeats")]
+    public int LocalSeats { get; init; } = 50;
+
+    [JsonPropertyName("edgeClusterId")]
+    public string EdgeClusterId { get; init; } = "edge-1";
+
+    [JsonPropertyName("syncIntervalSeconds")]
+    public int SyncIntervalSeconds { get; init; } = 30;
+
+    [JsonPropertyName("replicas")]
+    public int Replicas { get; init; } = 1;
+
+    [JsonPropertyName("storage")]
+    public string Storage { get; init; } = "sqlite";
+}
+
+public sealed record AchillesRelayStatus
+{
+    [JsonPropertyName("phase")]
+    public string Phase { get; init; } = "Pending";
+
+    [JsonPropertyName("allocatedSeats")]
+    public int AllocatedSeats { get; init; }
+
+    [JsonPropertyName("upstreamConnected")]
+    public bool UpstreamConnected { get; init; }
+
+    [JsonPropertyName("lastSyncedAt")]
+    public DateTimeOffset? LastSyncedAt { get; init; }
+
+    [JsonPropertyName("conditions")]
+    public IReadOnlyList<K8sCondition> Conditions { get; init; } = [];
+}
+
+public sealed record AchillesRelayCustomResource
+{
+    [JsonPropertyName("apiVersion")]
+    public string ApiVersion { get; init; } = "licensing.achilles.io/v1alpha1";
+
+    [JsonPropertyName("kind")]
+    public string Kind { get; init; } = "AchillesRelay";
+
+    [JsonPropertyName("metadata")]
+    public K8sObjectMeta Metadata { get; init; } = new();
+
+    [JsonPropertyName("spec")]
+    public AchillesRelaySpec Spec { get; init; } = null!;
+
+    [JsonPropertyName("status")]
+    public AchillesRelayStatus? Status { get; init; }
+}

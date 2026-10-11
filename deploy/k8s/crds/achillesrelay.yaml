@@ -1,0 +1,100 @@
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: achillesrelays.licensing.achilles.io
+  labels:
+    app.kubernetes.io/name: achilles
+    app.kubernetes.io/part-of: achilles-operator
+spec:
+  group: licensing.achilles.io
+  names:
+    kind: AchillesRelay
+    listKind: AchillesRelayList
+    plural: achillesrelays
+    singular: achillesrelay
+    shortNames:
+      - arelay
+      - achrelay
+  scope: Namespaced
+  versions:
+    - name: v1alpha1
+      served: true
+      storage: true
+      subresources:
+        status: {}
+      schema:
+        openAPIV3Schema:
+          type: object
+          properties:
+            spec:
+              type: object
+              required:
+                - upstreamServer
+              properties:
+                upstreamServer:
+                  type: string
+                  description: Parent Control Plane URL for upstream grant delegation.
+                localSeats:
+                  type: integer
+                  default: 50
+                  description: Seat quota delegated to this edge cluster.
+                edgeClusterId:
+                  type: string
+                  default: "edge-1"
+                  description: Unique edge cluster ID.
+                syncIntervalSeconds:
+                  type: integer
+                  default: 30
+                  description: Upstream synchronization heartbeat interval.
+                replicas:
+                  type: integer
+                  default: 1
+                storage:
+                  type: string
+                  default: "sqlite"
+            status:
+              type: object
+              properties:
+                phase:
+                  type: string
+                  enum:
+                    - Pending
+                    - Running
+                    - Degraded
+                    - Failed
+                allocatedSeats:
+                  type: integer
+                upstreamConnected:
+                  type: boolean
+                lastSyncedAt:
+                  type: string
+                  format: date-time
+                conditions:
+                  type: array
+                  items:
+                    type: object
+                    required:
+                      - type
+                      - status
+                    properties:
+                      type:
+                        type: string
+                      status:
+                        type: string
+                      reason:
+                        type: string
+                      message:
+                        type: string
+      additionalPrinterColumns:
+        - name: Upstream
+          type: string
+          jsonPath: .spec.upstreamServer
+        - name: Seats
+          type: integer
+          jsonPath: .spec.localSeats
+        - name: Phase
+          type: string
+          jsonPath: .status.phase
+        - name: Connected
+          type: boolean
+          jsonPath: .status.upstreamConnected

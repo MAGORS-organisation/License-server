@@ -1,0 +1,132 @@
+# Achilles License Infrastructure - Production Cloud-Native GitOps Stack
+# Architecture: PostgreSQL 17 + ControlPlane HA + Edge Relay + Envoy L7 Gateway + Prometheus + Grafana
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    container_name: achilles-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: achilles
+      POSTGRES_USER: achilles
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-AchillesSecure2026!}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U achilles -d achilles"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - achilles-net
+
+  controlplane:
+    build:
+      context: .
+      dockerfile: deploy/docker/Dockerfile.controlplane
+    image: ghcr.io/magors-organisation/achilles-controlplane:latest
+    container_name: achilles-controlplane
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      ConnectionStrings__AchillesDb: "Host=postgres;Port=5432;Database=achilles;Username=achilles;Password=${POSTGRES_PASSWORD:-AchillesSecure2026!}"
+      ConnectionStrings__SymbolonDb: "Host=postgres;Port=5432;Database=achilles;Username=achilles;Password=${POSTGRES_PASSWORD:-AchillesSecure2026!}"
+      ASPNETCORE_ENVIRONMENT: "Production"
+      ASPNETCORE_HTTP_PORTS: "8080"
+      Symbolon__PqcEnabled: "true"
+      Achilles__PqcEnabled: "true"
+    ports:
+      - "8080:8080"
+    healthcheck:
+      test: ["CMD-SHELL", "wget --spider -q http://localhost:8080/health/ready || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    networks:
+      - achilles-net
+
+  relay:
+    build:
+      context: .
+      dockerfile: deploy/docker/Dockerfile.relay
+    image: ghcr.io/magors-organisation/achilles-relay:latest
+    container_name: achilles-relay
+    restart: unless-stopped
+    depends_on:
+      controlplane:
+        condition: service_healthy
+    environment:
+      ASPNETCORE_ENVIRONMENT: "Production"
+      ASPNETCORE_HTTP_PORTS: "8180"
+      Database__ConnectionString: "Data Source=/app/data/achilles-relay.db"
+    ports:
+      - "8180:8180"
+    volumes:
+      - relay_data:/app/data
+    healthcheck:
+      test: ["CMD-SHELL", "wget --spider -q http://localhost:8180/health/ready || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    networks:
+      - achilles-net
+
+  envoy:
+    image: envoyproxy/envoy:v1.31-latest
+    container_name: achilles-envoy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    depends_on:
+      - controlplane
+      - relay
+    networks:
+      - achilles-net
+
+  prometheus:
+    image: prom/prometheus:v2.54.1
+    container_name: achilles-prometheus
+    restart: unless-stopped
+    volumes:
+      - ./deploy/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    ports:
+      - "9090:9090"
+    depends_on:
+      - controlplane
+      - relay
+    networks:
+      - achilles-net
+
+  grafana:
+    image: grafana/grafana:11.2.0
+    container_name: achilles-grafana
+    restart: unless-stopped
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD:-admin}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    volumes:
+      - ./dashboards/achilles-controlplane-grafana.json:/var/lib/grafana/dashboards/achilles-dashboard.json:ro
+      - grafana_data:/var/lib/grafana
+    ports:
+      - "3000:3000"
+    depends_on:
+      - prometheus
+    networks:
+      - achilles-net
+
+volumes:
+  postgres_data:
+  relay_data:
+  prometheus_data:
+  grafana_data:
+
+networks:
+  achilles-net:
+    driver: bridge
