@@ -20,6 +20,22 @@ public sealed class ObservabilityTests : IClassFixture<ControlPlaneFactory>
         Assert.Equal("text/plain", response.Content.Headers.ContentType?.MediaType);
 
         var content = await response.Content.ReadAsStringAsync();
+        Assert.Contains("achilles_seats_active", content, StringComparison.Ordinal);
+        Assert.Contains("achilles_seats_total", content, StringComparison.Ordinal);
+        Assert.Contains("achilles_seats_utilization_ratio", content, StringComparison.Ordinal);
+        Assert.Contains("achilles_queue_depth_current", content, StringComparison.Ordinal);
+        Assert.Contains("achilles_checkout_duration_seconds", content, StringComparison.Ordinal);
+        Assert.Contains("achilles_pqc_verification_duration_seconds", content, StringComparison.Ordinal);
+        Assert.Contains("achilles_checkout_success_total", content, StringComparison.Ordinal);
+        Assert.Contains("achilles_checkout_denied_total", content, StringComparison.Ordinal);
+        Assert.Contains("achilles_lease_renewed_total", content, StringComparison.Ordinal);
+        Assert.Contains("achilles_lease_released_total", content, StringComparison.Ordinal);
+        Assert.Contains("achilles_pqc_signatures_total", content, StringComparison.Ordinal);
+        Assert.Contains("achilles_tokens_consumed_total", content, StringComparison.Ordinal);
+        Assert.Contains("achilles_clock_skew_detected_total", content, StringComparison.Ordinal);
+        Assert.Contains("achilles_crypto_keys_total", content, StringComparison.Ordinal);
+        Assert.Contains("achilles_server_uptime_seconds", content, StringComparison.Ordinal);
+
         Assert.Contains("symbolon_seats_active", content, StringComparison.Ordinal);
         Assert.Contains("symbolon_seats_total", content, StringComparison.Ordinal);
         Assert.Contains("symbolon_checkout_success_total", content, StringComparison.Ordinal);

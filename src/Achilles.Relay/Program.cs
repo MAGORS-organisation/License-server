@@ -101,7 +101,25 @@ app.MapGet("/metrics", async (SqliteSeatStore seatStore, TimeProvider timeProvid
     int totalAllocated = await seatStore.GetAllocatedSeatCountAsync(now, ct).ConfigureAwait(false);
     int totalSeats = await seatStore.GetTotalSeatCountAsync(ct).ConfigureAwait(false);
 
-    var sb = new System.Text.StringBuilder(512);
+    double utilRatio = totalSeats > 0 ? Math.Clamp((double)totalAllocated / totalSeats, 0.0, 1.0) : 0.0;
+    var sb = new System.Text.StringBuilder(1024);
+
+    sb.AppendLine("# HELP achilles_relay_seats_allocated Current number of allocated seats on this relay node.");
+    sb.AppendLine("# TYPE achilles_relay_seats_allocated gauge");
+    sb.Append("achilles_relay_seats_allocated ").AppendLine(totalAllocated.ToString(System.Globalization.CultureInfo.InvariantCulture));
+
+    sb.AppendLine("# HELP achilles_relay_seats_total Total number of seats available on this relay node.");
+    sb.AppendLine("# TYPE achilles_relay_seats_total gauge");
+    sb.Append("achilles_relay_seats_total ").AppendLine(totalSeats.ToString(System.Globalization.CultureInfo.InvariantCulture));
+
+    sb.AppendLine("# HELP achilles_relay_seats_utilization_ratio Utilization ratio of seats on this relay node.");
+    sb.AppendLine("# TYPE achilles_relay_seats_utilization_ratio gauge");
+    sb.Append("achilles_relay_seats_utilization_ratio ").AppendLine(utilRatio.ToString("F4", System.Globalization.CultureInfo.InvariantCulture));
+
+    sb.AppendLine("# HELP achilles_relay_active_grants Number of upstream seat grants held by this relay.");
+    sb.AppendLine("# TYPE achilles_relay_active_grants gauge");
+    sb.Append("achilles_relay_active_grants ").AppendLine(grants.Count.ToString(System.Globalization.CultureInfo.InvariantCulture));
+
     sb.AppendLine("# HELP symbolon_relay_seats_allocated Current number of allocated seats on this relay node.");
     sb.AppendLine("# TYPE symbolon_relay_seats_allocated gauge");
     sb.Append("symbolon_relay_seats_allocated ").AppendLine(totalAllocated.ToString(System.Globalization.CultureInfo.InvariantCulture));

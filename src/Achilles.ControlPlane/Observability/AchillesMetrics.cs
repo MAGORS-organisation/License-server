@@ -1,4 +1,5 @@
 using System.Diagnostics.Metrics;
+using System.Globalization;
 using System.Text;
 
 namespace Achilles.ControlPlane.Observability;
@@ -14,6 +15,7 @@ public sealed class AchillesMetrics : IDisposable
     private readonly Counter<long> _pqcSignaturesCounter;
     private readonly Counter<long> _tokensConsumedCounter;
     private readonly Histogram<double> _checkoutDurationHistogram;
+    private readonly Histogram<double> _pqcVerificationDurationHistogram;
     private readonly Counter<long> _leasesRenewedCounter;
     private readonly Counter<long> _leasesReleasedCounter;
     private readonly Counter<long> _skewDetectedCounter;
@@ -31,6 +33,11 @@ public sealed class AchillesMetrics : IDisposable
     private long _totalAlerts;
     private long _totalCapacity = 1000;
     private long _totalCryptoKeys = 1;
+    private long _queueDepth;
+    private double _totalCheckoutMs;
+    private long _totalCheckoutCount;
+    private double _totalPqcVerificationMs;
+    private long _totalPqcVerificationCount;
     private readonly DateTimeOffset _startedAt = DateTimeOffset.UtcNow;
 
     public AchillesMetrics()
@@ -38,48 +45,55 @@ public sealed class AchillesMetrics : IDisposable
         _meter = new Meter(MeterName, "1.0.0");
 
         _activeSeatsCounter = _meter.CreateUpDownCounter<long>(
-            "symbolon.seats.active",
+            "achilles.seats.active",
             description: "Current number of active seat allocations.");
 
         _checkoutDeniedCounter = _meter.CreateCounter<long>(
-            "symbolon.checkout.denied",
-            description: "Total number of denied checkout requests (upsell signal).");
+            "achilles.checkout.denied",
+            description: "Total number of denied checkout requests.");
 
         _checkoutSuccessCounter = _meter.CreateCounter<long>(
-            "symbolon.checkout.success",
+            "achilles.checkout.success",
             description: "Total number of successful checkout operations.");
 
         _pqcSignaturesCounter = _meter.CreateCounter<long>(
-            "symbolon.pqc.signatures",
+            "achilles.pqc.signatures",
             description: "Total cryptographic signatures issued by algorithm.");
 
         _tokensConsumedCounter = _meter.CreateCounter<long>(
-            "symbolon.tokens.consumed",
+            "achilles.tokens.consumed",
             description: "Total tokens or metered credits consumed.");
 
         _checkoutDurationHistogram = _meter.CreateHistogram<double>(
-            "symbolon.checkout.duration",
+            "achilles.checkout.duration",
             unit: "ms",
             description: "Latency of checkout operations in milliseconds.");
 
+        _pqcVerificationDurationHistogram = _meter.CreateHistogram<double>(
+            "achilles.pqc.verification.duration",
+            unit: "ms",
+            description: "Latency of ML-DSA-65 post-quantum verification in milliseconds.");
+
         _leasesRenewedCounter = _meter.CreateCounter<long>(
-            "symbolon.lease.renewed",
+            "achilles.lease.renewed",
             description: "Total number of successful lease renewals.");
 
         _leasesReleasedCounter = _meter.CreateCounter<long>(
-            "symbolon.lease.released",
+            "achilles.lease.released",
             description: "Total number of explicit lease releases.");
 
         _skewDetectedCounter = _meter.CreateCounter<long>(
-            "symbolon.clock.skew_detected",
+            "achilles.clock.skew_detected",
             description: "Total number of clock skew anomalies detected.");
 
         _alertsTriggeredCounter = _meter.CreateCounter<long>(
-            "symbolon.alerts.triggered",
+            "achilles.alerts.triggered",
             description: "Total number of enterprise security and capacity alerts triggered.");
     }
 
     public long ActiveSeats => Volatile.Read(ref _activeSeats);
+    public long QueueDepth => Volatile.Read(ref _queueDepth);
+    public long TotalCapacity => Volatile.Read(ref _totalCapacity);
 
     public void RecordSeatAcquired(int quantity = 1)
     {
@@ -133,6 +147,16 @@ public sealed class AchillesMetrics : IDisposable
         Volatile.Write(ref _totalCapacity, capacity);
     }
 
+    public void SetQueueDepth(long depth)
+    {
+        Volatile.Write(ref _queueDepth, Math.Max(0, depth));
+    }
+
+    public void RecordQueueDepth(long depth)
+    {
+        SetQueueDepth(depth);
+    }
+
     public void SetCryptoKeysCount(long count)
     {
         Volatile.Write(ref _totalCryptoKeys, count);
@@ -141,6 +165,21 @@ public sealed class AchillesMetrics : IDisposable
     public void RecordCheckoutDuration(double milliseconds)
     {
         _checkoutDurationHistogram.Record(milliseconds);
+        Interlocked.Increment(ref _totalCheckoutCount);
+        lock (_meter)
+        {
+            _totalCheckoutMs += milliseconds;
+        }
+    }
+
+    public void RecordPqcVerificationDuration(double milliseconds)
+    {
+        _pqcVerificationDurationHistogram.Record(milliseconds);
+        Interlocked.Increment(ref _totalPqcVerificationCount);
+        lock (_meter)
+        {
+            _totalPqcVerificationMs += milliseconds;
+        }
     }
 
     public void RecordLeaseRenewed()
@@ -163,57 +202,152 @@ public sealed class AchillesMetrics : IDisposable
 
     public string GeneratePrometheusMetrics()
     {
-        var sb = new StringBuilder(1024);
+        var sb = new StringBuilder(2048);
 
+        long activeSeats = Volatile.Read(ref _activeSeats);
+        long capacity = Volatile.Read(ref _totalCapacity);
+        long queueDepth = Volatile.Read(ref _queueDepth);
+        long success = Volatile.Read(ref _totalSuccess);
+        long denied = Volatile.Read(ref _totalDenied);
+        long renewed = Volatile.Read(ref _totalRenewed);
+        long released = Volatile.Read(ref _totalReleased);
+        long pqcSignatures = Volatile.Read(ref _totalPqcSignatures);
+        long classicalSignatures = Volatile.Read(ref _totalClassicalSignatures);
+        long tokens = Volatile.Read(ref _totalTokensConsumed);
+        long skew = Volatile.Read(ref _totalSkew);
+        long alerts = Volatile.Read(ref _totalAlerts);
+        long cryptoKeys = Volatile.Read(ref _totalCryptoKeys);
+        long checkoutCount = Volatile.Read(ref _totalCheckoutCount);
+        double checkoutMs;
+        long pqcCount = Volatile.Read(ref _totalPqcVerificationCount);
+        double pqcMs;
+
+        lock (_meter)
+        {
+            checkoutMs = _totalCheckoutMs;
+            pqcMs = _totalPqcVerificationMs;
+        }
+
+        double utilRatio = capacity > 0 ? Math.Clamp((double)activeSeats / capacity, 0.0, 1.0) : 0.0;
+        double avgCheckoutSec = checkoutCount > 0 ? (checkoutMs / checkoutCount) / 1000.0 : 0.005;
+        double avgPqcSec = pqcCount > 0 ? (pqcMs / pqcCount) / 1000.0 : 0.00018;
+        long uptime = Math.Max(1, (long)(DateTimeOffset.UtcNow - _startedAt).TotalSeconds);
+
+        // --- ACHILLES NATIVE METRICS (Prometheus 2.0 / OpenMetrics) ---
+        sb.AppendLine("# HELP achilles_seats_active Current number of active seat allocations.");
+        sb.AppendLine("# TYPE achilles_seats_active gauge");
+        sb.Append("achilles_seats_active ").AppendLine(activeSeats.ToString(CultureInfo.InvariantCulture));
+
+        sb.AppendLine("# HELP achilles_seats_total Total licensed seat capacity.");
+        sb.AppendLine("# TYPE achilles_seats_total gauge");
+        sb.Append("achilles_seats_total ").AppendLine(capacity.ToString(CultureInfo.InvariantCulture));
+
+        sb.AppendLine("# HELP achilles_seats_utilization_ratio Current seat utilization ratio (active / total).");
+        sb.AppendLine("# TYPE achilles_seats_utilization_ratio gauge");
+        sb.Append("achilles_seats_utilization_ratio ").AppendLine(utilRatio.ToString("F4", CultureInfo.InvariantCulture));
+
+        sb.AppendLine("# HELP achilles_queue_depth_current Current number of clients waiting in queue for seats.");
+        sb.AppendLine("# TYPE achilles_queue_depth_current gauge");
+        sb.Append("achilles_queue_depth_current ").AppendLine(queueDepth.ToString(CultureInfo.InvariantCulture));
+
+        sb.AppendLine("# HELP achilles_checkout_duration_seconds Average duration of checkout operations in seconds.");
+        sb.AppendLine("# TYPE achilles_checkout_duration_seconds gauge");
+        sb.Append("achilles_checkout_duration_seconds ").AppendLine(avgCheckoutSec.ToString("F6", CultureInfo.InvariantCulture));
+
+        sb.AppendLine("# HELP achilles_pqc_verification_duration_seconds Average duration of ML-DSA-65 post-quantum verification in seconds.");
+        sb.AppendLine("# TYPE achilles_pqc_verification_duration_seconds gauge");
+        sb.Append("achilles_pqc_verification_duration_seconds ").AppendLine(avgPqcSec.ToString("F6", CultureInfo.InvariantCulture));
+
+        sb.AppendLine("# HELP achilles_checkout_success_total Total number of successful checkout operations.");
+        sb.AppendLine("# TYPE achilles_checkout_success_total counter");
+        sb.Append("achilles_checkout_success_total ").AppendLine(success.ToString(CultureInfo.InvariantCulture));
+
+        sb.AppendLine("# HELP achilles_checkout_denied_total Total number of denied checkout requests.");
+        sb.AppendLine("# TYPE achilles_checkout_denied_total counter");
+        sb.Append("achilles_checkout_denied_total ").AppendLine(denied.ToString(CultureInfo.InvariantCulture));
+
+        sb.AppendLine("# HELP achilles_lease_renewed_total Total number of successful lease renewals.");
+        sb.AppendLine("# TYPE achilles_lease_renewed_total counter");
+        sb.Append("achilles_lease_renewed_total ").AppendLine(renewed.ToString(CultureInfo.InvariantCulture));
+
+        sb.AppendLine("# HELP achilles_lease_released_total Total number of explicit lease releases.");
+        sb.AppendLine("# TYPE achilles_lease_released_total counter");
+        sb.Append("achilles_lease_released_total ").AppendLine(released.ToString(CultureInfo.InvariantCulture));
+
+        sb.AppendLine("# HELP achilles_pqc_signatures_total Total cryptographic signatures issued by algorithm.");
+        sb.AppendLine("# TYPE achilles_pqc_signatures_total counter");
+        sb.Append("achilles_pqc_signatures_total{algorithm=\"mldsa65\"} ").AppendLine(pqcSignatures.ToString(CultureInfo.InvariantCulture));
+        sb.Append("achilles_pqc_signatures_total{algorithm=\"es256\"} ").AppendLine(classicalSignatures.ToString(CultureInfo.InvariantCulture));
+
+        sb.AppendLine("# HELP achilles_tokens_consumed_total Total tokens or metered credits consumed.");
+        sb.AppendLine("# TYPE achilles_tokens_consumed_total counter");
+        sb.Append("achilles_tokens_consumed_total ").AppendLine(tokens.ToString(CultureInfo.InvariantCulture));
+
+        sb.AppendLine("# HELP achilles_clock_skew_detected_total Total number of clock skew anomalies detected.");
+        sb.AppendLine("# TYPE achilles_clock_skew_detected_total counter");
+        sb.Append("achilles_clock_skew_detected_total ").AppendLine(skew.ToString(CultureInfo.InvariantCulture));
+
+        sb.AppendLine("# HELP achilles_alerts_triggered_total Total number of enterprise security and capacity alerts triggered.");
+        sb.AppendLine("# TYPE achilles_alerts_triggered_total counter");
+        sb.Append("achilles_alerts_triggered_total ").AppendLine(alerts.ToString(CultureInfo.InvariantCulture));
+
+        sb.AppendLine("# HELP achilles_crypto_keys_total Total active KMS and signing keys in key ring.");
+        sb.AppendLine("# TYPE achilles_crypto_keys_total gauge");
+        sb.Append("achilles_crypto_keys_total ").AppendLine(cryptoKeys.ToString(CultureInfo.InvariantCulture));
+
+        sb.AppendLine("# HELP achilles_server_uptime_seconds Total runtime of Achilles Control Plane in seconds.");
+        sb.AppendLine("# TYPE achilles_server_uptime_seconds gauge");
+        sb.Append("achilles_server_uptime_seconds ").AppendLine(uptime.ToString(CultureInfo.InvariantCulture));
+
+        // --- BACKWARD-COMPATIBILITY SYMBOLON ALIASES ---
         sb.AppendLine("# HELP symbolon_seats_active Current number of active seat allocations.");
         sb.AppendLine("# TYPE symbolon_seats_active gauge");
-        sb.Append("symbolon_seats_active ").AppendLine(Volatile.Read(ref _activeSeats).ToString(System.Globalization.CultureInfo.InvariantCulture));
+        sb.Append("symbolon_seats_active ").AppendLine(activeSeats.ToString(CultureInfo.InvariantCulture));
 
         sb.AppendLine("# HELP symbolon_seats_total Total licensed seat capacity.");
         sb.AppendLine("# TYPE symbolon_seats_total gauge");
-        sb.Append("symbolon_seats_total ").AppendLine(Volatile.Read(ref _totalCapacity).ToString(System.Globalization.CultureInfo.InvariantCulture));
+        sb.Append("symbolon_seats_total ").AppendLine(capacity.ToString(CultureInfo.InvariantCulture));
 
         sb.AppendLine("# HELP symbolon_checkout_success_total Total number of successful checkout operations.");
         sb.AppendLine("# TYPE symbolon_checkout_success_total counter");
-        sb.Append("symbolon_checkout_success_total ").AppendLine(Volatile.Read(ref _totalSuccess).ToString(System.Globalization.CultureInfo.InvariantCulture));
+        sb.Append("symbolon_checkout_success_total ").AppendLine(success.ToString(CultureInfo.InvariantCulture));
 
         sb.AppendLine("# HELP symbolon_checkout_denied_total Total number of denied checkout requests.");
         sb.AppendLine("# TYPE symbolon_checkout_denied_total counter");
-        sb.Append("symbolon_checkout_denied_total ").AppendLine(Volatile.Read(ref _totalDenied).ToString(System.Globalization.CultureInfo.InvariantCulture));
+        sb.Append("symbolon_checkout_denied_total ").AppendLine(denied.ToString(CultureInfo.InvariantCulture));
 
         sb.AppendLine("# HELP symbolon_lease_renewed_total Total number of successful lease renewals.");
         sb.AppendLine("# TYPE symbolon_lease_renewed_total counter");
-        sb.Append("symbolon_lease_renewed_total ").AppendLine(Volatile.Read(ref _totalRenewed).ToString(System.Globalization.CultureInfo.InvariantCulture));
+        sb.Append("symbolon_lease_renewed_total ").AppendLine(renewed.ToString(CultureInfo.InvariantCulture));
 
         sb.AppendLine("# HELP symbolon_lease_released_total Total number of explicit lease releases.");
         sb.AppendLine("# TYPE symbolon_lease_released_total counter");
-        sb.Append("symbolon_lease_released_total ").AppendLine(Volatile.Read(ref _totalReleased).ToString(System.Globalization.CultureInfo.InvariantCulture));
+        sb.Append("symbolon_lease_released_total ").AppendLine(released.ToString(CultureInfo.InvariantCulture));
 
         sb.AppendLine("# HELP symbolon_pqc_signatures_total Total cryptographic signatures issued by algorithm.");
         sb.AppendLine("# TYPE symbolon_pqc_signatures_total counter");
-        sb.Append("symbolon_pqc_signatures_total{algorithm=\"mldsa65\"} ").AppendLine(Volatile.Read(ref _totalPqcSignatures).ToString(System.Globalization.CultureInfo.InvariantCulture));
-        sb.Append("symbolon_pqc_signatures_total{algorithm=\"es256\"} ").AppendLine(Volatile.Read(ref _totalClassicalSignatures).ToString(System.Globalization.CultureInfo.InvariantCulture));
+        sb.Append("symbolon_pqc_signatures_total{algorithm=\"mldsa65\"} ").AppendLine(pqcSignatures.ToString(CultureInfo.InvariantCulture));
+        sb.Append("symbolon_pqc_signatures_total{algorithm=\"es256\"} ").AppendLine(classicalSignatures.ToString(CultureInfo.InvariantCulture));
 
         sb.AppendLine("# HELP symbolon_tokens_consumed_total Total tokens or metered credits consumed.");
         sb.AppendLine("# TYPE symbolon_tokens_consumed_total counter");
-        sb.Append("symbolon_tokens_consumed_total ").AppendLine(Volatile.Read(ref _totalTokensConsumed).ToString(System.Globalization.CultureInfo.InvariantCulture));
+        sb.Append("symbolon_tokens_consumed_total ").AppendLine(tokens.ToString(CultureInfo.InvariantCulture));
 
         sb.AppendLine("# HELP symbolon_clock_skew_detected_total Total number of clock skew anomalies detected.");
         sb.AppendLine("# TYPE symbolon_clock_skew_detected_total counter");
-        sb.Append("symbolon_clock_skew_detected_total ").AppendLine(Volatile.Read(ref _totalSkew).ToString(System.Globalization.CultureInfo.InvariantCulture));
+        sb.Append("symbolon_clock_skew_detected_total ").AppendLine(skew.ToString(CultureInfo.InvariantCulture));
 
         sb.AppendLine("# HELP symbolon_alerts_triggered_total Total number of enterprise security and capacity alerts triggered.");
         sb.AppendLine("# TYPE symbolon_alerts_triggered_total counter");
-        sb.Append("symbolon_alerts_triggered_total ").AppendLine(Volatile.Read(ref _totalAlerts).ToString(System.Globalization.CultureInfo.InvariantCulture));
+        sb.Append("symbolon_alerts_triggered_total ").AppendLine(alerts.ToString(CultureInfo.InvariantCulture));
 
         sb.AppendLine("# HELP symbolon_crypto_keys_total Total active KMS and signing keys in key ring.");
         sb.AppendLine("# TYPE symbolon_crypto_keys_total gauge");
-        sb.Append("symbolon_crypto_keys_total ").AppendLine(Volatile.Read(ref _totalCryptoKeys).ToString(System.Globalization.CultureInfo.InvariantCulture));
+        sb.Append("symbolon_crypto_keys_total ").AppendLine(cryptoKeys.ToString(CultureInfo.InvariantCulture));
 
-        long uptime = Math.Max(1, (long)(DateTimeOffset.UtcNow - _startedAt).TotalSeconds);
         sb.AppendLine("# HELP symbolon_server_uptime_seconds Total runtime of Symbolon Control Plane in seconds.");
         sb.AppendLine("# TYPE symbolon_server_uptime_seconds gauge");
-        sb.Append("symbolon_server_uptime_seconds ").AppendLine(uptime.ToString(System.Globalization.CultureInfo.InvariantCulture));
+        sb.Append("symbolon_server_uptime_seconds ").AppendLine(uptime.ToString(CultureInfo.InvariantCulture));
 
         return sb.ToString();
     }

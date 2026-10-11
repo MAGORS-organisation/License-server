@@ -73,6 +73,10 @@ public sealed class RelayApiTests : IClassFixture<WebApplicationFactory<Program>
         response.Content.Headers.ContentType?.MediaType.Should().Be("text/plain");
 
         string content = await response.Content.ReadAsStringAsync();
+        content.Should().Contain("achilles_relay_seats_allocated");
+        content.Should().Contain("achilles_relay_seats_total");
+        content.Should().Contain("achilles_relay_seats_utilization_ratio");
+        content.Should().Contain("achilles_relay_active_grants");
         content.Should().Contain("symbolon_relay_seats_allocated");
         content.Should().Contain("symbolon_relay_seats_total");
         content.Should().Contain("symbolon_relay_active_grants");
