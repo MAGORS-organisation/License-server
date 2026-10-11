@@ -80,6 +80,12 @@ app.MapGet("/health/grant", async (SqliteSeatStore seatStore, TimeProvider timeP
     });
 });
 
+app.MapGet("/v1/.well-known/achilles-keys", (ISignatureProvider key) =>
+{
+    var jwk = key.ExportPublicJwk();
+    return Results.Ok(new JsonWebKeySetDto { Keys = [jwk] });
+});
+
 app.MapGet("/v1/.well-known/symbolon-keys", (ISignatureProvider key) =>
 {
     var jwk = key.ExportPublicJwk();

@@ -58,7 +58,7 @@ Rieši kľúčové nedostatky historických systémov ako FlexNet Publisher (FLE
         <tr><td><strong>Achilles Relay</strong></td><td>.NET 10 / SQLite WAL</td><td>Lokálny zástupca v privátnej sieti zákazníka, spracovanie tisícov lokálnych heartbeatov/s pri nulovej cloudovej latencii.</td></tr>
         <tr><td><strong>Klientske SDK</strong></td><td>C#, Python, Rust, C++, Go, Wasm</td><td>Klientske knižnice integrujúce automatický heartbeat na pozadí, adaptívny jitter, RAII a fallback.</td></tr>
         <tr><td><strong>Achilles CLI</strong></td><td>Single-file AOT binárka</td><td>Správa kľúčov, vydávanie licencií, diagnostika (doctor), SBOM export a kontrola integrity.</td></tr>
-        <tr><td><strong>Kubernetes Operator</strong></td><td>Kubernetes CRDs</td><td>Deklaratívna správa klastra (<code>SymbolonCluster</code>) a licencií (<code>SymbolonLicense</code>) v GitOps prostrediach.</td></tr>
+        <tr><td><strong>Kubernetes Operator</strong></td><td>Kubernetes CRDs</td><td>Deklaratívna správa klastra (<code>AchillesCluster</code>) a licencií (<code>AchillesLicense</code>) v GitOps prostrediach.</td></tr>
     </tbody>
 </table>
 
@@ -598,9 +598,7 @@ export ACHILLES_LICENSE_SERVER="8080@licence.firma.local"
 
 # Zoznam záložných serverov pre failover (oddelené čiarkou alebo bodkočiarkou):
 export ACHILLES_SERVERS="http://srv1:8080,http://srv2:8080;8080@srv3"
-
-# Spätná kompatibilita (ak existuje staršia premenná, Achilles ju automaticky načíta):
-export SYMBOLON_LICENSE_SERVER="8080@licence.firma.local"</code></pre>
+export ACHILLES_LICENSE_SERVER="8080@licence.firma.local"</code></pre>
 `
             },
             {
@@ -659,7 +657,7 @@ if (lease.Acquired) {
 client = AchillesClient("http://localhost:8080", product_code="cad-pro")
 with client.acquire_seat("ACH-9ABC-DEF2-3456-7890", features=["cad-core"]) as lease:
     print(f"Sedadlo #{lease.seat_number} alokované. Aplikácia beží...")
-# Automatické uvoľnenie po opustení bloku with (dostupný aj alias from symbolon import ...)</code></pre>
+# Automatické uvoľnenie po opustení bloku with (RAII kontext manažér)</code></pre>
 
 <h3>19.3 Rust (Tokio & RAII Drop)</h3>
 <pre><code>use achilles_client::AchillesClient;

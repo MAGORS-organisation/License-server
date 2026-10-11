@@ -1,6 +1,6 @@
 /**
  * ==============================================================================
- * Symbolon Retro FoxPro / DOS TUI Keyboard Engine & UI Controller
+ * Achilles Retro FoxPro / DOS TUI Keyboard Engine & UI Controller
  * Kompletná podpora navigácie z klávesnice (šípky, Enter, Esc, hotkeys, F1-F10)
  * ==============================================================================
  */
@@ -852,7 +852,7 @@
     window.downloadSbomDirect = function () {
         const link = document.createElement('a');
         link.href = '/v1/compliance/sbom';
-        link.download = 'symbolon-cyclonedx-sbom.json';
+        link.download = 'achilles-cyclonedx-sbom.json';
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);

@@ -1,9 +1,9 @@
-// Symbolon Control Plane - Web Dashboard Client
+// Achilles Control Plane - Web Dashboard Client
 
 // Intercept fetch to append API Key header automatically
 const originalFetch = window.fetch;
 window.fetch = function(url, options = {}) {
-    const key = localStorage.getItem("symbolon_api_key");
+    const key = localStorage.getItem("achilles_api_key") || localStorage.getItem("symbolon_api_key");
     if (key && typeof url === "string" && (url.startsWith("/admin/") || url.startsWith("/v1/") || url.startsWith("/scim/"))) {
         options = { ...options };
         options.headers = options.headers || {};
@@ -554,7 +554,8 @@ function initModals() {
     // View JWKS Modal
     document.getElementById("btn-view-jwks")?.addEventListener("click", async () => {
         try {
-            const res = await fetch("/v1/.well-known/symbolon-keys");
+            let res = await fetch("/v1/.well-known/achilles-keys");
+            if (!res.ok) res = await fetch("/v1/.well-known/symbolon-keys");
             const jwks = await res.json();
             document.getElementById("jwks-code-content").textContent = JSON.stringify(jwks, null, 2);
             openModal("modal-view-jwks");
@@ -1311,7 +1312,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
 // Auth Config & API Key Storage
 function updateApiKeyButtonState() {
-    const key = localStorage.getItem("symbolon_api_key");
+    const key = localStorage.getItem("achilles_api_key") || localStorage.getItem("symbolon_api_key");
     const btn = document.getElementById("btn-api-key-config");
     const input = document.getElementById("cfg-api-key");
     if (!btn) return;
@@ -1335,6 +1336,7 @@ function saveApiKey() {
         showToast(typeof I18N !== "undefined" ? I18N.t("common.error", "Zadajte platný API kľúč") : "Zadajte platný API kľúč", "error");
         return;
     }
+    localStorage.setItem("achilles_api_key", val);
     localStorage.setItem("symbolon_api_key", val);
     updateApiKeyButtonState();
     updateConfigApiKeyStatus();
@@ -1344,6 +1346,7 @@ function saveApiKey() {
 }
 
 function clearApiKey() {
+    localStorage.removeItem("achilles_api_key");
     localStorage.removeItem("symbolon_api_key");
     updateApiKeyButtonState();
     updateConfigApiKeyStatus();
@@ -1353,8 +1356,9 @@ function clearApiKey() {
 }
 
 function clearLocalStorageCache() {
-    const lang = localStorage.getItem("symbolon_lang") || "sk";
+    const lang = localStorage.getItem("achilles_lang") || localStorage.getItem("symbolon_lang") || "sk";
     localStorage.clear();
+    localStorage.setItem("achilles_lang", lang);
     localStorage.setItem("symbolon_lang", lang);
     const msg = typeof I18N !== "undefined"
         ? I18N.t("config.cacheClearedMsg", "Lokálne nastavenia boli úspešne vymazané.")
@@ -1371,7 +1375,7 @@ window.clearLocalStorageCache = clearLocalStorageCache;
 function updateConfigApiKeyStatus() {
     const statusEl = document.getElementById("config-api-key-status");
     if (!statusEl) return;
-    const key = localStorage.getItem("symbolon_api_key");
+    const key = localStorage.getItem("achilles_api_key") || localStorage.getItem("symbolon_api_key");
     if (key) {
         statusEl.textContent = key.substring(0, 12) + "••••••••••••";
         statusEl.style.color = "var(--accent-emerald)";
@@ -2116,7 +2120,7 @@ async function loadDistributedTraces() {
             const timeStr = new Date(t.startTime).toLocaleTimeString();
             const statusClass = t.status === "OK" ? "badge-active" : (t.status === "ERROR" ? "badge-danger" : "badge-secondary");
             const tagsFormatted = Object.entries(t.tags || {})
-                .map(([k, v]) => `<span style="display:inline-block; font-family: monospace; font-size: 11px; background: rgba(255,255,255,0.06); padding: 2px 6px; border-radius: 4px; margin: 1px 2px;"><strong>${escapeHtml(k.replace("symbolon.", ""))}</strong>: ${escapeHtml(String(v))}</span>`)
+                .map(([k, v]) => `<span style="display:inline-block; font-family: monospace; font-size: 11px; background: rgba(255,255,255,0.06); padding: 2px 6px; border-radius: 4px; margin: 1px 2px;"><strong>${escapeHtml(k.replace("achilles.", "").replace("symbolon.", ""))}</strong>: ${escapeHtml(String(v))}</span>`)
                 .join(" ");
 
             return `<tr>
@@ -2312,12 +2316,13 @@ async function runWasmValidation() {
     }
 
     try {
-        if (typeof SymbolonOfflineValidator !== 'function') {
-            showToast('SymbolonOfflineValidator knižnica nie je načítaná.', 'error');
+        const ValidatorClass = typeof AchillesOfflineValidator === 'function' ? AchillesOfflineValidator : (typeof SymbolonOfflineValidator === 'function' ? SymbolonOfflineValidator : null);
+        if (!ValidatorClass) {
+            showToast('AchillesOfflineValidator knižnica nie je načítaná.', 'error');
             return;
         }
 
-        const validator = new SymbolonOfflineValidator({ jwks });
+        const validator = new ValidatorClass({ jwks });
         const res = await validator.validate(licArea.value.trim(), fpInput?.value.trim() || null);
 
         let badgeClass = res.isValid ? 'badge-active' : (res.isExpired ? 'badge-expired' : 'badge-revoked');
@@ -2750,7 +2755,7 @@ async function transpileFlexNet(apply) {
             }
 
             if (apply) {
-                showToast(`Úspešne importovaných ${data.importedCount || planCount} licencií do Symbolon DB!`, "success");
+                showToast(`Úspešne importovaných ${data.importedCount || planCount} licencií do Achilles DB!`, "success");
                 refreshAllData();
             } else {
                 showToast("Náhľad konverzie úspešne vygenerovaný!", "info");
@@ -2845,7 +2850,7 @@ async function importKeygenSubmit(apply) {
         document.getElementById("keygen-output-preview").textContent = JSON.stringify(data, null, 2);
 
         if (apply) {
-            showToast(`Úspešne importovaných ${data.importedCount || 0} Keygen licencií do Symbolon DB!`, "success");
+            showToast(`Úspešne importovaných ${data.importedCount || 0} Keygen licencií do Achilles DB!`, "success");
             refreshAllData();
         } else {
             showToast("Náhľad Keygen importu vygenerovaný!", "info");
@@ -4311,8 +4316,8 @@ function handleAirGapRequestFile(file) {
     const reader = new FileReader();
     reader.onload = (e) => {
         const text = e.target.result;
-        if (!text || !text.includes("SYMBOLON GRANT REQUEST")) {
-            showToast("Súbor neobsahuje platnú hlavičku SYMBOLON GRANT REQUEST", "error");
+        if (!text || (!text.includes("ACHILLES GRANT REQUEST") && !text.includes("SYMBOLON GRANT REQUEST"))) {
+            showToast("Súbor neobsahuje platnú hlavičku ACHILLES GRANT REQUEST", "error");
             return;
         }
 

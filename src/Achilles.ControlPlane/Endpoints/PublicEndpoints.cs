@@ -89,6 +89,10 @@ public static class PublicEndpoints
             .WithName("GetRevocationsSymrl")
             .WithSummary("Stiahne kryptograficky podpísaný .symrl revokačný zoznam.");
 
+        group.MapGet("/.well-known/achilles-keys", GetJwks)
+            .WithName("GetAchillesJwks")
+            .WithSummary("Vráti JWKS verejných kľúčov Achilles.");
+
         group.MapGet("/.well-known/symbolon-keys", GetJwks)
             .WithName("GetJwks")
             .WithSummary("Vráti JWKS verejných kľúčov.");

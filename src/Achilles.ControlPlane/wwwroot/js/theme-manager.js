@@ -1,6 +1,6 @@
 /**
  * ==============================================================================
- * Symbolon Control Plane - Multi-Theme Manager
+ * Achilles Control Plane - Multi-Theme Manager
  * Controls switching between:
  *  - Modern Enterprise (Dark Slate)
  *  - DOS (FoxPro 2.6 TUI)
@@ -95,6 +95,9 @@
 
         updateThemeControls(theme, regime, effective);
 
+        window.dispatchEvent(new CustomEvent('achilles:themeChanged', {
+            detail: { theme, regime, effectiveAppleTheme: effective }
+        }));
         window.dispatchEvent(new CustomEvent('symbolon:themeChanged', {
             detail: { theme, regime, effectiveAppleTheme: effective }
         }));

@@ -1,9 +1,9 @@
 /**
- * Symbolon WebAssembly & In-Browser Offline License Validator SDK
+ * Achilles WebAssembly & In-Browser Offline License Validator SDK
  * High-performance, zero-dependency cryptographic license verification
  * using standard W3C WebCrypto API (NIST P-256 / ES256) and hardware fingerprinting.
  *
- * Conforms to Symbolon Normative Specification (spec/03-symlic-1.md).
+ * Conforms to Achilles Normative Specification (spec/03-symlic-1.md).
  * License: Apache-2.0
  */
 
@@ -13,11 +13,13 @@
   } else if (typeof module === 'object' && module.exports) {
     module.exports = factory();
   } else {
-    root.SymbolonValidator = factory();
-    // Also expose SymbolonOfflineValidator directly on window / root
-    root.SymbolonOfflineValidator = root.SymbolonValidator.SymbolonOfflineValidator;
-    root.generateBrowserFingerprint = root.SymbolonValidator.generateBrowserFingerprint;
-    root.checkFeatureEntitlement = root.SymbolonValidator.checkFeatureEntitlement;
+    const v = factory();
+    root.AchillesValidator = v;
+    root.AchillesOfflineValidator = v.AchillesOfflineValidator || v.SymbolonOfflineValidator;
+    root.SymbolonValidator = v;
+    root.SymbolonOfflineValidator = root.AchillesOfflineValidator;
+    root.generateBrowserFingerprint = v.generateBrowserFingerprint;
+    root.checkFeatureEntitlement = v.checkFeatureEntitlement;
   }
 }(typeof self !== 'undefined' ? self : this, function () {
   'use strict';
@@ -623,6 +625,7 @@
   }
 
   return {
+    AchillesOfflineValidator: SymbolonOfflineValidator,
     SymbolonOfflineValidator,
     ValidationResult,
     generateBrowserFingerprint,
