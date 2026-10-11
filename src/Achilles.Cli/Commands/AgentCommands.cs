@@ -39,7 +39,7 @@ public static class AgentCommands
         string? licenseKey = GetArg(args, "--license") ?? GetArg(args, "-l");
         bool isDaemon = args.Contains("--daemon", StringComparer.OrdinalIgnoreCase);
 
-        AnsiConsole.MarkupLine("[bold blue]=== Spúšťam Klientsky Agent Symbolon (symbolon-agent) ===[/]");
+        AnsiConsole.MarkupLine("[bold blue]=== Spúšťam Klientsky Agent Achilles (achilles-agent) ===[/]");
 
         Uri? serverUri = null;
         if (Uri.TryCreate(server, UriKind.Absolute, out var parsed))
@@ -60,7 +60,7 @@ public static class AgentCommands
                 return 0;
             }
 
-            AnsiConsole.MarkupLine("[yellow]Stlačte Ctrl+C alebo pošlite 'symbolon agent stop' pre ukončenie agenta.[/]");
+            AnsiConsole.MarkupLine("[yellow]Stlačte Ctrl+C alebo pošlite 'achilles agent stop' pre ukončenie agenta.[/]");
 
             // Wait until cancelled
             var tcs = new TaskCompletionSource();
@@ -128,7 +128,7 @@ public static class AgentCommands
             }
 
             var panel = new Panel(table)
-                .Header("[bold cyan] Symbolon Client Agent Status [/]");
+                .Header("[bold cyan] Achilles Client Agent Status [/]");
             panel.Border = BoxBorder.Double;
             AnsiConsole.Write(panel);
             return 0;
@@ -228,7 +228,7 @@ public static class AgentCommands
     private static async Task<int> HandleTrayAsync(string[] args)
     {
         int port = GetIntArg(args, "--port", 8189);
-        string? testTitle = GetArg(args, "--title") ?? "Symbolon Tray";
+        string? testTitle = GetArg(args, "--title") ?? "Achilles Tray";
         string? testMsg = GetArg(args, "--message");
 
         var traySvc = new TrayNotificationService();
@@ -240,7 +240,7 @@ public static class AgentCommands
             return 0;
         }
 
-        AnsiConsole.MarkupLine("[bold cyan]=== SYMBOLON DESKTOP TRAY NOTIFIKÁTOR & ROAMING MENU ===[/]");
+        AnsiConsole.MarkupLine("[bold cyan]=== ACHILLES DESKTOP TRAY NOTIFIKÁTOR & ROAMING MENU ===[/]");
 
         using var client = new HttpClient { BaseAddress = new Uri($"http://127.0.0.1:{port.ToString(CultureInfo.InvariantCulture)}/") };
 
@@ -282,7 +282,7 @@ public static class AgentCommands
                     AnsiConsole.Write(panel);
 
                     traySvc.Notify(
-                        "Symbolon Tray Manažér",
+                        "Achilles Tray Manažér",
                         $"Monitorovanie aktívne pre stroj {status.MachineId} (Lease: {status.LeaseId ?? "žiaden"})",
                         TrayNotificationLevel.Info
                     );
@@ -299,7 +299,7 @@ public static class AgentCommands
             AnsiConsole.MarkupLine($"[yellow]Lokálny agent na porte {port} nie je dostupný: {Markup.Escape(ex.Message)}[/]");
         }
 
-        traySvc.Notify("Symbolon Tray", "Klientsky agent v pohotovostnom režime.", TrayNotificationLevel.Info);
+        traySvc.Notify("Achilles Tray", "Klientsky agent v pohotovostnom režime.", TrayNotificationLevel.Info);
         AnsiConsole.MarkupLine("[green]✓ Tray notifikačná služba inicializovaná.[/]");
         return 0;
     }
@@ -360,7 +360,7 @@ public static class AgentCommands
 
     private static void PrintAgentHelp()
     {
-        AnsiConsole.MarkupLine("[bold]Použitie:[/] symbolon agent <príkaz> [[prepínače]]");
+        AnsiConsole.MarkupLine("[bold]Použitie:[/] achilles agent <príkaz> [[prepínače]]");
         AnsiConsole.WriteLine();
         AnsiConsole.MarkupLine("Klientsky desktop a CLI tray agent (IPC daemon na 127.0.0.1:8189) pre automatický heartbeat a offline borrow.");
         AnsiConsole.WriteLine();

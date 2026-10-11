@@ -34,4 +34,39 @@ public sealed class DesktopCommandsTests
         int exitCode = await Program.Main(["desktop", "inspect", "--port", "59999"]);
         exitCode.Should().Be(0);
     }
+
+    [Fact]
+    public async Task DesktopCompanion_OnceMode_ReturnsZero()
+    {
+        int exitCode = await Program.Main(["desktop", "companion", "--port", "59999", "--once"]);
+        exitCode.Should().Be(0);
+    }
+
+    [Fact]
+    public async Task DesktopBorrow_OfflineDaemon_ReturnsNonZero()
+    {
+        int exitCode = await Program.Main(["desktop", "borrow", "--days", "7", "--port", "59999"]);
+        exitCode.Should().Be(1);
+    }
+
+    [Fact]
+    public async Task DesktopReturn_OfflineDaemon_ReturnsNonZero()
+    {
+        int exitCode = await Program.Main(["desktop", "return", "--port", "59999"]);
+        exitCode.Should().Be(1);
+    }
+
+    [Fact]
+    public async Task DesktopNotify_ValidParameters_ReturnsZero()
+    {
+        int exitCode = await Program.Main(["desktop", "notify", "--title", "Achilles Test", "--message", "Unit test notification", "--level", "info"]);
+        exitCode.Should().Be(0);
+    }
+
+    [Fact]
+    public async Task DesktopUnknownSubcommand_ReturnsOne()
+    {
+        int exitCode = await Program.Main(["desktop", "invalid-subcommand"]);
+        exitCode.Should().Be(1);
+    }
 }

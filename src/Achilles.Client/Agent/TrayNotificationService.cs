@@ -76,7 +76,7 @@ public sealed class TrayNotificationService
     {
         string remStr = (expiresAt - DateTimeOffset.UtcNow).TotalMinutes.ToString("F0", System.Globalization.CultureInfo.InvariantCulture);
         Notify(
-            "Symbolon: Licencia Aktívna",
+            "Achilles: Licencia Aktívna",
             $"Sedadlo #{seatNo} pridelené (Lease {leaseId}, platnosť {remStr} minút)",
             TrayNotificationLevel.Success
         );
@@ -85,7 +85,7 @@ public sealed class TrayNotificationService
     public void NotifyExpiringSoon(string leaseId, TimeSpan remaining)
     {
         Notify(
-            "Symbolon Výstraha: Blíži sa expirácia",
+            "Achilles Výstraha: Blíži sa expirácia",
             $"Lease {leaseId} expiruje o {remaining.TotalMinutes:F0} minút. Skontrolujte sieťové spojenie.",
             TrayNotificationLevel.Warning
         );
@@ -94,7 +94,7 @@ public sealed class TrayNotificationService
     public void NotifyNetworkFailureGrace(TimeSpan remainingGrace)
     {
         Notify(
-            "Symbolon: Offline Ochranná Lehota (Grace)",
+            "Achilles: Offline Ochranná Lehota (Grace)",
             $"Licenčný server je nedostupný. Prepnuté do offline grace módu ({remainingGrace.TotalHours:F1} hodín zostáva).",
             TrayNotificationLevel.Warning
         );
@@ -103,16 +103,25 @@ public sealed class TrayNotificationService
     public void NotifyOfflineBorrowActive(string leaseId, int days)
     {
         Notify(
-            "Symbolon: Offline Roaming Aktívny",
+            "Achilles: Offline Roaming Aktívny",
             $"Sedadlo bolo vypožičané na {days} dní pre prácu bez internetu (Lease {leaseId}).",
             TrayNotificationLevel.Info
+        );
+    }
+
+    public void NotifyQueueSeatReady(string featureCode, string queueTicket)
+    {
+        Notify(
+            "Achilles: Sedadlo z radu je Pripravené!",
+            $"Sedadlo pre modul '{featureCode}' bolo uvoľnené a pridelené pre váš počítač (Lístok {queueTicket}).",
+            TrayNotificationLevel.Success
         );
     }
 
     public void NotifyLeaseReleased(string leaseId)
     {
         Notify(
-            "Symbolon: Sedadlo Uvoľnené",
+            "Achilles: Sedadlo Uvoľnené",
             $"Lease {leaseId} bol vrátený do floating poolu pre ostatných používateľov.",
             TrayNotificationLevel.Info
         );
