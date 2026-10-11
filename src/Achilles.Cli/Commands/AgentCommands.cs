@@ -47,7 +47,7 @@ public static class AgentCommands
             serverUri = parsed;
         }
 
-        await using var daemon = new SymbolonAgentDaemon(port, serverUri, licenseKey);
+        await using var daemon = new AchillesAgentDaemon(port, serverUri, licenseKey);
         try
         {
             daemon.Start();

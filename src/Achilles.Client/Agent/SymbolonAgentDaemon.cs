@@ -403,4 +403,23 @@ public sealed class SymbolonAgentDaemon : IAsyncDisposable, IDisposable
         _cts.Dispose();
     }
 }
+ 
+public sealed class AchillesAgentDaemon : IAsyncDisposable, IDisposable
+{
+    private readonly SymbolonAgentDaemon _inner;
+
+    public AchillesAgentDaemon(int port = 8189, Uri? serverUri = null, string? licenseKey = null, ILogger? logger = null)
+    {
+        _inner = new SymbolonAgentDaemon(port, serverUri, licenseKey, logger);
+    }
+
+    public int Port => _inner.Port;
+    public bool IsRunning => _inner.IsRunning;
+    public string MachineId => _inner.MachineId;
+    public TrayNotificationService Notifications => _inner.Notifications;
+
+    public void Start() => _inner.Start();
+    public void Dispose() => _inner.Dispose();
+    public ValueTask DisposeAsync() => _inner.DisposeAsync();
+}
 #pragma warning restore CA1031, CA1848, CA1873, CA1849, CA1024, CA1054, CA1056
