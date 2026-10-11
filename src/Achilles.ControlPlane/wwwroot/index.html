@@ -10,7 +10,8 @@
     <script>
         (function() {
             try {
-                var t = localStorage.getItem('achilles_theme') || localStorage.getItem('symbolon_theme') || localStorage.getItem('symbolon-theme') || 'modern';
+                var t = localStorage.getItem('achilles_theme') || localStorage.getItem('symbolon_theme') || localStorage.getItem('symbolon-theme') || 'retro';
+                if (t === 'modern') t = 'retro';
                 document.documentElement.setAttribute('data-theme', t);
                 var m = localStorage.getItem('achilles_apple_mode') || localStorage.getItem('symbolon_apple_mode') || 'system';
                 document.documentElement.setAttribute('data-apple-mode', m);
@@ -206,8 +207,7 @@
                 </div>
                 <!-- Theme Switcher in Topbar -->
                 <div class="theme-switcher" id="topbar-theme-switcher" title="Zmeniť tému rozhrania / Switch theme" data-i18n-title="topbar.themeTooltip">
-                    <button class="theme-btn-compact active" data-theme="modern" onclick="setAppTheme('modern')" title="Modern Enterprise">💼 Modern</button>
-                    <button class="theme-btn-compact" data-theme="retro" onclick="setAppTheme('retro')" title="DOS (FoxPro 2.6 TUI)">💾 DOS</button>
+                    <button class="theme-btn-compact active" data-theme="retro" onclick="setAppTheme('retro')" title="DOS (FoxPro 2.6 TUI)">💾 DOS</button>
                     <button class="theme-btn-compact" data-theme="cyberpunk" onclick="setAppTheme('cyberpunk')" title="Cyberpunk 2077 HUD">⚡ Cyber</button>
                     <button class="theme-btn-compact" data-theme="apple" onclick="setAppTheme('apple')" title="Apple iOS">🍎 Apple</button>
                     <button class="apple-quick-toggle" id="topbar-apple-toggle" style="display: none;" onclick="cycleAppleRegime()" title="Prepnúť režim Apple (Systém / Denný / Nočný)">🌓 Auto</button>
@@ -2650,8 +2650,7 @@
                                 <button class="lang-btn" data-lang="de" onclick="setAppLanguage('de')" style="font-size: 13px; padding: 6px 12px;">🇩🇪 Deutsch</button>
                             </div>
                             <div class="theme-switcher" style="padding: 4px; gap: 4px;">
-                                <button class="theme-btn-compact active" data-theme="modern" onclick="setAppTheme('modern')" style="font-size: 13px; padding: 6px 12px;">💼 Modern</button>
-                                <button class="theme-btn-compact" data-theme="retro" onclick="setAppTheme('retro')" style="font-size: 13px; padding: 6px 12px;">💾 DOS</button>
+                                <button class="theme-btn-compact active" data-theme="retro" onclick="setAppTheme('retro')" style="font-size: 13px; padding: 6px 12px;">💾 DOS</button>
                                 <button class="theme-btn-compact" data-theme="cyberpunk" onclick="setAppTheme('cyberpunk')" style="font-size: 13px; padding: 6px 12px;">⚡ Cyberpunk</button>
                                 <button class="theme-btn-compact" data-theme="apple" onclick="setAppTheme('apple')" style="font-size: 13px; padding: 6px 12px;">🍎 Apple</button>
                             </div>
@@ -2667,34 +2666,15 @@
                     </p>
 
                     <div class="config-card-grid">
-                        <!-- Modern Dark Card -->
-                        <div class="theme-choice-card border-active" id="theme-card-modern" onclick="setAppTheme('modern')">
-                            <div>
-                                <div class="lang-choice-header">
-                                    <div class="lang-choice-title">
-                                        <span class="lang-flag">💼</span>
-                                        <span data-i18n="config.themeModernTitle">Modern Enterprise</span>
-                                    </div>
-                                    <span class="badge" id="tag-theme-active-modern" style="background: var(--accent-blue); color: #fff; font-size: 11px;" data-i18n="config.activeThemeTag">Aktívny Dizajn</span>
-                                </div>
-                                <p style="color: var(--text-secondary); font-size: 13px; margin-top: 10px; line-height: 1.5;" data-i18n="config.themeModernDesc">
-                                    Klasický tmavý bridlicový dizajn (Slate-900) optimalizovaný pre produkčné riadiace centrá a monitoring.
-                                </p>
-                            </div>
-                            <div style="display: flex; justify-content: flex-end;">
-                                <button type="button" class="btn btn-secondary btn-sm" onclick="event.stopPropagation(); setAppTheme('modern');" data-i18n="config.btnActivateTheme">Prepnúť Dizajn</button>
-                            </div>
-                        </div>
-
                         <!-- DOS TUI Card -->
-                        <div class="theme-choice-card" id="theme-card-retro" onclick="setAppTheme('retro')">
+                        <div class="theme-choice-card border-active" id="theme-card-retro" onclick="setAppTheme('retro')">
                             <div>
                                 <div class="lang-choice-header">
                                     <div class="lang-choice-title">
                                         <span class="lang-flag">💾</span>
                                         <span data-i18n="config.themeRetroTitle">DOS (FoxPro 2.6 TUI)</span>
                                     </div>
-                                    <span class="badge" id="tag-theme-active-retro" style="background: var(--accent-blue); color: #fff; font-size: 11px; display: none;" data-i18n="config.activeThemeTag">Aktívny Dizajn</span>
+                                    <span class="badge" id="tag-theme-active-retro" style="background: var(--accent-blue); color: #fff; font-size: 11px; display: inline-block;" data-i18n="config.activeThemeTag">Aktívny Dizajn</span>
                                 </div>
                                 <p style="color: var(--text-secondary); font-size: 13px; margin-top: 10px; line-height: 1.5;" data-i18n="config.themeRetroDesc">
                                     Nostalgická kaskádová DOS konzola v štýle 90. rokov s kompletnou podporou ovládania z klávesnice (F1-F10).
@@ -3248,9 +3228,8 @@
                     <p style="color: var(--text-secondary); font-size: 12px; margin-bottom: 10px;" data-i18n="config.themeSectionDesc">
                         Zvoľte vizuálny štýl rozhrania Achilles:
                     </p>
-                    <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px;">
-                        <button type="button" class="btn btn-primary btn-sm" data-modal-theme="modern" onclick="setAppTheme('modern')" style="padding: 6px 4px; font-size: 11px; justify-content: center;">💼 Modern</button>
-                        <button type="button" class="btn btn-secondary btn-sm" data-modal-theme="retro" onclick="setAppTheme('retro')" style="padding: 6px 4px; font-size: 11px; justify-content: center;">💾 DOS</button>
+                    <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px;">
+                        <button type="button" class="btn btn-primary btn-sm" data-modal-theme="retro" onclick="setAppTheme('retro')" style="padding: 6px 4px; font-size: 11px; justify-content: center;">💾 DOS</button>
                         <button type="button" class="btn btn-secondary btn-sm" data-modal-theme="cyberpunk" onclick="setAppTheme('cyberpunk')" style="padding: 6px 4px; font-size: 11px; justify-content: center;">⚡ Cyber</button>
                         <button type="button" class="btn btn-secondary btn-sm" data-modal-theme="apple" onclick="setAppTheme('apple')" style="padding: 6px 4px; font-size: 11px; justify-content: center;">🍎 Apple</button>
                     </div>

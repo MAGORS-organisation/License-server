@@ -2,9 +2,8 @@
  * ==============================================================================
  * Achilles Control Plane - Multi-Theme Manager
  * Controls switching between:
- *  - Modern Enterprise (Dark Slate)
  *  - DOS (FoxPro 2.6 TUI)
- *  - Cyberpunk 2077 HUD (Neon Cyan/Pink/Yellow)
+ *  - Cyberpunk 2077 HUD (Neon Cyan/Yellow)
  *  - Apple iOS (Human Interface Glassmorphism with Day/Night/System regime)
  * ==============================================================================
  */
@@ -15,7 +14,7 @@
     const THEME_STORAGE_KEY = 'achilles_theme';
     const APPLE_REGIME_STORAGE_KEY = 'achilles_apple_mode';
 
-    const SUPPORTED_THEMES = ['modern', 'retro', 'cyberpunk', 'apple'];
+    const SUPPORTED_THEMES = ['retro', 'cyberpunk', 'apple'];
     const SUPPORTED_REGIMES = ['system', 'light', 'dark'];
 
     function getAppTheme() {
@@ -23,7 +22,7 @@
         if (stored && SUPPORTED_THEMES.includes(stored)) {
             return stored;
         }
-        return 'modern';
+        return 'retro';
     }
 
     function getAppleRegime() {
@@ -45,7 +44,7 @@
 
     function applyTheme(theme, regime) {
         if (!SUPPORTED_THEMES.includes(theme)) {
-            theme = 'modern';
+            theme = 'retro';
         }
         if (!SUPPORTED_REGIMES.includes(regime)) {
             regime = getAppleRegime();
@@ -150,7 +149,7 @@
     }
 
     function setAppTheme(theme) {
-        if (!SUPPORTED_THEMES.includes(theme)) theme = 'modern';
+        if (!SUPPORTED_THEMES.includes(theme)) theme = 'retro';
         localStorage.setItem(THEME_STORAGE_KEY, theme);
         localStorage.setItem('symbolon_theme', theme);
         localStorage.setItem('symbolon-theme', theme);

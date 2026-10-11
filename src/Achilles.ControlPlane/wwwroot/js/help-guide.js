@@ -760,16 +760,15 @@ helm install achilles deploy/helm/achilles/ -n licensing --create-namespace</cod
                 title: 'Dizajnové Témy & Klávesové Ovládanie (F1-F12)',
                 icon: '🎨',
                 badge: 'Témy & UI',
-                summary: 'Prehľad 4 grafických tém (Modern, DOS FoxPro, Cyberpunk 2077 HUD, Apple iOS s denným/nočným režimom) a 100% klávesové ovládanie bez myši.',
+                summary: 'Prehľad 3 grafických tém (DOS FoxPro 2.6 TUI, Cyberpunk 2077 HUD, Apple iOS s denným/nočným režimom) a 100% klávesové ovládanie bez myši.',
                 targetView: 'view-config',
                 targetViewName: 'Prepínač Tém',
                 content: `
-<h3>22.1 Štyri Profesionálne Dizajnové Témy</h3>
+<h3>22.1 Tri Profesionálne Dizajnové Témy</h3>
 <p>
-Achilles ponúka 4 jedinečné dizajnové prostredia prispôsobené preferenciám používateľa:
+Achilles ponúka 3 jedinečné dizajnové prostredia prispôsobené preferenciám používateľa:
 </p>
 <ol>
-    <li><strong>💼 Modern Enterprise:</strong> Čisté, responzívne webové rozhranie v štýle moderných cloudových platforiem s tmavým bridlicovým pozadím a azúrovými akcentmi.</li>
     <li><strong>💾 DOS (FoxPro 2.6 TUI):</strong> Autentická retro textová estetika DOS/FoxPro s kaskádovými oknami, pravouhlými tieňmi, CRT phosphor filtrom a žltými akcelerátormi.</li>
     <li><strong>⚡ Cyberpunk 2077 HUD:</strong> Autentické neónové rozhranie v štýle videohry Cyberpunk 2077 so žiarivou Cyber žltou (<code>#fcee0a</code>), elektrickou modrou (<code>#00f0ff</code>), výstražnou neónovou červenou (<code>#ff003c</code>), skosenými rohmi (chamfer clip-path) a nočnou HUD estetikou.</li>
     <li><strong>🍎 Apple iOS Glassmorphism:</strong> Jemná elegancia podľa Apple Human Interface Guidelines s polopriehľadným frosted glass efektom (<code>backdrop-filter: blur(25px)</code>) a trojrežimovým systémom:

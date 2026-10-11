@@ -149,18 +149,6 @@ public static class VisualizerEndpoints
       --dim: #1e591e;
       --font-family: 'Courier New', Courier, monospace;
       --box-shadow: 0 0 12px rgba(51, 255, 51, 0.25);
-    }
-    :root[data-theme="modern"] {
-      --bg-color: #0f172a;
-      --card-bg: #1e293b;
-      --border-color: #334155;
-      --text-color: #f8fafc;
-      --accent-color: #06b6d4;
-      --highlight: #10b981;
-      --dim: #64748b;
-      --font-family: system-ui, -apple-system, sans-serif;
-      --box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3);
-    }
     :root[data-theme="cyberpunk"] {
       --bg-color: #07070f;
       --card-bg: #120b24;
@@ -296,7 +284,7 @@ public static class VisualizerEndpoints
       <small>Real-Time Cluster Topology & Transparency Log Inspector</small>
     </div>
     <div>
-      <button class="theme-btn" id="themeToggle" onclick="toggleTheme()">◒ Prepni Tému (DOS / CRT Phosphor / Modern Dark / Cyberpunk / Apple iOS)</button>
+      <button class="theme-btn" id="themeToggle" onclick="toggleTheme()">◒ Prepni Tému (DOS / CRT Phosphor / Cyberpunk / Apple iOS)</button>
     </div>
   </header>
 
@@ -341,16 +329,15 @@ public static class VisualizerEndpoints
   </div>
 
   <script>
-    const themes = ['retro', 'modern', 'cyberpunk', 'apple'];
+    const themes = ['retro', 'cyberpunk', 'apple'];
     const themeLabels = {
       retro: 'DOS (CRT Phosphor)',
-      modern: 'Modern Dark',
       cyberpunk: 'Cyberpunk 2077 HUD',
       apple: 'Apple iOS Glass'
     };
     function updateThemeButton(theme) {
       const btn = document.getElementById('themeToggle');
-      if (btn) btn.innerText = `◒ Téma: ${themeLabels[theme] || theme} (DOS / CRT Phosphor / Modern Dark / Cyberpunk / Apple iOS)`;
+      if (btn) btn.innerText = `◒ Téma: ${themeLabels[theme] || theme} (DOS / CRT Phosphor / Cyberpunk / Apple iOS)`;
     }
     function toggleTheme() {
       const html = document.documentElement;

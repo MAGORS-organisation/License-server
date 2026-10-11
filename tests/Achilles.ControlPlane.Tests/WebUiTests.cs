@@ -30,7 +30,8 @@ public sealed class WebUiTests : IClassFixture<ControlPlaneFactory>
         Assert.Contains("view-help", content, StringComparison.Ordinal);
         Assert.Contains("btn-topbar-help", content, StringComparison.Ordinal);
         Assert.Contains("topbar-lang-switcher", content, StringComparison.Ordinal);
-        Assert.Contains("topbar-theme-switcher", content, StringComparison.Ordinal);
+        Assert.Contains("theme-card-retro", content, StringComparison.Ordinal);
+        Assert.DoesNotContain("theme-card-modern", content, StringComparison.Ordinal);
         Assert.Contains("theme-card-cyberpunk", content, StringComparison.Ordinal);
         Assert.Contains("theme-card-apple", content, StringComparison.Ordinal);
         Assert.Contains("apple-regime-segmented", content, StringComparison.Ordinal);
