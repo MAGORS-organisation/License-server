@@ -43,6 +43,34 @@ document.addEventListener("DOMContentLoaded", () => {
             setTimeout(() => switchToView(hashView), 100);
         }
     }
+
+    // Re-render dynamic elements when application language changes
+    window.addEventListener("achilles:languageChanged", () => {
+        checkSystemHealth();
+        loadDashboardKPIs();
+        const activeSec = document.querySelector(".view-section.active");
+        if (activeSec) {
+            const vid = activeSec.id;
+            if (vid === "view-licenses") loadLicenses();
+            else if (vid === "view-keys") { loadSigningKeys(); loadKmsHierarchy(); }
+            else if (vid === "view-relays") loadRelays();
+            else if (vid === "view-audit") loadAuditLogs();
+            else if (vid === "view-reports") loadReportsView();
+            else if (vid === "view-airgap") loadAirGapView();
+            else if (vid === "view-webhooks") { loadWebhooks(); loadGlobalDeliveries(); }
+            else if (vid === "view-apikeys") { loadApiKeys(); loadTransparencyRoot(); }
+            else if (vid === "view-mesh") loadMeshAndAlerts();
+            else if (vid === "view-scim") loadScimDirectory();
+            else if (vid === "view-tokens") { loadTokenWallets(); loadTokenRates(); loadTokenLedger(); }
+            else if (vid === "view-features") loadFeaturesView();
+            else if (vid === "view-revocations") loadRevocationsView();
+            else if (vid === "view-queue") loadQueueView();
+            else if (vid === "view-policy-rules") loadPolicyRulesView();
+            else if (vid === "view-machines") loadMachinesView();
+            else if (vid === "view-experiments") loadExperimentsView();
+            else if (vid === "view-pqc") loadPqcView();
+        }
+    });
 });
 
 // Navigation Handling
@@ -142,6 +170,7 @@ async function refreshAllData() {
 
 // System Health Check
 async function checkSystemHealth() {
+    const t = (k, fb) => (window.I18N && typeof window.I18N.t === "function") ? window.I18N.t(k, fb) : fb;
     try {
         const res = await fetch("/health/ready");
         const dot = document.querySelector(".pulse-dot");
@@ -149,11 +178,11 @@ async function checkSystemHealth() {
         if (res.ok) {
             dot.style.backgroundColor = "var(--accent-emerald)";
             dot.style.boxShadow = "0 0 8px var(--accent-emerald)";
-            text.textContent = "System Ready (DB Connected)";
+            text.textContent = t("topbar.healthReady", "Systém pripravený (DB pripojená)");
         } else {
             dot.style.backgroundColor = "var(--accent-amber)";
             dot.style.boxShadow = "0 0 8px var(--accent-amber)";
-            text.textContent = "Degraded";
+            text.textContent = t("topbar.healthDegraded", "Znížený výkon");
         }
     } catch {
         const dot = document.querySelector(".pulse-dot");
@@ -161,13 +190,14 @@ async function checkSystemHealth() {
         if (dot && text) {
             dot.style.backgroundColor = "var(--accent-rose)";
             dot.style.boxShadow = "0 0 8px var(--accent-rose)";
-            text.textContent = "Offline";
+            text.textContent = t("topbar.healthError", "Chyba spojenia / Offline");
         }
     }
 }
 
 // Load KPIs and Charts
 async function loadDashboardKPIs() {
+    const t = (k, fb) => (window.I18N && typeof window.I18N.t === "function") ? window.I18N.t(k, fb) : fb;
     try {
         const [repRes, licRes, keyRes] = await Promise.all([
             fetch("/admin/v1/reports/concurrency"),
@@ -178,7 +208,8 @@ async function loadDashboardKPIs() {
         if (repRes.ok) {
             const report = await repRes.json();
             document.getElementById("kpi-active-seats").textContent = report.activeSeats ?? 0;
-            document.getElementById("kpi-total-seats").textContent = `z celkovo ${report.totalSeats ?? 0} sedadiel`;
+            const ofTotalTemplate = t("overview.ofTotalSeats", "z celkovo {0} sedadiel");
+            document.getElementById("kpi-total-seats").textContent = ofTotalTemplate.replace("{0}", report.totalSeats ?? 0);
             document.getElementById("kpi-utilization").textContent = `${Math.round(report.utilizationPercentage ?? 0)}%`;
             document.getElementById("kpi-denials").textContent = report.denialsCount ?? 0;
 
@@ -208,6 +239,7 @@ function renderConcurrencyBar(active, total) {
     const ctx = canvas.getContext("2d");
     const w = canvas.width;
     const h = canvas.height;
+    const t = (k, fb) => (window.I18N && typeof window.I18N.t === "function") ? window.I18N.t(k, fb) : fb;
 
     ctx.clearRect(0, 0, w, h);
 
@@ -232,13 +264,15 @@ function renderConcurrencyBar(active, total) {
     }
 
     // Text labels
+    const occLabel = t("overview.occupied", "Obsadené");
+    const utilLabel = t("overview.utilization", "vyťaženie");
     ctx.fillStyle = "#f3f4f6";
     ctx.font = "bold 13px system-ui, sans-serif";
     ctx.textAlign = "left";
-    ctx.fillText(`Obsadené: ${active} / ${total}`, 24, h / 2 + 5);
+    ctx.fillText(`${occLabel}: ${active} / ${total}`, 24, h / 2 + 5);
 
     ctx.textAlign = "right";
-    ctx.fillText(`${Math.round(ratio * 100)}% vyťaženie`, w - 24, h / 2 + 5);
+    ctx.fillText(`${Math.round(ratio * 100)}% ${utilLabel}`, w - 24, h / 2 + 5);
 }
 
 // Simple Canvas Breakdown
@@ -248,14 +282,15 @@ function renderLicenseTypeBreakdown(lics) {
     const ctx = canvas.getContext("2d");
     const w = canvas.width;
     const h = canvas.height;
+    const t = (k, fb) => (window.I18N && typeof window.I18N.t === "function") ? window.I18N.t(k, fb) : fb;
 
     ctx.clearRect(0, 0, w, h);
 
     const counts = { floating: 0, nodelock: 0, other: 0 };
     lics.forEach(l => {
-        const t = (l.type || "").toLowerCase();
-        if (t.includes("floating")) counts.floating++;
-        else if (t.includes("nodelock")) counts.nodelock++;
+        const typeStr = (l.type || "").toLowerCase();
+        if (typeStr.includes("floating")) counts.floating++;
+        else if (typeStr.includes("nodelock")) counts.nodelock++;
         else counts.other++;
     });
 
@@ -263,9 +298,9 @@ function renderLicenseTypeBreakdown(lics) {
     let startY = 30;
 
     const items = [
-        { label: "Floating Sedadlá", count: counts.floating, color: "#3b82f6" },
-        { label: "Node-locked", count: counts.nodelock, color: "#8b5cf6" },
-        { label: "Ostatné / Trial", count: counts.other, color: "#10b981" }
+        { label: t("overview.typeFloating", "Floating Sedadlá"), count: counts.floating, color: "#3b82f6" },
+        { label: t("overview.typeNodelock", "Node-locked"), count: counts.nodelock, color: "#8b5cf6" },
+        { label: t("overview.typeOther", "Ostatné / Trial"), count: counts.other, color: "#10b981" }
     ];
 
     items.forEach(item => {
@@ -291,6 +326,7 @@ function renderLicenseTypeBreakdown(lics) {
 async function loadLicenses() {
     const tbody = document.getElementById("licenses-table-body");
     if (!tbody) return;
+    const t = (k, fb) => (window.I18N && typeof window.I18N.t === "function") ? window.I18N.t(k, fb) : fb;
 
     try {
         const res = await fetch("/admin/v1/licenses");
@@ -298,15 +334,15 @@ async function loadLicenses() {
         const lics = await res.json();
 
         if (lics.length === 0) {
-            tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;color:var(--text-muted);padding:32px;">Žiadne licencie neboli nájdené. Vytvorte prvú licenciu kliknutím na tlačidlo hore.</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;color:var(--text-muted);padding:32px;">${t("licenses.empty", "Žiadne licencie neboli nájdené. Vytvorte prvú licenciu kliknutím na tlačidlo hore.")}</td></tr>`;
             return;
         }
 
         tbody.innerHTML = lics.map(l => {
             const isRevoked = l.state === "revoked";
             const badgeClass = isRevoked ? "badge-revoked" : "badge-active";
-            const stateLabel = isRevoked ? "Revokovaná" : "Aktívna";
-            const expDate = l.expiresAt ? new Date(l.expiresAt).toLocaleDateString() : "Permanentná";
+            const stateLabel = isRevoked ? t("common.revoked", "Revokovaná") : t("common.active", "Aktívna");
+            const expDate = l.expiresAt ? new Date(l.expiresAt).toLocaleDateString() : t("common.permanent", "Permanentná");
 
             return `
                 <tr>
@@ -320,18 +356,18 @@ async function loadLicenses() {
                         <div style="display:flex;gap:6px;">
                             ${!isRevoked ? `
                                 <button class="btn btn-secondary btn-sm" onclick="openLicenseDetailsModal('${escapeHtml(l.id)}', '${escapeHtml(l.customer || l.id)}')">
-                                    👤 Používatelia
+                                    ${t("licenses.actionUsers", "👤 Používatelia")}
                                 </button>
                                 <button class="btn btn-secondary btn-sm" onclick="openLicenseRulesView('${escapeHtml(l.id)}')">
-                                    📜 Pravidlá
+                                    ${t("licenses.actionRules", "📜 Pravidlá")}
                                 </button>
                                 <button class="btn btn-secondary btn-sm" onclick="downloadLicenseFile('${escapeHtml(l.licenseKey)}')">
                                     ⬇ .symlic
                                 </button>
                                 <button class="btn btn-danger btn-sm" onclick="revokeLicensePrompt('${escapeHtml(l.id)}')">
-                                    Revokovať
+                                    ${t("common.revoke", "Revokovať")}
                                 </button>
-                            ` : `<span style="color:var(--text-muted);font-size:12px;">Žiadne akcie</span>`}
+                            ` : `<span style="color:var(--text-muted);font-size:12px;">${t("common.noActions", "Žiadne akcie")}</span>`}
                         </div>
                     </td>
                 </tr>
@@ -346,6 +382,7 @@ async function loadLicenses() {
 async function loadSigningKeys() {
     const tbody = document.getElementById("keys-table-body");
     if (!tbody) return;
+    const t = (k, fb) => (window.I18N && typeof window.I18N.t === "function") ? window.I18N.t(k, fb) : fb;
 
     try {
         const res = await fetch("/admin/v1/keys");
@@ -370,9 +407,9 @@ async function loadSigningKeys() {
                     <td>
                         ${k.state !== "revoked" ? `
                             <button class="btn btn-danger btn-sm" onclick="revokeKeyPrompt('${escapeHtml(k.kid)}')">
-                                Revokovať
+                                ${t("common.revoke", "Revokovať")}
                             </button>
-                        ` : `<span style="color:var(--text-muted);font-size:12px;">Revokovaný</span>`}
+                        ` : `<span style="color:var(--text-muted);font-size:12px;">${t("common.revoked", "Revokovaný")}</span>`}
                     </td>
                 </tr>
             `;

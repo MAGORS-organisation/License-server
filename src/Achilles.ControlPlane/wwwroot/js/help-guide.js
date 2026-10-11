@@ -9,19 +9,32 @@
 (function () {
     'use strict';
 
+    function getHelpLang() {
+        return (window.I18N && typeof window.I18N.getLanguage === 'function') ? window.I18N.getLanguage() : 'sk';
+    }
+
+    function ht(key, fb) {
+        return (window.I18N && typeof window.I18N.t === 'function') ? window.I18N.t(key, fb) : fb;
+    }
+
+    function getHelpCategories() {
+        const lang = getHelpLang();
+        const cats = [
+            { id: 'all', icon: '📚', sk: 'Všetky Témy', en: 'All Topics', de: 'Alle Themen' },
+            { id: 'core', icon: '🏛️', sk: 'Základ & Architektúra', en: 'Core & Architecture', de: 'Kern & Architektur' },
+            { id: 'floating', icon: '💺', sk: 'Plávajúce Licencie & Lízing', en: 'Floating Licenses & Leasing', de: 'Floating-Lizenzen & Leasing' },
+            { id: 'crypto', icon: '⚛️', sk: 'Kryptografia & PQC', en: 'Cryptography & PQC', de: 'Kryptographie & PQC' },
+            { id: 'airgap', icon: '🛰️', sk: 'Relay, Air-Gap & Siete', en: 'Relay, Air-Gap & Networks', de: 'Relay, Air-Gap & Netzwerke' },
+            { id: 'security', icon: '🛡️', sk: 'eBPF & Bezpečnosť', en: 'eBPF & Security', de: 'eBPF & Sicherheit' },
+            { id: 'enterprise', icon: '🏢', sk: 'Enterprise & Identity', en: 'Enterprise & Identity', de: 'Enterprise & Identitäten' },
+            { id: 'sdk', icon: '💻', sk: 'SDK & Vývojári', en: 'SDK & Developers', de: 'SDK & Entwickler' },
+            { id: 'operations', icon: '⚙️', sk: 'CLI & Prevádzka', en: 'CLI & Operations', de: 'CLI & Betrieb' }
+        ];
+        return cats.map(c => ({ id: c.id, icon: c.icon, label: c[lang] || c.sk }));
+    }
+
     // Dáta komplexnej príručky systému Achilles
     const helpGuideData = {
-        categories: [
-            { id: 'all', label: 'Všetky Témy', icon: '📚' },
-            { id: 'core', label: 'Základ & Architektúra', icon: '🏛️' },
-            { id: 'floating', label: 'Plávajúce Licencie & Lízing', icon: '💺' },
-            { id: 'crypto', label: 'Kryptografia & PQC', icon: '⚛️' },
-            { id: 'airgap', label: 'Relay, Air-Gap & Siete', icon: '🛰️' },
-            { id: 'security', label: 'eBPF & Bezpečnosť', icon: '🛡️' },
-            { id: 'enterprise', label: 'Enterprise & Identity', icon: '🏢' },
-            { id: 'sdk', label: 'SDK & Vývojári', icon: '💻' },
-            { id: 'operations', label: 'CLI & Prevádzka', icon: '⚙️' }
-        ],
 
         chapters: [
             {
@@ -853,6 +866,61 @@ Achilles ponúka 3 jedinečné dizajnové prostredia prispôsobené preferenciá
         });
     }
 
+
+    const chapterI18n = {
+        'ch-intro': {
+            en: { title: 'Introduction and System Architecture', badge: 'Core', summary: 'Complete overview of the Achilles ecosystem, operating principles, component separation, ControlPlane/Relay topology, and artifact formats.', targetViewName: 'Server Overview' },
+            de: { title: 'Einführung und Gesamtarchitektur des Systems', badge: 'Basis', summary: 'Vollständige Übersicht über das Achilles-Ökosystem, Funktionsprinzipien, Komponententeilung, ControlPlane/Relay-Topologie und Artefaktformate.', targetViewName: 'Server-Übersicht' }
+        },
+        'ch-floating': {
+            en: { title: 'Floating Licenses & Lease Mechanism', badge: 'Core', summary: 'O(1) seat allocation principle, FOR UPDATE SKIP LOCKED, periodic heartbeats, adaptive jitter, clock skew protection, and guaranteed zero over-allocation.', targetViewName: 'Licenses Directory' },
+            de: { title: 'Floating-Lizenzen & Leasing-Mechanismus', badge: 'Kern', summary: 'O(1)-Sitzzuweisungsprinzip, FOR UPDATE SKIP LOCKED, periodische Heartbeats, adaptiver Jitter, Clock-Skew-Schutz und garantierte Null-Überbelegung.', targetViewName: 'Lizenzverzeichnis' }
+        },
+        'ch-pqc': {
+            en: { title: 'Cryptography, KMS, and Post-Quantum Security (PQC)', badge: 'Cryptography', summary: 'Hybrid digital signatures ML-DSA-65 (FIPS 204) + NIST P-256 (ES256), three-tier key hierarchy (§9.3), Cloud KMS/HSM integration, and RFC 9964 formats.', targetViewName: 'Keys Management & PQC' },
+            de: { title: 'Kryptographie, KMS und Post-Quanten-Sicherheit (PQC)', badge: 'Kryptographie', summary: 'Hybride digitale Signaturen ML-DSA-65 (FIPS 204) + NIST P-256 (ES256), dreistufige Schlüsselhierarchie (§9.3), Cloud KMS/HSM-Integration und RFC 9964 Formate.', targetViewName: 'Schlüsselverwaltung & PQC' }
+        },
+        'ch-relay-airgap': {
+            en: { title: 'On-Premise Relay, Air-Gap, and Network Topology', badge: 'Networks', summary: 'Autonomous local proxy nodes, offline seat delegation (.symreq ➜ .symgrant), Crockford Base32 key formats, and Merkle transparent audit tree.', targetViewName: 'Air-Gap & Relay Portal' },
+            de: { title: 'On-Premise-Relay, Air-Gap und Netzwerktopologie', badge: 'Netzwerke', summary: 'Autonome lokale Proxy-Knoten, Offline-Sitzdelegierung (.symreq ➜ .symgrant), Crockford Base32-Schlüsselformate und Merkle-Audit-Baum.', targetViewName: 'Air-Gap- & Relay-Portal' }
+        },
+        'ch-ebpf': {
+            en: { title: 'eBPF Kernel Protection & Hardware Node-Lock', badge: 'Security', summary: 'Low-level network socket inspection in Linux kernel, anti-debugging protection, hardware fingerprints (FPR-1..19), fuzzy matching, and VM cloning detection.', targetViewName: 'Node-Lock & Machines' },
+            de: { title: 'eBPF-Kernelschutz & Hardware-Node-Lock', badge: 'Sicherheit', summary: 'Netzwerk-Socket-Prüfung im Linux-Kernel, Anti-Debugging-Schutz, Hardware-Fingerprints (FPR-1..19), Fuzzy-Matching und VM-Klonungserkennung.', targetViewName: 'Node-Lock & Rechner' }
+        },
+        'ch-enterprise': {
+            en: { title: 'Enterprise Integrations, SCIM 2.0, and Identity', badge: 'Enterprise', summary: 'Integration with enterprise IdPs (Microsoft Entra ID, Okta, Ping), SCIM 2.0 provisioning and de-provisioning, role-based access control (RBAC), and SSO.', targetViewName: 'SCIM Directory' },
+            de: { title: 'Enterprise-Integrationen, SCIM 2.0 und Identitäten', badge: 'Enterprise', summary: 'Anbindung an Enterprise-IdPs (Microsoft Entra ID, Okta, Ping), SCIM 2.0 Bereitstellung und De-Bereitstellung, rollenbasierte Zugriffskontrolle (RBAC) und SSO.', targetViewName: 'SCIM-Verzeichnis' }
+        },
+        'ch-sdk': {
+            en: { title: 'Client SDKs & Developer Integration', badge: 'Developers', summary: 'Integration guide for C# .NET, Python, Rust, C++, Go, and WebAssembly with automatic lease management, RAII pattern, and adaptive jitter.', targetViewName: 'Wasm Validator' },
+            de: { title: 'Client-SDKs & Entwicklerintegration', badge: 'Entwickler', summary: 'Integrationsleitfaden für C# .NET, Python, Rust, C++, Go und WebAssembly mit automatischer Lease-Verwaltung, RAII-Muster und adaptivem Jitter.', targetViewName: 'Wasm-Validator' }
+        },
+        'ch-operations': {
+            en: { title: 'Operations, Monitoring, CLI, and Kubernetes Operator', badge: 'Operations', summary: 'Achilles CLI commands, diagnostics (doctor), Prometheus metrics, OpenTelemetry distributed traces, Kubernetes CRDs (AchillesCluster, AchillesLicense), and Helm charts.', targetViewName: 'Diagnostics & CRA' },
+            de: { title: 'Betrieb, Monitoring, CLI und Kubernetes Operator', badge: 'Betrieb', summary: 'Achilles CLI-Befehle, Diagnose (Doctor), Prometheus-Metriken, OpenTelemetry-Traces, Kubernetes-CRDs (AchillesCluster, AchillesLicense) und Helm-Charts.', targetViewName: 'Diagnose & CRA' }
+        },
+        'ch-shortcuts': {
+            en: { title: 'Keyboard Shortcuts & TUI Navigation', badge: 'Reference', summary: 'Complete reference of function keys F1-F12, navigation shortcuts, and hotkey accelerators for the Achilles control plane.', targetViewName: 'Configuration' },
+            de: { title: 'Tastenkombinationen & TUI-Navigation', badge: 'Referenz', summary: 'Vollständige Referenz der Funktionstasten F1-F12, Navigationskürzel und Beschleunigungstasten für das Achilles Control Plane.', targetViewName: 'Konfiguration' }
+        }
+    };
+
+    function getChapterMeta(ch) {
+        const lang = getHelpLang();
+        if (chapterI18n[ch.id] && chapterI18n[ch.id][lang]) {
+            const loc = chapterI18n[ch.id][lang];
+            return {
+                ...ch,
+                title: loc.title || ch.title,
+                badge: loc.badge || ch.badge,
+                summary: loc.summary || ch.summary,
+                targetViewName: loc.targetViewName || ch.targetViewName
+            };
+        }
+        return ch;
+    }
+
     /**
      * Vykreslenie kategórií
      */
@@ -860,7 +928,8 @@ Achilles ponúka 3 jedinečné dizajnové prostredia prispôsobené preferenciá
         const container = document.getElementById('help-filter-pills');
         if (!container) return;
 
-        container.innerHTML = helpGuideData.categories.map(cat => `
+        const categories = getHelpCategories();
+        container.innerHTML = categories.map(cat => `
             <button class="help-pill ${cat.id === currentCategory ? 'active' : ''}" 
                     onclick="window.HelpGuide.setCategory('${cat.id}')">
                 <span>${cat.icon}</span> ${cat.label}
@@ -875,7 +944,7 @@ Achilles ponúka 3 jedinečné dizajnové prostredia prispôsobené preferenciá
         const listEl = document.getElementById('help-toc-list');
         if (!listEl) return;
 
-        const filtered = helpGuideData.chapters.filter(ch => {
+        const filtered = helpGuideData.chapters.map(getChapterMeta).filter(ch => {
             const matchesCat = currentCategory === 'all' || ch.category === currentCategory;
             const matchesSearch = !searchQuery || 
                 ch.title.toLowerCase().includes(searchQuery) ||
@@ -886,10 +955,12 @@ Achilles ponúka 3 jedinečné dizajnové prostredia prispôsobené preferenciá
         });
 
         if (filtered.length === 0) {
+            const noResTemplate = ht('help.noResults', 'Žiadna kapitola nevyhovuje výrazu "{0}".');
+            const resetFilterLabel = ht('help.btnResetFilter', 'Zrušiť filter');
             listEl.innerHTML = `
                 <div style="padding: 24px; text-align: center; color: var(--text-secondary); font-size: 13px;">
-                    🔍 Žiadna kapitola nevyhovuje výrazu "<strong>${escapeHtml(searchQuery)}</strong>".<br>
-                    <button class="btn btn-secondary btn-sm" style="margin-top: 10px;" onclick="window.HelpGuide.resetFilters()">Zrušiť filter</button>
+                    🔍 ${noResTemplate.replace('{0}', '<strong>' + escapeHtml(searchQuery) + '</strong>')}<br>
+                    <button class="btn btn-secondary btn-sm" style="margin-top: 10px;" onclick="window.HelpGuide.resetFilters()">${resetFilterLabel}</button>
                 </div>
             `;
             return;
@@ -911,22 +982,34 @@ Achilles ponúka 3 jedinečné dizajnové prostredia prispôsobené preferenciá
      * Vykreslenie obsahu konkrétnej kapitoly
      */
     function renderChapterContent(chapterId) {
-        const chapter = helpGuideData.chapters.find(c => c.id === chapterId) || helpGuideData.chapters[0];
+        const rawChapter = helpGuideData.chapters.find(c => c.id === chapterId) || helpGuideData.chapters[0];
+        const chapter = getChapterMeta(rawChapter);
         currentChapterId = chapter.id;
 
         const contentEl = document.getElementById('help-content-display');
         if (!contentEl) return;
+
+        const chapterPrefix = ht('help.chapterPrefix', 'Kapitola {0} · {1}')
+            .replace('{0}', chapter.number)
+            .replace('{1}', chapter.badge);
+        const openViewLabel = ht('help.openView', '↗ Otvoriť: {0}')
+            .replace('{0}', chapter.targetViewName);
+        const footerText = ht('help.footerText', '📖 Achilles Enterprise Floating License Server · Oficiálna Príručka');
+        const prevLabel = ht('help.btnPrev', '← Predchádzajúca');
+        const nextLabel = ht('help.btnNext', 'Ďalšia →');
+        const copyLabel = ht('help.btnCopy', 'Kopírovať');
+        const copiedLabel = ht('help.btnCopied', '✓ Skopírované');
 
         contentEl.innerHTML = `
             <article class="help-article">
                 <header class="help-article-header">
                     <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; margin-bottom: 8px;">
                         <span class="badge" style="background: var(--accent-primary); color: #fff; font-size: 11px; padding: 4px 10px;">
-                            Kapitola ${chapter.number} · ${chapter.badge}
+                            ${chapterPrefix}
                         </span>
                         ${chapter.targetView ? `
                             <button class="btn btn-secondary btn-sm" onclick="switchToView('${chapter.targetView}')" title="Otvoriť obrazovku v aplikácii">
-                                ↗ Otvoriť: ${chapter.targetViewName}
+                                ${openViewLabel}
                             </button>
                         ` : ''}
                     </div>
@@ -938,11 +1021,11 @@ Achilles ponúka 3 jedinečné dizajnové prostredia prispôsobené preferenciá
                 </div>
                 <footer class="help-article-footer" style="margin-top: 32px; padding-top: 20px; border-top: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
                     <div style="font-size: 12px; color: var(--text-secondary);">
-                        📖 Achilles Enterprise Floating License Server · Oficiálna Príručka
+                        ${footerText}
                     </div>
                     <div style="display: flex; gap: 8px;">
-                        <button class="btn btn-secondary btn-sm" onclick="window.HelpGuide.navigate(-1)">← Predchádzajúca</button>
-                        <button class="btn btn-primary btn-sm" onclick="window.HelpGuide.navigate(1)">Ďalšia →</button>
+                        <button class="btn btn-secondary btn-sm" onclick="window.HelpGuide.navigate(-1)">${prevLabel}</button>
+                        <button class="btn btn-primary btn-sm" onclick="window.HelpGuide.navigate(1)">${nextLabel}</button>
                     </div>
                 </footer>
             </article>
@@ -1014,6 +1097,13 @@ Achilles ponúka 3 jedinečné dizajnové prostredia prispôsobené preferenciá
             }
         }
     };
+
+    // Prekreslenie príručky pri zmene jazyka aplikácie
+    window.addEventListener('achilles:languageChanged', () => {
+        renderCategoryPills();
+        renderChapterList();
+        renderChapterContent(currentChapterId);
+    });
 
     // Inicializácia pri načítaní DOM
     document.addEventListener('DOMContentLoaded', () => {

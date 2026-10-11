@@ -141,9 +141,10 @@
         const topbarAppleToggle = document.getElementById('topbar-apple-toggle');
         if (topbarAppleToggle) {
             topbarAppleToggle.style.display = theme === 'apple' ? 'inline-flex' : 'none';
-            let label = '🌓 Auto';
-            if (regime === 'light') label = '☀️ Day';
-            if (regime === 'dark') label = '🌙 Night';
+            const i18n = window.I18N;
+            let label = '🌓 ' + (i18n ? i18n.t('theme.regimeSystem') : 'Auto');
+            if (regime === 'light') label = '☀️ ' + (i18n ? i18n.t('theme.regimeLight') : 'Day');
+            if (regime === 'dark') label = '🌙 ' + (i18n ? i18n.t('theme.regimeDark') : 'Night');
             topbarAppleToggle.innerHTML = label;
         }
     }
@@ -188,6 +189,10 @@
     } else {
         initTheme();
     }
+
+    window.addEventListener('achilles:languageChanged', function() {
+        updateThemeControls(getAppTheme(), getAppleRegime(), computeEffectiveAppleTheme(getAppleRegime()));
+    });
 
     // Expose global Theme API
     window.ThemeManager = {

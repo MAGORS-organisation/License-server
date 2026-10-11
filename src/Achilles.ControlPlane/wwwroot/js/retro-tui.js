@@ -18,50 +18,153 @@
         activeModalId: null
     };
 
-    // Položky hlavného kaskádového menu (presne podľa FoxPro rozvrhnutia)
-    const mainMenuItems = [
-        { id: 'vstupy', label: 'Vstupy (Prehľad)', hotkey: 'V', view: 'view-overview', hasSub: false },
-        { id: 'licencie', label: 'Licencie', hotkey: 'L', view: 'view-licenses', hasSub: false },
-        { id: 'kluce', label: 'Kľúče & PQC', hotkey: 'K', view: 'view-keys', hasSub: false },
-        { id: 'ciselniky', label: 'Číselníky', hotkey: 'Č', view: null, hasSub: true },
-        { isSeparator: true },
-        { id: 'relaye', label: 'Relay uzly', hotkey: 'R', view: 'view-relays', hasSub: false },
-        { id: 'mesh', label: 'Relay Mesh & Klastre', hotkey: 'M', view: 'view-mesh', hasSub: false },
-        { id: 'audit', label: 'Auditný denník', hotkey: 'A', view: 'view-audit', hasSub: false },
-        { id: 'reports', label: 'Reporty & True-Up', hotkey: 'y', view: 'view-reports', hasSub: false },
-        { id: 'airgap', label: 'Air-Gap portál', hotkey: 'G', view: 'view-airgap', hasSub: false },
-        { id: 'wasm', label: 'Wasm Validátor', hotkey: 'D', view: 'view-wasm', hasSub: false },
-        { id: 'tokens', label: 'Tokeny & Kredity', hotkey: 'E', view: 'view-tokens', hasSub: false },
-        { id: 'migrate', label: 'Migrácia (FlexNet)', hotkey: 'I', view: 'view-migrate', hasSub: false },
-        { id: 'features', label: 'F[u]nkcie & Moduly', hotkey: 'U', view: 'view-features', hasSub: false },
-        { id: 'revocations', label: 'Revokácie & CRL', hotkey: 'X', view: 'view-revocations', hasSub: false },
-        { id: 'queue', label: 'Licenčný Rad (FLT-31)', hotkey: 'Q', view: 'view-queue', hasSub: false },
-        { id: 'policyrules', label: 'Pravidlá & Options', hotkey: 'Z', view: 'view-policy-rules', hasSub: false },
-        { id: 'machines', label: 'Stroje & Node-Lock', hotkey: 'N', view: 'view-machines', hasSub: false },
-        { id: 'webhooky', label: 'Webhooky', hotkey: 'W', view: 'view-webhooks', hasSub: false },
-        { id: 'experiments', label: 'A/B Experimenty (AB-1)', hotkey: 'B', view: 'view-experiments', hasSub: false },
-        { id: 'pqc', label: 'Post-Quantum Era (M7)', hotkey: 'q', view: 'view-pqc', hasSub: false },
-        { isSeparator: true },
-        { id: 'sulad', label: 'Súlad & CRA / SBOM', hotkey: 'S', view: 'view-system', hasSub: false },
-        { id: 'apikeys', label: 'API Kľúče & Merkle', hotkey: 'T', view: 'view-apikeys', hasSub: false },
-        { id: 'konfiguracia', label: 'Konfigurácia', hotkey: 'O', view: 'view-config', hasSub: false },
-        { id: 'pomoc', label: 'Príručka & Pomoc (F1)', hotkey: 'P', view: 'view-help', hasSub: false }
-    ];
+    // Dynamické preklady a definície menu
+    let mainMenuItems = [];
+    let submenuItems = [];
 
-    // Položky kaskádového podmenu "Číselníky" (ako na screenshotu)
-    const submenuItems = [
-        { id: 'sub-tenants', label: 'Adresár zákazníkov', hotkey: 'A', action: () => alert('Adresár zákazníkov ISV') },
-        { id: 'sub-products', label: 'Katalóg produktov', hotkey: 'K', action: () => alert('Katalóg chránených aplikácií') },
-        { id: 'sub-policies', label: 'Licenčné politiky', hotkey: 'P', action: () => alert('Šablóny licenčných politík') },
-        { id: 'sub-rules', label: 'Options & Pravidlá (FLT-24)', hotkey: 'O', action: () => { switchRetroView('view-policy-rules'); if (typeof window.loadPolicyRulesView === 'function') window.loadPolicyRulesView(); } },
-        { id: 'sub-features', label: 'Katalóg modulov a suít', hotkey: 'F', action: () => { switchRetroView('view-features'); if (typeof loadFeaturesView === 'function') loadFeaturesView(); } },
-        { id: 'sub-jwks', label: 'Verejné kľúče (JWKS)', hotkey: 'V', action: () => { if (typeof openJwksModal === 'function') openJwksModal(); } },
-        { id: 'sub-kms', label: 'Cloud KMS & HSM Stav', hotkey: 'M', action: () => { switchRetroView('view-keys'); if (typeof loadKmsHierarchy === 'function') loadKmsHierarchy(); } },
-        { id: 'sub-hierarchy', label: '3-Úrovňová Hierarchia (§9.3)', hotkey: '3', action: () => { switchRetroView('view-keys'); if (typeof verifyKeyHierarchy === 'function') verifyKeyHierarchy(); } },
-        { id: 'sub-rates', label: 'Sadzby & Kredity (Tokeny)', hotkey: 'S', action: () => { switchRetroView('view-tokens'); if (typeof loadTokenRates === 'function') loadTokenRates(); } },
-        { id: 'sub-borrow', label: 'Offline Roaming (.symlease)', hotkey: 'B', action: () => { switchRetroView('view-overview'); if (typeof openBorrowModal === 'function') openBorrowModal(); } },
-        { id: 'sub-nodes', label: 'Hardvérové odtlačky & Stroje', hotkey: 'H', action: () => { switchRetroView('view-machines'); if (typeof window.loadMachinesView === 'function') window.loadMachinesView(); } }
-    ];
+    function getActiveLang() {
+        return (window.I18N && typeof window.I18N.getLanguage === 'function') ? window.I18N.getLanguage() : 'sk';
+    }
+
+    function t(key, fb) {
+        return (window.I18N && typeof window.I18N.t === 'function') ? window.I18N.t(key, fb) : fb;
+    }
+
+    function loadLocalizedMenuItems() {
+        const lang = getActiveLang();
+
+        if (lang === 'en') {
+            mainMenuItems = [
+                { id: 'vstupy', label: 'Inputs (Overview)', hotkey: 'I', view: 'view-overview', hasSub: false },
+                { id: 'licencie', label: 'Licenses', hotkey: 'L', view: 'view-licenses', hasSub: false },
+                { id: 'kluce', label: 'Keys & PQC', hotkey: 'K', view: 'view-keys', hasSub: false },
+                { id: 'ciselniky', label: 'Catalogs', hotkey: 'C', view: null, hasSub: true },
+                { isSeparator: true },
+                { id: 'relaye', label: 'Relay Nodes', hotkey: 'R', view: 'view-relays', hasSub: false },
+                { id: 'mesh', label: 'Relay Mesh & Clusters', hotkey: 'M', view: 'view-mesh', hasSub: false },
+                { id: 'audit', label: 'Audit Log', hotkey: 'A', view: 'view-audit', hasSub: false },
+                { id: 'reports', label: 'Reports & True-Up', hotkey: 'y', view: 'view-reports', hasSub: false },
+                { id: 'airgap', label: 'Air-Gap Portal', hotkey: 'G', view: 'view-airgap', hasSub: false },
+                { id: 'wasm', label: 'Wasm Validator', hotkey: 'D', view: 'view-wasm', hasSub: false },
+                { id: 'tokens', label: 'Tokens & Credits', hotkey: 'E', view: 'view-tokens', hasSub: false },
+                { id: 'migrate', label: 'Migration (FlexNet)', hotkey: 'X', view: 'view-migrate', hasSub: false },
+                { id: 'features', label: 'Features & Modules', hotkey: 'U', view: 'view-features', hasSub: false },
+                { id: 'revocations', label: 'Revocations & CRL', hotkey: 'V', view: 'view-revocations', hasSub: false },
+                { id: 'queue', label: 'License Queue (FLT-31)', hotkey: 'Q', view: 'view-queue', hasSub: false },
+                { id: 'policyrules', label: 'Rules & Options', hotkey: 'Z', view: 'view-policy-rules', hasSub: false },
+                { id: 'machines', label: 'Machines & Node-Lock', hotkey: 'N', view: 'view-machines', hasSub: false },
+                { id: 'webhooky', label: 'Webhooks', hotkey: 'W', view: 'view-webhooks', hasSub: false },
+                { id: 'experiments', label: 'A/B Experiments (AB-1)', hotkey: 'B', view: 'view-experiments', hasSub: false },
+                { id: 'pqc', label: 'Post-Quantum Era (M7)', hotkey: 'q', view: 'view-pqc', hasSub: false },
+                { isSeparator: true },
+                { id: 'sulad', label: 'Compliance & CRA / SBOM', hotkey: 'S', view: 'view-system', hasSub: false },
+                { id: 'apikeys', label: 'API Keys & Merkle', hotkey: 'T', view: 'view-apikeys', hasSub: false },
+                { id: 'konfiguracia', label: 'Configuration', hotkey: 'O', view: 'view-config', hasSub: false },
+                { id: 'pomoc', label: 'User Manual & Help (F1)', hotkey: 'P', view: 'view-help', hasSub: false }
+            ];
+            submenuItems = [
+                { id: 'sub-tenants', label: 'Customer Directory', hotkey: 'C', action: () => alert('ISV Customer Directory') },
+                { id: 'sub-products', label: 'Product Catalog', hotkey: 'P', action: () => alert('Protected Application Catalog') },
+                { id: 'sub-policies', label: 'License Policies', hotkey: 'L', action: () => alert('License Policy Templates') },
+                { id: 'sub-rules', label: 'Options & Rules (FLT-24)', hotkey: 'O', action: () => { switchRetroView('view-policy-rules'); if (typeof window.loadPolicyRulesView === 'function') window.loadPolicyRulesView(); } },
+                { id: 'sub-features', label: 'Module & Suite Catalog', hotkey: 'M', action: () => { switchRetroView('view-features'); if (typeof loadFeaturesView === 'function') loadFeaturesView(); } },
+                { id: 'sub-jwks', label: 'Public Keys (JWKS)', hotkey: 'K', action: () => { if (typeof openJwksModal === 'function') openJwksModal(); } },
+                { id: 'sub-kms', label: 'Cloud KMS & HSM Status', hotkey: 'S', action: () => { switchRetroView('view-keys'); if (typeof loadKmsHierarchy === 'function') loadKmsHierarchy(); } },
+                { id: 'sub-hierarchy', label: '3-Tier Hierarchy (§9.3)', hotkey: '3', action: () => { switchRetroView('view-keys'); if (typeof verifyKeyHierarchy === 'function') verifyKeyHierarchy(); } },
+                { id: 'sub-rates', label: 'Rates & Credits (Tokens)', hotkey: 'R', action: () => { switchRetroView('view-tokens'); if (typeof loadTokenRates === 'function') loadTokenRates(); } },
+                { id: 'sub-borrow', label: 'Offline Roaming (.symlease)', hotkey: 'B', action: () => { switchRetroView('view-overview'); if (typeof openBorrowModal === 'function') openBorrowModal(); } },
+                { id: 'sub-nodes', label: 'Hardware Fingerprints & Machines', hotkey: 'H', action: () => { switchRetroView('view-machines'); if (typeof window.loadMachinesView === 'function') window.loadMachinesView(); } }
+            ];
+        } else if (lang === 'de') {
+            mainMenuItems = [
+                { id: 'vstupy', label: 'Eingaben (Übersicht)', hotkey: 'E', view: 'view-overview', hasSub: false },
+                { id: 'licencie', label: 'Lizenzen', hotkey: 'L', view: 'view-licenses', hasSub: false },
+                { id: 'kluce', label: 'Schlüssel & PQC', hotkey: 'S', view: 'view-keys', hasSub: false },
+                { id: 'ciselniky', label: 'Kataloge', hotkey: 'K', view: null, hasSub: true },
+                { isSeparator: true },
+                { id: 'relaye', label: 'Relay-Knoten', hotkey: 'R', view: 'view-relays', hasSub: false },
+                { id: 'mesh', label: 'Relay-Mesh & Cluster', hotkey: 'M', view: 'view-mesh', hasSub: false },
+                { id: 'audit', label: 'Audit-Protokoll', hotkey: 'A', view: 'view-audit', hasSub: false },
+                { id: 'reports', label: 'Berichte & True-Up', hotkey: 'B', view: 'view-reports', hasSub: false },
+                { id: 'airgap', label: 'Air-Gap-Portal', hotkey: 'G', view: 'view-airgap', hasSub: false },
+                { id: 'wasm', label: 'Wasm-Validator', hotkey: 'D', view: 'view-wasm', hasSub: false },
+                { id: 'tokens', label: 'Token & Guthaben', hotkey: 'T', view: 'view-tokens', hasSub: false },
+                { id: 'migrate', label: 'Migration (FlexNet)', hotkey: 'I', view: 'view-migrate', hasSub: false },
+                { id: 'features', label: 'Features & Module', hotkey: 'U', view: 'view-features', hasSub: false },
+                { id: 'revocations', label: 'Widerrufe & CRL', hotkey: 'X', view: 'view-revocations', hasSub: false },
+                { id: 'queue', label: 'Lizenz-Warteschlange (FLT-31)', hotkey: 'Q', view: 'view-queue', hasSub: false },
+                { id: 'policyrules', label: 'Richtlinien & Optionen', hotkey: 'Z', view: 'view-policy-rules', hasSub: false },
+                { id: 'machines', label: 'Maschinen & Node-Lock', hotkey: 'N', view: 'view-machines', hasSub: false },
+                { id: 'webhooky', label: 'Webhooks', hotkey: 'W', view: 'view-webhooks', hasSub: false },
+                { id: 'experiments', label: 'A/B-Experimente (AB-1)', hotkey: 'p', view: 'view-experiments', hasSub: false },
+                { id: 'pqc', label: 'Post-Quanten-Ära (M7)', hotkey: 'q', view: 'view-pqc', hasSub: false },
+                { isSeparator: true },
+                { id: 'sulad', label: 'CRA-Compliance & SBOM', hotkey: 'C', view: 'view-system', hasSub: false },
+                { id: 'apikeys', label: 'API-Schlüssel & Merkle', hotkey: 'k', view: 'view-apikeys', hasSub: false },
+                { id: 'konfiguracia', label: 'Konfiguration', hotkey: 'O', view: 'view-config', hasSub: false },
+                { id: 'pomoc', label: 'Handbuch & Hilfe (F1)', hotkey: 'H', view: 'view-help', hasSub: false }
+            ];
+            submenuItems = [
+                { id: 'sub-tenants', label: 'Kundenverzeichnis', hotkey: 'K', action: () => alert('ISV-Kundenverzeichnis') },
+                { id: 'sub-products', label: 'Produktkatalog', hotkey: 'P', action: () => alert('Katalog geschützter Anwendungen') },
+                { id: 'sub-policies', label: 'Lizenzrichtlinien', hotkey: 'L', action: () => alert('Lizenzrichtlinien-Vorlagen') },
+                { id: 'sub-rules', label: 'Options & Richtlinien (FLT-24)', hotkey: 'O', action: () => { switchRetroView('view-policy-rules'); if (typeof window.loadPolicyRulesView === 'function') window.loadPolicyRulesView(); } },
+                { id: 'sub-features', label: 'Modul- und Suite-Katalog', hotkey: 'M', action: () => { switchRetroView('view-features'); if (typeof loadFeaturesView === 'function') loadFeaturesView(); } },
+                { id: 'sub-jwks', label: 'Öffentliche Schlüssel (JWKS)', hotkey: 'Ö', action: () => { if (typeof openJwksModal === 'function') openJwksModal(); } },
+                { id: 'sub-kms', label: 'Cloud KMS & HSM Status', hotkey: 'S', action: () => { switchRetroView('view-keys'); if (typeof loadKmsHierarchy === 'function') loadKmsHierarchy(); } },
+                { id: 'sub-hierarchy', label: '3-Stufige Hierarchie (§9.3)', hotkey: '3', action: () => { switchRetroView('view-keys'); if (typeof verifyKeyHierarchy === 'function') verifyKeyHierarchy(); } },
+                { id: 'sub-rates', label: 'Tarife & Guthaben (Tokens)', hotkey: 'T', action: () => { switchRetroView('view-tokens'); if (typeof loadTokenRates === 'function') loadTokenRates(); } },
+                { id: 'sub-borrow', label: 'Offline Roaming (.symlease)', hotkey: 'B', action: () => { switchRetroView('view-overview'); if (typeof openBorrowModal === 'function') openBorrowModal(); } },
+                { id: 'sub-nodes', label: 'Hardware-Fingerprints & Rechner', hotkey: 'H', action: () => { switchRetroView('view-machines'); if (typeof window.loadMachinesView === 'function') window.loadMachinesView(); } }
+            ];
+        } else {
+            // Default: Slovak
+            mainMenuItems = [
+                { id: 'vstupy', label: 'Vstupy (Prehľad)', hotkey: 'V', view: 'view-overview', hasSub: false },
+                { id: 'licencie', label: 'Licencie', hotkey: 'L', view: 'view-licenses', hasSub: false },
+                { id: 'kluce', label: 'Kľúče & PQC', hotkey: 'K', view: 'view-keys', hasSub: false },
+                { id: 'ciselniky', label: 'Číselníky', hotkey: 'Č', view: null, hasSub: true },
+                { isSeparator: true },
+                { id: 'relaye', label: 'Relay uzly', hotkey: 'R', view: 'view-relays', hasSub: false },
+                { id: 'mesh', label: 'Relay Mesh & Klastre', hotkey: 'M', view: 'view-mesh', hasSub: false },
+                { id: 'audit', label: 'Auditný denník', hotkey: 'A', view: 'view-audit', hasSub: false },
+                { id: 'reports', label: 'Reporty & True-Up', hotkey: 'y', view: 'view-reports', hasSub: false },
+                { id: 'airgap', label: 'Air-Gap portál', hotkey: 'G', view: 'view-airgap', hasSub: false },
+                { id: 'wasm', label: 'Wasm Validátor', hotkey: 'D', view: 'view-wasm', hasSub: false },
+                { id: 'tokens', label: 'Tokeny & Kredity', hotkey: 'E', view: 'view-tokens', hasSub: false },
+                { id: 'migrate', label: 'Migrácia (FlexNet)', hotkey: 'I', view: 'view-migrate', hasSub: false },
+                { id: 'features', label: 'Funkcie & Moduly', hotkey: 'U', view: 'view-features', hasSub: false },
+                { id: 'revocations', label: 'Revokácie & CRL', hotkey: 'X', view: 'view-revocations', hasSub: false },
+                { id: 'queue', label: 'Licenčný Rad (FLT-31)', hotkey: 'Q', view: 'view-queue', hasSub: false },
+                { id: 'policyrules', label: 'Pravidlá & Options', hotkey: 'Z', view: 'view-policy-rules', hasSub: false },
+                { id: 'machines', label: 'Stroje & Node-Lock', hotkey: 'N', view: 'view-machines', hasSub: false },
+                { id: 'webhooky', label: 'Webhooky', hotkey: 'W', view: 'view-webhooks', hasSub: false },
+                { id: 'experiments', label: 'A/B Experimenty (AB-1)', hotkey: 'B', view: 'view-experiments', hasSub: false },
+                { id: 'pqc', label: 'Post-Quantum Era (M7)', hotkey: 'q', view: 'view-pqc', hasSub: false },
+                { isSeparator: true },
+                { id: 'sulad', label: 'Súlad & CRA / SBOM', hotkey: 'S', view: 'view-system', hasSub: false },
+                { id: 'apikeys', label: 'API Kľúče & Merkle', hotkey: 'T', view: 'view-apikeys', hasSub: false },
+                { id: 'konfiguracia', label: 'Konfigurácia', hotkey: 'O', view: 'view-config', hasSub: false },
+                { id: 'pomoc', label: 'Príručka & Pomoc (F1)', hotkey: 'P', view: 'view-help', hasSub: false }
+            ];
+            submenuItems = [
+                { id: 'sub-tenants', label: 'Adresár zákazníkov', hotkey: 'A', action: () => alert('Adresár zákazníkov ISV') },
+                { id: 'sub-products', label: 'Katalóg produktov', hotkey: 'K', action: () => alert('Katalóg chránených aplikácií') },
+                { id: 'sub-policies', label: 'Licenčné politiky', hotkey: 'P', action: () => alert('Šablóny licenčných politík') },
+                { id: 'sub-rules', label: 'Options & Pravidlá (FLT-24)', hotkey: 'O', action: () => { switchRetroView('view-policy-rules'); if (typeof window.loadPolicyRulesView === 'function') window.loadPolicyRulesView(); } },
+                { id: 'sub-features', label: 'Katalóg modulov a suít', hotkey: 'F', action: () => { switchRetroView('view-features'); if (typeof loadFeaturesView === 'function') loadFeaturesView(); } },
+                { id: 'sub-jwks', label: 'Verejné kľúče (JWKS)', hotkey: 'V', action: () => { if (typeof openJwksModal === 'function') openJwksModal(); } },
+                { id: 'sub-kms', label: 'Cloud KMS & HSM Stav', hotkey: 'M', action: () => { switchRetroView('view-keys'); if (typeof loadKmsHierarchy === 'function') loadKmsHierarchy(); } },
+                { id: 'sub-hierarchy', label: '3-Úrovňová Hierarchia (§9.3)', hotkey: '3', action: () => { switchRetroView('view-keys'); if (typeof verifyKeyHierarchy === 'function') verifyKeyHierarchy(); } },
+                { id: 'sub-rates', label: 'Sadzby & Kredity (Tokeny)', hotkey: 'S', action: () => { switchRetroView('view-tokens'); if (typeof loadTokenRates === 'function') loadTokenRates(); } },
+                { id: 'sub-borrow', label: 'Offline Roaming (.symlease)', hotkey: 'B', action: () => { switchRetroView('view-overview'); if (typeof openBorrowModal === 'function') openBorrowModal(); } },
+                { id: 'sub-nodes', label: 'Hardvérové odtlačky & Stroje', hotkey: 'H', action: () => { switchRetroView('view-machines'); if (typeof window.loadMachinesView === 'function') window.loadMachinesView(); } }
+            ];
+        }
+    }
+
+    // Inicializujeme menu dáta
+    loadLocalizedMenuItems();
 
     // Inicializácia po načítaní DOM
     document.addEventListener('DOMContentLoaded', () => {
@@ -71,39 +174,162 @@
     });
 
     /**
+     * Vracia HTML položiek hornej lišty v závislosti od jazyka
+     */
+    function getRetroTopbarHtml() {
+        const lang = getActiveLang();
+        let items = [];
+        if (lang === 'en') {
+            items = [
+                { label: '≡ <span class="hotkey">A</span>chilles', click: 'toggleMainMenu()' },
+                { label: '<span class="hotkey">O</span>verview', click: "switchRetroView('view-overview')" },
+                { label: '<span class="hotkey">L</span>icenses', click: "switchRetroView('view-licenses')" },
+                { label: '<span class="hotkey">K</span>eys', click: "switchRetroView('view-keys')" },
+                { label: '<span class="hotkey">R</span>elays', click: "switchRetroView('view-relays')" },
+                { label: '<span class="hotkey">M</span>esh', click: "switchRetroView('view-mesh')" },
+                { label: '<span class="hotkey">A</span>udit', click: "switchRetroView('view-audit')" },
+                { label: 'Report<span class="hotkey">s</span>', click: "switchRetroView('view-reports')" },
+                { label: 'Air-<span class="hotkey">G</span>ap', click: "switchRetroView('view-airgap')" },
+                { label: '<span class="hotkey">W</span>asm', click: "switchRetroView('view-wasm')" },
+                { label: 'Tok<span class="hotkey">e</span>ns', click: "switchRetroView('view-tokens')" },
+                { label: 'M<span class="hotkey">i</span>grate', click: "switchRetroView('view-migrate')" },
+                { label: '<span class="hotkey">W</span>ebhooks', click: "switchRetroView('view-webhooks')" },
+                { label: 'Revo<span class="hotkey">k</span>ations', click: "switchRetroView('view-revocations')" },
+                { label: '<span class="hotkey">Q</span>ueue', click: "switchRetroView('view-queue')" },
+                { label: 'Rule<span class="hotkey">s</span>', click: "switchRetroView('view-policy-rules')" },
+                { label: '<span class="hotkey">N</span>ode-Lock', click: "switchRetroView('view-machines')" },
+                { label: 'A/<span class="hotkey">B</span> Exp', click: "switchRetroView('view-experiments')" },
+                { label: 'P<span class="hotkey">Q</span>C M7', click: "switchRetroView('view-pqc')" },
+                { label: '<span class="hotkey">C</span>ompliance', click: "switchRetroView('view-system')" },
+                { label: 'C<span class="hotkey">o</span>nfig', click: "switchRetroView('view-config')" },
+                { label: '<span class="hotkey">H</span>elp (F1)', click: "switchRetroView('view-help')" }
+            ];
+        } else if (lang === 'de') {
+            items = [
+                { label: '≡ <span class="hotkey">A</span>chilles', click: 'toggleMainMenu()' },
+                { label: '<span class="hotkey">Ü</span>bersicht', click: "switchRetroView('view-overview')" },
+                { label: '<span class="hotkey">L</span>izenzen', click: "switchRetroView('view-licenses')" },
+                { label: '<span class="hotkey">S</span>chlüssel', click: "switchRetroView('view-keys')" },
+                { label: '<span class="hotkey">R</span>elays', click: "switchRetroView('view-relays')" },
+                { label: '<span class="hotkey">M</span>esh', click: "switchRetroView('view-mesh')" },
+                { label: '<span class="hotkey">A</span>udit', click: "switchRetroView('view-audit')" },
+                { label: '<span class="hotkey">B</span>erichte', click: "switchRetroView('view-reports')" },
+                { label: 'Air-<span class="hotkey">G</span>ap', click: "switchRetroView('view-airgap')" },
+                { label: '<span class="hotkey">W</span>asm', click: "switchRetroView('view-wasm')" },
+                { label: '<span class="hotkey">T</span>oken', click: "switchRetroView('view-tokens')" },
+                { label: 'M<span class="hotkey">i</span>gration', click: "switchRetroView('view-migrate')" },
+                { label: '<span class="hotkey">W</span>ebhooks', click: "switchRetroView('view-webhooks')" },
+                { label: 'Wider<span class="hotkey">r</span>ufe', click: "switchRetroView('view-revocations')" },
+                { label: '<span class="hotkey">Q</span>ueue', click: "switchRetroView('view-queue')" },
+                { label: 'Richt<span class="hotkey">l</span>inien', click: "switchRetroView('view-policy-rules')" },
+                { label: '<span class="hotkey">N</span>ode-Lock', click: "switchRetroView('view-machines')" },
+                { label: 'A/<span class="hotkey">B</span> Exp', click: "switchRetroView('view-experiments')" },
+                { label: 'P<span class="hotkey">Q</span>C M7', click: "switchRetroView('view-pqc')" },
+                { label: '<span class="hotkey">C</span>RA Súlad', click: "switchRetroView('view-system')" },
+                { label: 'K<span class="hotkey">o</span>nfig', click: "switchRetroView('view-config')" },
+                { label: '<span class="hotkey">H</span>ilfe (F1)', click: "switchRetroView('view-help')" }
+            ];
+        } else {
+            items = [
+                { label: '≡ <span class="hotkey">A</span>chilles', click: 'toggleMainMenu()' },
+                { label: '<span class="hotkey">P</span>rehľad', click: "switchRetroView('view-overview')" },
+                { label: '<span class="hotkey">L</span>icencie', click: "switchRetroView('view-licenses')" },
+                { label: '<span class="hotkey">K</span>ľúče', click: "switchRetroView('view-keys')" },
+                { label: '<span class="hotkey">R</span>elaye', click: "switchRetroView('view-relays')" },
+                { label: '<span class="hotkey">M</span>esh', click: "switchRetroView('view-mesh')" },
+                { label: '<span class="hotkey">A</span>udit', click: "switchRetroView('view-audit')" },
+                { label: 'Report<span class="hotkey">y</span>', click: "switchRetroView('view-reports')" },
+                { label: 'Air-<span class="hotkey">G</span>ap', click: "switchRetroView('view-airgap')" },
+                { label: '<span class="hotkey">W</span>asm', click: "switchRetroView('view-wasm')" },
+                { label: 'Tok<span class="hotkey">e</span>ny', click: "switchRetroView('view-tokens')" },
+                { label: 'M<span class="hotkey">i</span>grácia', click: "switchRetroView('view-migrate')" },
+                { label: '<span class="hotkey">W</span>ebhooky', click: "switchRetroView('view-webhooks')" },
+                { label: 'Revo<span class="hotkey">k</span>ácie', click: "switchRetroView('view-revocations')" },
+                { label: '<span class="hotkey">Q</span>ueue Rad', click: "switchRetroView('view-queue')" },
+                { label: '<span class="hotkey">Z</span>ásady (FLT-24)', click: "switchRetroView('view-policy-rules')" },
+                { label: '<span class="hotkey">N</span>ode-Lock', click: "switchRetroView('view-machines')" },
+                { label: 'A/<span class="hotkey">B</span> Exp', click: "switchRetroView('view-experiments')" },
+                { label: 'P<span class="hotkey">Q</span>C M7', click: "switchRetroView('view-pqc')" },
+                { label: '<span class="hotkey">S</span>úlad CRA', click: "switchRetroView('view-system')" },
+                { label: 'K<span class="hotkey">o</span>nfigurácia', click: "switchRetroView('view-config')" },
+                { label: '<span class="hotkey">H</span>elp (F1)', click: "switchRetroView('view-help')" }
+            ];
+        }
+        return items.map(it => `<li class="retro-menu-item" onclick="${it.click}" tabindex="0">${it.label}</li>`).join('');
+    }
+
+    /**
+     * Vracia HTML spodného riadku funkčných klávesov (F1-F12)
+     */
+    function getRetroFkeyHtml() {
+        const lang = getActiveLang();
+        if (lang === 'en') {
+            return `
+                <button class="fkey-btn" onclick="switchRetroView('view-help')"><span class="fkey-badge">F1</span> Manual</button>
+                <button class="fkey-btn" onclick="switchRetroView('view-overview')"><span class="fkey-badge">F2</span> Overview</button>
+                <button class="fkey-btn" onclick="switchRetroView('view-licenses')"><span class="fkey-badge">F3</span> Licenses</button>
+                <button class="fkey-btn" onclick="switchRetroView('view-keys')"><span class="fkey-badge">F4</span> Keys</button>
+                <button class="fkey-btn" onclick="switchRetroView('view-relays')"><span class="fkey-badge">F5</span> Relays</button>
+                <button class="fkey-btn" onclick="switchRetroView('view-audit')"><span class="fkey-badge">F6</span> Audit</button>
+                <button class="fkey-btn" onclick="switchRetroView('view-airgap')"><span class="fkey-badge">F7</span> AirGap</button>
+                <button class="fkey-btn" onclick="switchRetroView('view-webhooks')"><span class="fkey-badge">F8</span> Webhook</button>
+                <button class="fkey-btn" onclick="switchRetroView('view-system')"><span class="fkey-badge">F9</span> Compliance</button>
+                <button class="fkey-btn" onclick="switchRetroView('view-revocations')"><span class="fkey-badge">F11</span> Revocations</button>
+                <button class="fkey-btn" onclick="switchRetroView('view-reports')"><span class="fkey-badge">F12</span> Reports</button>
+                <button class="fkey-btn" onclick="toggleMainMenu()"><span class="fkey-badge">F10</span> Menu</button>
+                <button class="fkey-btn" onclick="handleEscKey()"><span class="fkey-badge">ESC</span> Back</button>
+            `;
+        } else if (lang === 'de') {
+            return `
+                <button class="fkey-btn" onclick="switchRetroView('view-help')"><span class="fkey-badge">F1</span> Handbuch</button>
+                <button class="fkey-btn" onclick="switchRetroView('view-overview')"><span class="fkey-badge">F2</span> Übersicht</button>
+                <button class="fkey-btn" onclick="switchRetroView('view-licenses')"><span class="fkey-badge">F3</span> Lizenzen</button>
+                <button class="fkey-btn" onclick="switchRetroView('view-keys')"><span class="fkey-badge">F4</span> Schlüssel</button>
+                <button class="fkey-btn" onclick="switchRetroView('view-relays')"><span class="fkey-badge">F5</span> Relays</button>
+                <button class="fkey-btn" onclick="switchRetroView('view-audit')"><span class="fkey-badge">F6</span> Audit</button>
+                <button class="fkey-btn" onclick="switchRetroView('view-airgap')"><span class="fkey-badge">F7</span> AirGap</button>
+                <button class="fkey-btn" onclick="switchRetroView('view-webhooks')"><span class="fkey-badge">F8</span> Webhook</button>
+                <button class="fkey-btn" onclick="switchRetroView('view-system')"><span class="fkey-badge">F9</span> CRA</button>
+                <button class="fkey-btn" onclick="switchRetroView('view-revocations')"><span class="fkey-badge">F11</span> Widerrufe</button>
+                <button class="fkey-btn" onclick="switchRetroView('view-reports')"><span class="fkey-badge">F12</span> Berichte</button>
+                <button class="fkey-btn" onclick="toggleMainMenu()"><span class="fkey-badge">F10</span> Menü</button>
+                <button class="fkey-btn" onclick="handleEscKey()"><span class="fkey-badge">ESC</span> Zurück</button>
+            `;
+        } else {
+            return `
+                <button class="fkey-btn" onclick="switchRetroView('view-help')"><span class="fkey-badge">F1</span> Príručka</button>
+                <button class="fkey-btn" onclick="switchRetroView('view-overview')"><span class="fkey-badge">F2</span> Prehľad</button>
+                <button class="fkey-btn" onclick="switchRetroView('view-licenses')"><span class="fkey-badge">F3</span> Licencie</button>
+                <button class="fkey-btn" onclick="switchRetroView('view-keys')"><span class="fkey-badge">F4</span> Kľúče</button>
+                <button class="fkey-btn" onclick="switchRetroView('view-relays')"><span class="fkey-badge">F5</span> Relaye</button>
+                <button class="fkey-btn" onclick="switchRetroView('view-audit')"><span class="fkey-badge">F6</span> Audit</button>
+                <button class="fkey-btn" onclick="switchRetroView('view-airgap')"><span class="fkey-badge">F7</span> AirGap</button>
+                <button class="fkey-btn" onclick="switchRetroView('view-webhooks')"><span class="fkey-badge">F8</span> Webhook</button>
+                <button class="fkey-btn" onclick="switchRetroView('view-system')"><span class="fkey-badge">F9</span> Súlad</button>
+                <button class="fkey-btn" onclick="switchRetroView('view-revocations')"><span class="fkey-badge">F11</span> Revokácie</button>
+                <button class="fkey-btn" onclick="switchRetroView('view-reports')"><span class="fkey-badge">F12</span> Reporty</button>
+                <button class="fkey-btn" onclick="toggleMainMenu()"><span class="fkey-badge">F10</span> Menu</button>
+                <button class="fkey-btn" onclick="handleEscKey()"><span class="fkey-badge">ESC</span> Späť</button>
+            `;
+        }
+    }
+
+    /**
      * Zostaví HTML štruktúru pre retro FoxPro lišty a kaskádové menu
      */
     function initRetroDOM() {
+        const lang = getActiveLang();
+        const themeLabel = t('retro.themePrefix', 'Téma');
+
         // 1. Horná lišta
         const topBar = document.createElement('header');
         topBar.className = 'retro-top-bar';
         topBar.innerHTML = `
             <ul class="retro-menu-bar">
-                <li class="retro-menu-item" onclick="toggleMainMenu()" tabindex="0">≡ <span class="hotkey">A</span>chilles</li>
-                <li class="retro-menu-item" onclick="switchRetroView('view-overview')" tabindex="0"><span class="hotkey">P</span>rehľad</li>
-                <li class="retro-menu-item" onclick="switchRetroView('view-licenses')" tabindex="0"><span class="hotkey">L</span>icencie</li>
-                <li class="retro-menu-item" onclick="switchRetroView('view-keys')" tabindex="0"><span class="hotkey">K</span>ľúče</li>
-                <li class="retro-menu-item" onclick="switchRetroView('view-relays')" tabindex="0"><span class="hotkey">R</span>elaye</li>
-                <li class="retro-menu-item" onclick="switchRetroView('view-mesh')" tabindex="0"><span class="hotkey">M</span>esh</li>
-                <li class="retro-menu-item" onclick="switchRetroView('view-audit')" tabindex="0"><span class="hotkey">A</span>udit</li>
-                <li class="retro-menu-item" onclick="switchRetroView('view-reports')" tabindex="0">Report<span class="hotkey">y</span></li>
-                <li class="retro-menu-item" onclick="switchRetroView('view-airgap')" tabindex="0">Air-<span class="hotkey">G</span>ap</li>
-                <li class="retro-menu-item" onclick="switchRetroView('view-wasm')" tabindex="0"><span class="hotkey">W</span>asm</li>
-                <li class="retro-menu-item" onclick="switchRetroView('view-tokens')" tabindex="0">Tok<span class="hotkey">e</span>ny</li>
-                <li class="retro-menu-item" onclick="switchRetroView('view-migrate')" tabindex="0">M<span class="hotkey">i</span>grácia</li>
-                <li class="retro-menu-item" onclick="switchRetroView('view-webhooks')" tabindex="0"><span class="hotkey">W</span>ebhooky</li>
-                <li class="retro-menu-item" onclick="switchRetroView('view-revocations')" tabindex="0">Revo<span class="hotkey">k</span>ácie</li>
-                <li class="retro-menu-item" onclick="switchRetroView('view-queue')" tabindex="0"><span class="hotkey">Q</span>ueue Rad</li>
-                <li class="retro-menu-item" onclick="switchRetroView('view-policy-rules')" tabindex="0"><span class="hotkey">Z</span>ásady (FLT-24)</li>
-                <li class="retro-menu-item" onclick="switchRetroView('view-machines')" tabindex="0"><span class="hotkey">N</span>ode-Lock</li>
-                <li class="retro-menu-item" onclick="switchRetroView('view-experiments')" tabindex="0">A/<span class="hotkey">B</span> Exp</li>
-                <li class="retro-menu-item" onclick="switchRetroView('view-pqc')" tabindex="0">P<span class="hotkey">Q</span>C M7</li>
-                <li class="retro-menu-item" onclick="switchRetroView('view-system')" tabindex="0"><span class="hotkey">S</span>úlad CRA</li>
-                <li class="retro-menu-item" onclick="switchRetroView('view-config')" tabindex="0">K<span class="hotkey">o</span>nfigurácia</li>
-                <li class="retro-menu-item" onclick="switchRetroView('view-help')" tabindex="0"><span class="hotkey">H</span>elp (F1)</li>
+                ${getRetroTopbarHtml()}
             </ul>
             <div style="font-size: 11px; color: #444; font-weight: bold; display: flex; align-items: center; gap: 8px;">
-                <span class="retro-theme-switcher">[ Téma: <a href="javascript:void(0)" class="retro-theme-link active" data-theme="retro" onclick="setAppTheme('retro')"><span class="hotkey">D</span>OS</a> | <a href="javascript:void(0)" class="retro-theme-link" data-theme="cyberpunk" onclick="setAppTheme('cyberpunk')"><span class="hotkey">C</span>yber</a> | <a href="javascript:void(0)" class="retro-theme-link" data-theme="apple" onclick="setAppTheme('apple')"><span class="hotkey">A</span>pple</a> ]</span>
+                <span class="retro-theme-switcher">[ ${themeLabel}: <a href="javascript:void(0)" class="retro-theme-link active" data-theme="retro" onclick="setAppTheme('retro')"><span class="hotkey">D</span>OS</a> | <a href="javascript:void(0)" class="retro-theme-link" data-theme="cyberpunk" onclick="setAppTheme('cyberpunk')"><span class="hotkey">C</span>yber</a> | <a href="javascript:void(0)" class="retro-theme-link" data-theme="apple" onclick="setAppTheme('apple')"><span class="hotkey">A</span>pple</a> ]</span>
                 <span class="retro-lang-switcher">[ <a href="javascript:void(0)" class="retro-lang-link active" data-lang="sk" onclick="setAppLanguage('sk')"><span class="hotkey">S</span>K</a> | <a href="javascript:void(0)" class="retro-lang-link" data-lang="en" onclick="setAppLanguage('en')"><span class="hotkey">E</span>N</a> | <a href="javascript:void(0)" class="retro-lang-link" data-lang="de" onclick="setAppLanguage('de')"><span class="hotkey">D</span>E</a> ]</span>
                 <span id="retro-server-clock">--:--:--</span> | <span id="retro-conn-status" style="color: green;">● ONLINE</span>
             </div>
@@ -747,7 +973,73 @@
         }
     }
 
-    window.addEventListener('hashchange', checkHashNavigation);
+        window.addEventListener('hashchange', checkHashNavigation);
+
+        // Prekreslenie textov retro UI pri zmene jazyka
+        window.addEventListener('achilles:languageChanged', () => {
+            loadLocalizedMenuItems();
+            refreshRetroDOM();
+        });
+
+        function refreshRetroDOM() {
+            const menuBar = document.querySelector('.retro-menu-bar');
+            if (menuBar) {
+                menuBar.innerHTML = getRetroTopbarHtml();
+            }
+
+            const headerEl = document.querySelector('.retro-window-header');
+            if (headerEl) {
+                headerEl.textContent = t('retro.mainMenuHeader', 'HLAVNÉ MENU (F10)');
+            }
+
+            const mainList = document.getElementById('retro-main-list');
+            if (mainList) {
+                let menuListHtml = '';
+                mainMenuItems.forEach((item, idx) => {
+                    if (item.isSeparator) {
+                        menuListHtml += '<li class="retro-separator"></li>';
+                    } else {
+                        const hotkeyLetter = item.hotkey;
+                        const labelFormatted = item.label.replace(hotkeyLetter, `<span class="hotkey">${hotkeyLetter}</span>`);
+                        const arrow = item.hasSub ? '►' : '';
+                        menuListHtml += `
+                            <li class="retro-list-item" data-index="${idx}" onclick="handleMainMenuItemClick(${idx})">
+                                <span>${labelFormatted}</span>
+                                <span>${arrow}</span>
+                            </li>
+                        `;
+                    }
+                });
+                mainList.innerHTML = menuListHtml;
+                updateMenuHighlights();
+            }
+
+            const popupSubmenu = document.getElementById('retro-popup-sub');
+            if (popupSubmenu) {
+                let subListHtml = '';
+                submenuItems.forEach((sub, sIdx) => {
+                    const hotkeyLetter = sub.hotkey;
+                    const labelFormatted = sub.label.replace(hotkeyLetter, `<span class="hotkey">${hotkeyLetter}</span>`);
+                    subListHtml += `
+                        <div class="retro-popup-item" data-subindex="${sIdx}" onclick="handleSubmenuItemClick(${sIdx})">
+                            ${labelFormatted}
+                        </div>
+                    `;
+                });
+                popupSubmenu.innerHTML = subListHtml;
+            }
+
+            const fkeyRow = document.querySelector('.retro-fkey-row');
+            if (fkeyRow) {
+                fkeyRow.innerHTML = getRetroFkeyHtml();
+            }
+
+            // Sync active lang link
+            const currentLang = getActiveLang();
+            document.querySelectorAll('.retro-lang-link').forEach(link => {
+                link.classList.toggle('active', link.getAttribute('data-lang') === currentLang);
+            });
+        }
     setTimeout(checkHashNavigation, 200);
 
     /**

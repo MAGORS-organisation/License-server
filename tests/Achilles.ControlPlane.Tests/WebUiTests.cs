@@ -111,6 +111,7 @@ public sealed class WebUiTests : IClassFixture<ControlPlaneFactory>
         Assert.Contains(".help-toc-item", css, StringComparison.Ordinal);
         Assert.Contains(".btn-copy-code", css, StringComparison.Ordinal);
         Assert.Contains("nav.help", i18nJsContent, StringComparison.Ordinal);
+        Assert.Contains("nav.system", i18nJsContent, StringComparison.Ordinal);
         Assert.Contains("help.title", i18nJsContent, StringComparison.Ordinal);
     }
 
@@ -138,5 +139,23 @@ public sealed class WebUiTests : IClassFixture<ControlPlaneFactory>
         Assert.True(telemetry.MemoryMb > 0.0);
         Assert.NotNull(telemetry.ServerIp);
         Assert.False(string.IsNullOrWhiteSpace(telemetry.CurrentUser));
+    }
+
+    [Fact]
+    public async Task I18n_Dictionary_Contains_Complete_Key_Parity_Across_All_Languages()
+    {
+        var response = await _client.GetAsync("/js/i18n.js");
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        string js = await response.Content.ReadAsStringAsync();
+        Assert.Contains("\"nav.system\"", js, StringComparison.Ordinal);
+        Assert.Contains("\"overview.ofTotalSeats\"", js, StringComparison.Ordinal);
+        Assert.Contains("\"theme.regimeSystem\"", js, StringComparison.Ordinal);
+        Assert.Contains("\"theme.regimeLight\"", js, StringComparison.Ordinal);
+        Assert.Contains("\"theme.regimeDark\"", js, StringComparison.Ordinal);
+        Assert.Contains("\"config.themeCyberpunkTitle\"", js, StringComparison.Ordinal);
+        Assert.Contains("\"config.themeAppleTitle\"", js, StringComparison.Ordinal);
+        Assert.Contains("\"help.title\"", js, StringComparison.Ordinal);
+        Assert.Contains("\"common.actions\"", js, StringComparison.Ordinal);
     }
 }

@@ -291,7 +291,7 @@
             <section id="view-licenses" class="view-section">
                 <div class="table-card">
                     <div class="table-header">
-                        <div class="table-title">Všetky Evidované Licencie</div>
+                        <div class="table-title" data-i18n="licenses.title">Všetky Evidované Licencie</div>
                         <div class="table-actions">
                             <button class="btn btn-primary btn-sm" onclick="openModal('modal-issue-license')">+ Vystaviť Licenciu</button>
                         </div>
@@ -299,13 +299,13 @@
                     <table>
                         <thead>
                             <tr>
-                                <th>Zákazník</th>
-                                <th>Produkt</th>
-                                <th>Typ</th>
-                                <th>Sedadlá</th>
-                                <th>Platnosť Do</th>
-                                <th>Stav</th>
-                                <th>Akcie</th>
+                                <th data-i18n="licenses.colCustomer">Zákazník</th>
+                                <th data-i18n="licenses.colProduct">Produkt</th>
+                                <th data-i18n="licenses.colModel">Typ</th>
+                                <th data-i18n="licenses.colSeats">Sedadlá</th>
+                                <th data-i18n="licenses.colExpires">Platnosť Do</th>
+                                <th data-i18n="licenses.colStatus">Stav</th>
+                                <th data-i18n="licenses.colActions">Akcie</th>
                             </tr>
                         </thead>
                         <tbody id="licenses-table-body">
@@ -346,7 +346,7 @@
                 <div class="table-card" style="margin-bottom: 24px;">
                     <div class="table-header">
                         <div>
-                            <div class="table-title">🏛️ Reťazec Dôvery: 3-Úrovňová Hierarchia Podpisových Kľúčov (§9.3)</div>
+                            <div class="table-title" data-i18n="keys.trustChainTitle">🏛️ Reťazec Dôvery: 3-Úrovňová Hierarchia Podpisových Kľúčov (§9.3)</div>
                             <div style="font-size: 12px; color: var(--text-secondary); margin-top: 4px;">
                                 Oddelenie zodpovednosti: Root Anchor (Offline/Cold) ➜ Intermediate Product Authority ➜ Ephemeral Lease Key (Leaf).
                             </div>
@@ -360,7 +360,7 @@
 
                 <div class="table-card">
                     <div class="table-header">
-                        <div class="table-title">Kryptografické Podpisové Kľúče & JWKS (RFC 9964)</div>
+                        <div class="table-title" data-i18n="keys.title">Kryptografické Podpisové Kľúče & JWKS (RFC 9964)</div>
                         <div class="table-actions">
                             <button class="btn btn-secondary btn-sm" id="btn-view-jwks">Zobraziť JWKS</button>
                             <button class="btn btn-primary btn-sm" id="btn-open-rotate-modal">Rotovať Kľúč</button>
@@ -369,12 +369,12 @@
                     <table>
                         <thead>
                             <tr>
-                                <th>Key ID (kid)</th>
-                                <th>Algoritmus</th>
-                                <th>Úloha</th>
-                                <th>Stav</th>
-                                <th>Platnosť</th>
-                                <th>Akcie</th>
+                                <th data-i18n="keys.colKid">Key ID (kid)</th>
+                                <th data-i18n="keys.colAlgorithm">Algoritmus</th>
+                                <th data-i18n="keys.colUsage">Úloha</th>
+                                <th data-i18n="keys.colStatus">Stav</th>
+                                <th data-i18n="keys.colValidity">Platnosť</th>
+                                <th data-i18n="keys.colActions">Akcie</th>
                             </tr>
                         </thead>
                         <tbody id="keys-table-body">
@@ -390,17 +390,17 @@
             <section id="view-relays" class="view-section">
                 <div class="table-card">
                     <div class="table-header">
-                        <div class="table-title">Registrované On-Premise Relay Uzly</div>
+                        <div class="table-title" data-i18n="relays.title">Registrované On-Premise Relay Uzly</div>
                     </div>
                     <table>
                         <thead>
                             <tr>
-                                <th>Relay ID</th>
-                                <th>Názov Uzla</th>
-                                <th>Organizácia</th>
-                                <th>Verzia</th>
-                                <th>Posledný Heartbeat</th>
-                                <th>Stav</th>
+                                <th data-i18n="relays.colId">Relay ID</th>
+                                <th data-i18n="relays.colName">Názov Uzla</th>
+                                <th data-i18n="relays.colOrg">Organizácia</th>
+                                <th data-i18n="relays.colVersion">Verzia</th>
+                                <th data-i18n="relays.colLastHeartbeat">Posledný Heartbeat</th>
+                                <th data-i18n="relays.colStatus">Stav</th>
                             </tr>
                         </thead>
                         <tbody id="relays-table-body">
@@ -421,7 +421,7 @@
             <section id="view-audit" class="view-section">
                 <div class="table-card">
                     <div class="table-header">
-                        <div class="table-title">Kryptograficky Reťazený Auditný Denník (SHA-256)</div>
+                        <div class="table-title" data-i18n="audit.title">Kryptograficky Reťazený Auditný Denník (SHA-256)</div>
                         <div class="table-actions">
                             <button class="btn btn-secondary btn-sm" onclick="loadAuditLogs()">Obnoviť</button>
                         </div>
@@ -429,11 +429,11 @@
                     <table>
                         <thead>
                             <tr>
-                                <th>Časová Pečiatka</th>
-                                <th>Udalosť</th>
-                                <th>Subjekt</th>
-                                <th>Popis</th>
-                                <th>Kryptografický Hash</th>
+                                <th data-i18n="audit.colTime">Časová Pečiatka</th>
+                                <th data-i18n="audit.colType">Udalosť</th>
+                                <th data-i18n="audit.colSubject">Subjekt</th>
+                                <th data-i18n="audit.colDescription">Popis</th>
+                                <th data-i18n="audit.colHash">Kryptografický Hash</th>
                             </tr>
                         </thead>
                         <tbody id="audit-table-body">
@@ -626,15 +626,15 @@
                         <table style="width: 100%;">
                             <thead>
                                 <tr>
-                                    <th>ID Grantu</th>
-                                    <th>Licencia</th>
-                                    <th>Relay ID</th>
-                                    <th>Rozsah Sedadiel</th>
-                                    <th>Počet</th>
-                                    <th>Seq / Supersedes</th>
-                                    <th>Stav</th>
-                                    <th>Platnosť Do</th>
-                                    <th style="text-align: right;">Akcia</th>
+                                    <th data-i18n="airgap.colGrantId">ID Grantu</th>
+                                    <th data-i18n="airgap.colLicense">Licencia</th>
+                                    <th data-i18n="airgap.colRelayId">Relay ID</th>
+                                    <th data-i18n="airgap.colSeatRange">Rozsah Sedadiel</th>
+                                    <th data-i18n="airgap.colCount">Počet</th>
+                                    <th data-i18n="airgap.colSeq">Seq / Supersedes</th>
+                                    <th data-i18n="common.status">Stav</th>
+                                    <th data-i18n="airgap.colValidUntil">Platnosť Do</th>
+                                    <th style="text-align: right;" data-i18n="common.action">Akcia</th>
                                 </tr>
                             </thead>
                             <tbody id="ag-grants-tbody">
@@ -689,7 +689,7 @@
                 <div class="table-card" style="margin-bottom: 24px;">
                     <div class="table-header">
                         <div>
-                            <div class="table-title">🔔 Registrované Webhook Odbery (Slack, Teams, Custom CRM)</div>
+                            <div class="table-title" data-i18n="webhooks.title">🔔 Registrované Webhook Odbery (Slack, Teams, Custom CRM)</div>
                             <div style="font-size: 12px; color: var(--text-secondary); margin-top: 4px;">
                                 Asynchrónne HTTP POST volania s HMAC-SHA256 podpismi v hlavičke <code>X-Achilles-Signature: t=...,v1=...</code>.
                             </div>
@@ -703,13 +703,13 @@
                     <table>
                         <thead>
                             <tr>
-                                <th>Názov</th>
-                                <th>Formát</th>
-                                <th>Cieľová URL</th>
-                                <th>Odoberané Udalosti</th>
-                                <th>Posledné Doručenie</th>
-                                <th>Stav</th>
-                                <th>Akcie</th>
+                                <th data-i18n="webhooks.colName">Názov</th>
+                                <th data-i18n="webhooks.colFormat">Formát</th>
+                                <th data-i18n="webhooks.colTargetUrl">Cieľová URL</th>
+                                <th data-i18n="webhooks.colEvents">Odoberané Udalosti</th>
+                                <th data-i18n="webhooks.colLastDelivery">Posledné Doručenie</th>
+                                <th data-i18n="common.status">Stav</th>
+                                <th data-i18n="common.actions">Akcie</th>
                             </tr>
                         </thead>
                         <tbody id="webhooks-table-body">
@@ -724,7 +724,7 @@
                 <div class="table-card">
                     <div class="table-header">
                         <div>
-                            <div class="table-title">📜 História Doručenia Správ &amp; Dead-Letter Queue (DLQ)</div>
+                            <div class="table-title" data-i18n="webhooks.historyTitle">📜 História Doručenia Správ &amp; Dead-Letter Queue (DLQ)</div>
                             <div style="font-size: 12px; color: var(--text-secondary); margin-top: 4px;">
                                 Auditný log všetkých odoslaných webhookov s možnosťou okamžitého zopakovania (replay) zlyhaných správ.
                             </div>
@@ -739,14 +739,14 @@
                     <table>
                         <thead>
                             <tr>
-                                <th>Delivery ID</th>
-                                <th>Udalosť</th>
-                                <th>HTTP Kód</th>
-                                <th>Trvanie</th>
-                                <th>Pokusy</th>
-                                <th>Stav</th>
-                                <th>Čas / Chyba</th>
-                                <th>Akcie</th>
+                                <th data-i18n="webhooks.colDeliveryId">Delivery ID</th>
+                                <th data-i18n="webhooks.colEvent">Udalosť</th>
+                                <th data-i18n="webhooks.colHttpCode">HTTP Kód</th>
+                                <th data-i18n="webhooks.colDuration">Trvanie</th>
+                                <th data-i18n="webhooks.colAttempts">Pokusy</th>
+                                <th data-i18n="common.status">Stav</th>
+                                <th data-i18n="webhooks.colTimeError">Čas / Chyba</th>
+                                <th data-i18n="common.actions">Akcie</th>
                             </tr>
                         </thead>
                         <tbody id="global-deliveries-table-body">
@@ -786,7 +786,7 @@
                 <div class="table-card" style="margin-top: 20px;">
                     <div class="table-header">
                         <div>
-                            <div class="table-title">Prístupové API Kľúče & Riadenie Rolí (RBAC)</div>
+                            <div class="table-title" data-i18n="apikeys.title">Prístupové API Kľúče & Riadenie Rolí (RBAC)</div>
                             <div class="table-subtitle">Bezpečné tokeny pre CI/CD pipelines, externé CRM a administrátorov</div>
                         </div>
                         <div class="table-actions">
@@ -796,12 +796,12 @@
                     <table>
                         <thead>
                             <tr>
-                                <th>Názov / Popis</th>
-                                <th>Prefix Kľúča</th>
-                                <th>Rola (RBAC)</th>
-                                <th>Expirácia</th>
-                                <th>Vytvorený</th>
-                                <th>Akcie</th>
+                                <th data-i18n="apikeys.colNameDesc">Názov / Popis</th>
+                                <th data-i18n="apikeys.colPrefix">Prefix Kľúča</th>
+                                <th data-i18n="apikeys.colRole">Rola (RBAC)</th>
+                                <th data-i18n="apikeys.colExpiration">Expirácia</th>
+                                <th data-i18n="common.created">Vytvorený</th>
+                                <th data-i18n="common.actions">Akcie</th>
                             </tr>
                         </thead>
                         <tbody id="apikeys-table-body">
@@ -816,7 +816,7 @@
                 <div class="table-card" style="margin-top: 20px;">
                     <div class="table-header">
                         <div>
-                            <div class="table-title">Verifikácia Inkluzívneho Dôkazu (Merkle Audit Path)</div>
+                            <div class="table-title" data-i18n="apikeys.merkleTitle">Verifikácia Inkluzívneho Dôkazu (Merkle Audit Path)</div>
                             <div class="table-subtitle">Matematické overenie, že konkrétny záznam v audite nebol zmenený ani sfalšovaný</div>
                         </div>
                     </div>
@@ -871,7 +871,7 @@
                 <div class="table-card" style="margin-top: 20px;">
                     <div class="table-header">
                         <div>
-                            <div class="table-title">🚨 Aktívne Udalosti a Anomálie (IAlertService)</div>
+                            <div class="table-title" data-i18n="mesh.alertsTitle">🚨 Aktívne Udalosti a Anomálie (IAlertService)</div>
                             <div class="table-subtitle">Detekcia vyčerpania kapacity (≥ 90%), denial spikes a bezpečnostných anomálií</div>
                         </div>
                         <div class="table-actions">
@@ -881,11 +881,11 @@
                     <table>
                         <thead>
                             <tr>
-                                <th>Časová Pečiatka</th>
-                                <th>Typ Alertu</th>
-                                <th>Licencia / Tenant</th>
-                                <th>Popis / Dôvod</th>
-                                <th>Závažnosť</th>
+                                <th data-i18n="mesh.colAlertTime">Časová Pečiatka</th>
+                                    <th data-i18n="mesh.colAlertType">Typ Alertu</th>
+                                    <th data-i18n="mesh.colTenant">Licencia / Tenant</th>
+                                    <th data-i18n="mesh.colReason">Popis / Dôvod</th>
+                                    <th data-i18n="mesh.colSeverity">Závažnosť</th>
                             </tr>
                         </thead>
                         <tbody id="mesh-alerts-table-body">
@@ -900,19 +900,19 @@
                 <div class="table-card" style="margin-top: 20px;">
                     <div class="table-header">
                         <div>
-                            <div class="table-title">🌐 Decentralizovaná Relay Mesh Topológia (Lamport Consensus)</div>
+                            <div class="table-title" data-i18n="mesh.nodesTitle">🌐 Decentralizovaná Relay Mesh Topológia (Lamport Consensus)</div>
                             <div class="table-subtitle">Disjoint seat leasing zabraňujúci split-brain overage pri výpadku spojenia</div>
                         </div>
                     </div>
                     <table>
                         <thead>
                             <tr>
-                                <th>Node ID</th>
-                                <th>Endpoint</th>
-                                <th>Pridelené Sedadlá</th>
-                                <th>Voľné Sedadlá</th>
-                                <th>Posledný Heartbeat</th>
-                                <th>Stav</th>
+                                <th data-i18n="mesh.colNodeId">Node ID</th>
+                                    <th data-i18n="common.endpoint">Endpoint</th>
+                                    <th data-i18n="mesh.colAssignedSeats">Pridelené Sedadlá</th>
+                                    <th data-i18n="mesh.colFreeSeats">Voľné Sedadlá</th>
+                                    <th data-i18n="relays.colLastHeartbeat">Posledný Heartbeat</th>
+                                    <th data-i18n="common.status">Stav</th>
                             </tr>
                         </thead>
                         <tbody id="mesh-nodes-table-body">
@@ -968,7 +968,7 @@
                 <div class="table-card" style="margin-top: 20px;">
                     <div class="table-header">
                         <div>
-                            <div class="table-title">🌍 Active-Active Multi-Region Geo-Replication (CRDT &amp; Vector Clocks)</div>
+                            <div class="table-title" data-i18n="mesh.replicationTitle">🌍 Active-Active Multi-Region Geo-Replication (CRDT & Vector Clocks)</div>
                             <div class="table-subtitle">Kauzálne vektorové hodiny, PN-Counter CRDT a bezkolízne disjoint alokácie naprieč dátovými centrami</div>
                         </div>
                         <div class="table-actions">
@@ -978,12 +978,12 @@
                     <table>
                         <thead>
                             <tr>
-                                <th>Región</th>
-                                <th>Typ</th>
-                                <th>Endpoint</th>
-                                <th>Disjoint Rozsah Sedadiel</th>
-                                <th>Vektorový Čas (Clock)</th>
-                                <th>Stav Replikácie</th>
+                                <th data-i18n="mesh.colRegion">Región</th>
+                                    <th data-i18n="common.type">Typ</th>
+                                    <th data-i18n="common.endpoint">Endpoint</th>
+                                    <th data-i18n="mesh.colDisjointRange">Disjoint Rozsah Sedadiel</th>
+                                    <th data-i18n="mesh.colVectorClock">Vektorový Čas (Clock)</th>
+                                    <th data-i18n="mesh.colReplStatus">Stav Replikácie</th>
                             </tr>
                         </thead>
                         <tbody id="geo-replication-table-body">
@@ -1014,7 +1014,7 @@
                 <div class="table-card" style="margin-top: 20px;">
                     <div class="table-header">
                         <div>
-                            <div class="table-title">⚡ eBPF Kernel Socket Enforcement (Linux Boundary)</div>
+                            <div class="table-title" data-i18n="mesh.ebpfTitle">⚡ eBPF Kernel Socket Enforcement (Linux Boundary)</div>
                             <div class="table-subtitle">Nízkoúrovňová ochrana jadra: cgroup socket filtre, BPF hash mapy a automatické zablokovanie neoprávnených spojení (-EPERM)</div>
                         </div>
                         <div class="table-actions">
@@ -1046,12 +1046,12 @@
                     <table>
                         <thead>
                             <tr>
-                                <th>Čas Udalosti</th>
-                                <th>Cgroup ID</th>
-                                <th>PID Procesu</th>
-                                <th>Cieľová Adresa</th>
-                                <th>Dôvod Blokovania Jadrom</th>
-                                <th>Akcia Jadra</th>
+                                <th data-i18n="common.timestamp">Čas Udalosti</th>
+                                    <th data-i18n="mesh.colCgroupId">Cgroup ID</th>
+                                    <th data-i18n="mesh.colProcessPid">PID Procesu</th>
+                                    <th data-i18n="mesh.colDestAddress">Cieľová Adresa</th>
+                                    <th data-i18n="mesh.colBlockReason">Dôvod Blokovania Jadrom</th>
+                                    <th data-i18n="mesh.colKernelAction">Akcia Jadra</th>
                             </tr>
                         </thead>
                         <tbody id="ebpf-violations-table-body">
@@ -1066,7 +1066,7 @@
                 <div class="table-card" style="margin-top: 20px;">
                     <div class="table-header">
                         <div>
-                            <div class="table-title">🛡️ Anti-Fraud &amp; Geografický Radar (Impossible Travel &amp; VM Cloning)</div>
+                            <div class="table-title" data-i18n="mesh.fraudTitle">🛡️ Anti-Fraud & Geografický Radar (Impossible Travel & VM Cloning)</div>
                             <div class="table-subtitle">Detekcia nemožnej rýchlosti presunu (&gt; 900 km/h) a kolízií duplikovaného hardvéru naprieč verejnými IP adresami</div>
                         </div>
                         <div class="table-actions">
@@ -1076,13 +1076,13 @@
                     <table>
                         <thead>
                             <tr>
-                                <th>Časová Pečiatka</th>
-                                <th>Licencia / Používateľ</th>
-                                <th>Klient IP</th>
-                                <th>Typ Anomálie</th>
-                                <th>Závažnosť</th>
-                                <th>Rýchlosť / Vzdialenosť</th>
-                                <th>Detail Detekcie</th>
+                                <th data-i18n="mesh.colAlertTime">Časová Pečiatka</th>
+                                    <th data-i18n="mesh.colTenant">Licencia / Používateľ</th>
+                                    <th data-i18n="common.endpoint">Klient IP</th>
+                                    <th data-i18n="mesh.colAlertType">Typ Anomálie</th>
+                                    <th data-i18n="mesh.colSeverity">Závažnosť</th>
+                                    <th data-i18n="common.duration">Rýchlosť / Vzdialenosť</th>
+                                    <th data-i18n="mesh.colReason">Detail Detekcie</th>
                             </tr>
                         </thead>
                         <tbody id="fraud-radar-table-body">
@@ -1097,7 +1097,7 @@
                 <div class="table-card" style="margin-top: 20px;">
                     <div class="table-header">
                         <div>
-                            <div class="table-title">💼 Aktívne Zapožičané Sedadlá (Offline Roaming / Poľné Zariadenia)</div>
+                            <div class="table-title" data-i18n="mesh.leasesTitle">💼 Aktívne Zapožičané Sedadlá (Offline Roaming / Poľné Zariadenia)</div>
                             <div class="table-subtitle">Prehľad licencií v offline režime (1–30 dní) s možnosťou predčasného administrátorského uvoľnenia</div>
                         </div>
                         <div class="table-actions">
@@ -1109,13 +1109,13 @@
                     <table>
                         <thead>
                             <tr>
-                                <th>Lease ID</th>
-                                <th>Licencia</th>
-                                <th>Sedadlo #</th>
-                                <th>Zariadenie (Machine ID)</th>
-                                <th>Zapožičané Do (UTC)</th>
-                                <th>Zostávajúci Čas</th>
-                                <th>Administrácia</th>
+                                <th data-i18n="mesh.colLeaseId">Lease ID</th>
+                                    <th data-i18n="airgap.colLicense">Licencia</th>
+                                    <th data-i18n="common.seats">Sedadlo #</th>
+                                    <th data-i18n="mesh.colMachineId">Zariadenie (Machine ID)</th>
+                                    <th data-i18n="mesh.colLeaseUntil">Zapožičané Do (UTC)</th>
+                                    <th data-i18n="mesh.colRemainingTime">Zostávajúci Čas</th>
+                                    <th data-i18n="common.actions">Administrácia</th>
                             </tr>
                         </thead>
                         <tbody id="borrowed-seats-table-body">
@@ -1167,7 +1167,7 @@
                 <div class="table-card">
                     <div class="table-header">
                         <div>
-                            <div class="table-title">👥 Podnikový Adresár Používateľov (SCIM 2.0 Directory Bridge)</div>
+                            <div class="table-title" data-i18n="scim.title">👥 Podnikový Adresár Používateľov (SCIM 2.0 Directory Bridge)</div>
                             <div class="table-subtitle">Automatická synchronizácia z Microsoft Entra ID (Azure AD), Okta a PingFederate s okamžitým odobratím licencií</div>
                         </div>
                         <div class="table-actions">
@@ -1177,14 +1177,14 @@
                     <table>
                         <thead>
                             <tr>
-                                <th>Používateľ (Username)</th>
-                                <th>Celé Meno</th>
-                                <th>Email</th>
-                                <th>Externé ID (IdP GUID)</th>
-                                <th>Skupiny</th>
-                                <th>Stav Účtu</th>
-                                <th>Posledná Synchronizácia</th>
-                                <th>Zero-Trust Akcia</th>
+                                <th data-i18n="scim.colUsername">Používateľ (Username)</th>
+                                <th data-i18n="scim.colFullName">Celé Meno</th>
+                                <th data-i18n="scim.colEmail">Email</th>
+                                <th data-i18n="scim.colExternalId">Externé ID (IdP GUID)</th>
+                                <th data-i18n="scim.colGroups">Skupiny</th>
+                                <th data-i18n="scim.colAccountStatus">Stav Účtu</th>
+                                <th data-i18n="scim.colLastSync">Posledná Synchronizácia</th>
+                                <th data-i18n="scim.colZeroTrustAction">Zero-Trust Akcia</th>
                             </tr>
                         </thead>
                         <tbody id="scim-users-table-body">
@@ -1352,7 +1352,7 @@
                 <div class="table-card">
                     <div class="table-header">
                         <div>
-                            <div class="table-title">🪙 Kreditové Peňaženky Zákazníkov (Token Pools &amp; Wallets)</div>
+                            <div class="table-title" data-i18n="tokens.walletsTitle">🪙 Kreditové Peňaženky Zákazníkov (Token Pools & Wallets)</div>
                             <div class="table-subtitle">Metered Pay-As-You-Go model spotreby tokenov pre CAD, simulácie a GPU výpočty</div>
                         </div>
                         <div class="table-actions">
@@ -1363,13 +1363,13 @@
                     <table>
                         <thead>
                             <tr>
-                                <th>Kód Peňaženky</th>
-                                <th>Názov / Popis</th>
-                                <th>Disponibilný Zostatok</th>
-                                <th>Rezervované</th>
-                                <th>Overdraft Limit</th>
-                                <th>Stav</th>
-                                <th>Akcie</th>
+                                <th data-i18n="tokens.colWalletCode">Kód Peňaženky</th>
+                                <th data-i18n="apikeys.colNameDesc">Názov / Popis</th>
+                                <th data-i18n="tokens.colBalance">Disponibilný Zostatok</th>
+                                <th data-i18n="tokens.colReserved">Rezervované</th>
+                                <th data-i18n="tokens.colOverdraft">Overdraft Limit</th>
+                                <th data-i18n="common.status">Stav</th>
+                                <th data-i18n="common.actions">Akcie</th>
                             </tr>
                         </thead>
                         <tbody id="token-wallets-table-body">
@@ -1384,7 +1384,7 @@
                 <div class="table-card" style="margin-top: 24px;">
                     <div class="table-header">
                         <div>
-                            <div class="table-title">📊 Sadzobník Spotreby Modulov (Consumption Rates)</div>
+                            <div class="table-title" data-i18n="tokens.ratesTitle">📊 Sadzobník Spotreby Modulov (Consumption Rates)</div>
                             <div class="table-subtitle">Definícia počtu kreditov spotrebovaných za minútu behu alebo za dokončenú operáciu</div>
                         </div>
                         <div class="table-actions">
@@ -1395,11 +1395,11 @@
                     <table>
                         <thead>
                             <tr>
-                                <th>Kód Funkcie (Feature)</th>
-                                <th>Sadzba / Minúta</th>
-                                <th>Sadzba / Operácia</th>
-                                <th>Popis Úlohy</th>
-                                <th>Posledná Úprava</th>
+                                <th data-i18n="tokens.colFeatureCode">Kód Funkcie (Feature)</th>
+                                <th data-i18n="tokens.colRateMinute">Sadzba / Minúta</th>
+                                <th data-i18n="tokens.colRateOperation">Sadzba / Operácia</th>
+                                <th data-i18n="tokens.colTaskDesc">Popis Úlohy</th>
+                                <th data-i18n="tokens.colLastModified">Posledná Úprava</th>
                             </tr>
                         </thead>
                         <tbody id="token-rates-table-body">
@@ -1414,7 +1414,7 @@
                 <div class="table-card" style="margin-top: 24px;">
                     <div class="table-header">
                         <div>
-                            <div class="table-title">📜 Auditný Denník Pohybu Kreditov (Consumption Ledger)</div>
+                            <div class="table-title" data-i18n="tokens.ledgerTitle">📜 Auditný Denník Pohybu Kreditov (Consumption Ledger)</div>
                             <div class="table-subtitle">Nemenný záznam všetkých transakcií (credit, reserve, consume, release)</div>
                         </div>
                         <div class="table-actions">
@@ -1424,13 +1424,13 @@
                     <table>
                         <thead>
                             <tr>
-                                <th>Časová Pečiatka</th>
-                                <th>Peňaženka</th>
-                                <th>Typ Transakcie</th>
-                                <th>Kredity</th>
-                                <th>Zostatok Po</th>
-                                <th>Funkcia</th>
-                                <th>Idempotencia</th>
+                                <th data-i18n="common.timestamp">Časová Pečiatka</th>
+                                <th data-i18n="tokens.colWalletCode">Peňaženka</th>
+                                <th data-i18n="tokens.colTxType">Typ Transakcie</th>
+                                <th data-i18n="tokens.colCredits">Kredity</th>
+                                <th data-i18n="tokens.colBalanceAfter">Zostatok Po</th>
+                                <th data-i18n="migrate.colFeature">Funkcia</th>
+                                <th data-i18n="tokens.colIdempotency">Idempotencia</th>
                             </tr>
                         </thead>
                         <tbody id="token-ledger-table-body">
@@ -1547,19 +1547,19 @@
 
                     <div class="table-card" style="margin-top: 20px;">
                         <div class="table-header">
-                            <div class="table-title">Štatistika Funkcií a Odporúčaná Veľkosť Fondu (Right-Sizing)</div>
+                            <div class="table-title" data-i18n="migrate.capacityTitle">Štatistika Funkcií a Odporúčaná Veľkosť Fondu (Right-Sizing)</div>
                         </div>
                         <table>
                             <thead>
                                 <tr>
-                                    <th>Funkcia</th>
-                                    <th>Špička Súbežnosti</th>
-                                    <th>Checkouts</th>
-                                    <th>Odmietnutia (Denials)</th>
-                                    <th>Používatelia</th>
-                                    <th>Odporúčané Sedadlá</th>
-                                    <th>Overdraft Buffer</th>
-                                    <th>Odôvodnenie Odporúčania</th>
+                                    <th data-i18n="migrate.colFeature">Funkcia</th>
+                                <th data-i18n="migrate.colPeak">Špička Súbežnosti</th>
+                                <th data-i18n="migrate.colCheckouts">Checkouts</th>
+                                <th data-i18n="migrate.colDenials">Odmietnutia (Denials)</th>
+                                <th data-i18n="migrate.colUsers">Používatelia</th>
+                                <th data-i18n="migrate.colRecommendedSeats">Odporúčané Sedadlá</th>
+                                <th data-i18n="migrate.colBuffer">Overdraft Buffer</th>
+                                <th data-i18n="migrate.colReasoning">Odôvodnenie Odporúčania</th>
                                 </tr>
                             </thead>
                             <tbody id="log-features-table-body">
@@ -1659,21 +1659,21 @@
                 <div class="table-card" style="margin-bottom: 24px;">
                     <div class="table-header">
                         <div>
-                            <div class="table-title">Katalóg Modulov a Funkcií (Feature Catalog)</div>
+                            <div class="table-title" data-i18n="features.modulesTitle">Katalóg Modulov a Funkcií (Feature Catalog)</div>
                             <div class="table-subtitle">Zoznam všetkých definovaných modulov v systéme</div>
                         </div>
                     </div>
                     <table>
                         <thead>
                             <tr>
-                                <th>Kód</th>
-                                <th>Názov</th>
-                                <th>Produkt</th>
-                                <th>Typ</th>
-                                <th>Verziové Rozpätie</th>
-                                <th>Max Sedadlá</th>
-                                <th>Vytvorené</th>
-                                <th>Akcie</th>
+                                <th data-i18n="features.colCode">Kód</th>
+                                <th data-i18n="common.name">Názov</th>
+                                <th data-i18n="common.product">Produkt</th>
+                                <th data-i18n="common.type">Typ</th>
+                                <th data-i18n="features.colVersionRange">Verziové Rozpätie</th>
+                                <th data-i18n="features.colMaxSeats">Max Sedadlá</th>
+                                <th data-i18n="common.created">Vytvorené</th>
+                                <th data-i18n="common.actions">Akcie</th>
                             </tr>
                         </thead>
                         <tbody id="features-table-body">
@@ -1688,19 +1688,19 @@
                 <div class="table-card">
                     <div class="table-header">
                         <div>
-                            <div class="table-title">Balíčky Modulov (Package Suites)</div>
+                            <div class="table-title" data-i18n="features.suitesTitle">Balíčky Modulov (Package Suites)</div>
                             <div class="table-subtitle">Zoskupenia viacerých modulov pod jednotným licenčným kódom</div>
                         </div>
                     </div>
                     <table>
                         <thead>
                             <tr>
-                                <th>Kód Suity</th>
-                                <th>Názov</th>
-                                <th>Produkt</th>
-                                <th>Zahrnuté Moduly</th>
-                                <th>Vytvorené</th>
-                                <th>Akcie</th>
+                                <th data-i18n="features.colSuiteCode">Kód Suity</th>
+                                <th data-i18n="common.name">Názov</th>
+                                <th data-i18n="common.product">Produkt</th>
+                                <th data-i18n="features.colIncludedModules">Zahrnuté Moduly</th>
+                                <th data-i18n="common.created">Vytvorené</th>
+                                <th data-i18n="common.actions">Akcie</th>
                             </tr>
                         </thead>
                         <tbody id="suites-table-body">
@@ -1756,18 +1756,18 @@
                 <div class="table-card">
                     <div class="table-header">
                         <div>
-                            <div class="table-title">Zoznam Aktívnych Revokácií (Enterprise CRL Tabuľka)</div>
+                            <div class="table-title" data-i18n="revocations.title">Zoznam Aktívnych Revokácií (Enterprise CRL Tabuľka)</div>
                             <div class="table-subtitle">Záznamy distribuované klientom cez endpoint /v1/revocations/latest s delta synchronizáciou</div>
                         </div>
                     </div>
                     <table class="data-table">
                         <thead>
                             <tr>
-                                <th style="width: 70px;">Sekvencia</th>
-                                <th style="width: 100px;">Typ Subjektu</th>
-                                <th>Identifikátor Subjektu</th>
-                                <th>Dôvod Revokácie</th>
-                                <th style="width: 170px;">Dátum Revokácie</th>
+                                <th style="width: 70px;" data-i18n="revocations.colSeq">Sekvencia</th>
+                                <th style="width: 100px;" data-i18n="revocations.colSubjectType">Typ Subjektu</th>
+                                <th data-i18n="revocations.colSubjectId">Identifikátor Subjektu</th>
+                                <th data-i18n="revocations.colReason">Dôvod Revokácie</th>
+                                <th style="width: 170px;" data-i18n="revocations.colDate">Dátum Revokácie</th>
                             </tr>
                         </thead>
                         <tbody id="revocations-table-body">
@@ -1821,7 +1821,7 @@
                 <div class="table-card">
                     <div class="table-header" style="display: flex; justify-content: space-between; align-items: center;">
                         <div>
-                            <div class="table-title">Monitor Licenčného Radu</div>
+                            <div class="table-title" data-i18n="queue.title">Monitor Licenčného Radu</div>
                             <div class="table-subtitle">Požiadavky zoradené podľa priority a času príchodu (FIFO v rámci priority)</div>
                         </div>
                         <div style="display: flex; gap: 10px; align-items: center;">
@@ -1837,15 +1837,15 @@
                     <table class="data-table">
                         <thead>
                             <tr>
-                                <th style="width: 60px;">Pozícia</th>
-                                <th style="width: 180px;">Ticket</th>
-                                <th>Licenčný Kľúč</th>
-                                <th>Používateľ / Stroj</th>
-                                <th style="width: 80px;">Priorita</th>
-                                <th style="width: 100px;">Stav</th>
-                                <th style="width: 140px;">Vytvorené</th>
-                                <th style="width: 140px;">Expirácia</th>
-                                <th style="width: 140px; text-align: right;">Akcie</th>
+                                <th style="width: 60px;" data-i18n="queue.colPosition">Pozícia</th>
+                                <th style="width: 180px;" data-i18n="queue.colTicket">Ticket</th>
+                                <th data-i18n="queue.colLicenseKey">Licenčný Kľúč</th>
+                                <th data-i18n="queue.colUserMachine">Používateľ / Stroj</th>
+                                <th style="width: 80px;" data-i18n="queue.colPriority">Priorita</th>
+                                <th style="width: 100px;" data-i18n="common.status">Stav</th>
+                                <th style="width: 140px;" data-i18n="common.created">Vytvorené</th>
+                                <th style="width: 140px;" data-i18n="common.expires">Expirácia</th>
+                                <th style="width: 140px; text-align: right;" data-i18n="common.actions">Akcie</th>
                             </tr>
                         </thead>
                         <tbody id="queue-table-body">
@@ -1920,7 +1920,7 @@
                 <div class="table-card" style="margin-top: 20px;">
                     <div class="table-header">
                         <div>
-                            <div class="table-title">🛰️ OpenTelemetry Distribuované Stopy (W3C TraceContext Waterfall)</div>
+                            <div class="table-title" data-i18n="system.title">🛰️ OpenTelemetry Distribuované Stopy (W3C TraceContext Waterfall)</div>
                             <div class="table-subtitle">Živý diagnostický zberateľ stôp (checkout, renew, borrow, fraud_check, sss, ebpf) v reálnom čase</div>
                         </div>
                         <div class="table-actions">
@@ -1930,13 +1930,13 @@
                     <table>
                         <thead>
                             <tr>
-                                <th>Časová Pečiatka</th>
-                                <th>Operácia (Span Name)</th>
-                                <th>Trace ID (W3C)</th>
-                                <th>Span ID</th>
-                                <th>Trvanie</th>
-                                <th>Stav</th>
-                                <th>Atribúty / Tagy</th>
+                                <th data-i18n="common.timestamp">Časová Pečiatka</th>
+                                <th data-i18n="system.colSpanName">Operácia (Span Name)</th>
+                                <th data-i18n="system.colTraceId">Trace ID (W3C)</th>
+                                <th data-i18n="system.colSpanId">Span ID</th>
+                                <th data-i18n="system.colDuration">Trvanie</th>
+                                <th data-i18n="common.status">Stav</th>
+                                <th data-i18n="system.colAttributes">Atribúty / Tagy</th>
                             </tr>
                         </thead>
                         <tbody id="distributed-traces-table-body">
@@ -2024,19 +2024,19 @@
                 <div class="table-card" style="margin-bottom: 24px;">
                     <div class="table-header">
                         <div>
-                            <div class="table-title">📈 Časový Vývoj Súbežnosti Sedadiel (FLT-38 Concurrency Timeline)</div>
+                            <div class="table-title" data-i18n="reports.concurrencyTitle">📈 Časový Vývoj Súbežnosti Sedadiel (FLT-38 Concurrency Timeline)</div>
                             <div class="table-subtitle">Deterministická schodisková funkcia vypočítaná priamo z immutable auditných udalostí (žiadne vzorkovanie)</div>
                         </div>
                     </div>
                     <table class="data-table">
                         <thead>
                             <tr>
-                                <th>Časové Okno (Od - Do)</th>
-                                <th style="width: 90px; text-align: right;">Špička (Peak)</th>
-                                <th style="width: 110px; text-align: right;">Časový Priemer</th>
-                                <th style="width: 90px; text-align: right;">Checkouts</th>
-                                <th style="width: 90px; text-align: right;">Zamietnutia</th>
-                                <th style="width: 200px;">Vyťaženie Kapacity</th>
+                                <th data-i18n="reports.colTimeWindow">Časové Okno (Od - Do)</th>
+                                <th style="width: 90px; text-align: right;" data-i18n="reports.colPeak">Špička (Peak)</th>
+                                <th style="width: 110px; text-align: right;" data-i18n="reports.colAverage">Časový Priemer</th>
+                                <th style="width: 90px; text-align: right;" data-i18n="reports.colCheckouts">Checkouts</th>
+                                <th style="width: 90px; text-align: right;" data-i18n="reports.colDenials">Zamietnutia</th>
+                                <th style="width: 200px;" data-i18n="reports.colCapacity">Vyťaženie Kapacity</th>
                             </tr>
                         </thead>
                         <tbody id="concurrency-timeline-table-body">
@@ -2051,7 +2051,7 @@
                 <div class="table-card" style="margin-bottom: 24px;">
                     <div class="table-header">
                         <div>
-                            <div class="table-title">📋 Enterprise True-Up Zmluvný Audit Výkaz (§6.5)</div>
+                            <div class="table-title" data-i18n="reports.trueUpTitle">📋 Enterprise True-Up Zmluvný Audit Výkaz (§6.5)</div>
                             <div class="table-subtitle">Vyhodnotenie kontraktu podľa zaznamenaných maxím a spoplatniteľných prekročení pre oddelenie nákupu</div>
                         </div>
                         <div class="table-actions">
@@ -2066,13 +2066,13 @@
                     <table class="data-table">
                         <thead>
                             <tr>
-                                <th>Licencia ID / Kľúč</th>
-                                <th>Názov / Klient</th>
-                                <th style="text-align: right;">Zmluvný Limit</th>
-                                <th style="text-align: right;">Dosiahnutá Špička</th>
-                                <th style="text-align: right;">Nadlimitné Sedadlá</th>
-                                <th style="text-align: right;">Spoplatniteľné Sedadlosekundy</th>
-                                <th>Stav Súladu</th>
+                                <th data-i18n="reports.colLicenseId">Licencia ID / Kľúč</th>
+                                <th data-i18n="common.customer">Názov / Klient</th>
+                                <th style="text-align: right;" data-i18n="reports.colContractLimit">Zmluvný Limit</th>
+                                <th style="text-align: right;" data-i18n="reports.colPeakReached">Dosiahnutá Špička</th>
+                                <th style="text-align: right;" data-i18n="reports.colOverageSeats">Nadlimitné Sedadlá</th>
+                                <th style="text-align: right;" data-i18n="reports.colBillableSeconds">Spoplatniteľné Sedadlosekundy</th>
+                                <th data-i18n="reports.colComplianceStatus">Stav Súladu</th>
                             </tr>
                         </thead>
                         <tbody id="trueup-table-body">
@@ -2087,19 +2087,19 @@
                 <div class="table-card" style="margin-bottom: 24px;">
                     <div class="table-header">
                         <div>
-                            <div class="table-title">🚫 Analytika Zamietnutí a Kapacitných Úzkych Hrdiel (FLT-39 Denials)</div>
+                            <div class="table-title" data-i18n="reports.denialsTitle">🚫 Analytika Zamietnutí a Kapacitných Úzkych Hrdiel (FLT-39 Denials)</div>
                             <div class="table-subtitle">Detailný zoznam neúspešných pokusov o získanie sedadla s identifikáciou klienta a dôvodu</div>
                         </div>
                     </div>
                     <table class="data-table">
                         <thead>
                             <tr>
-                                <th style="width: 160px;">Časová Pečiatka</th>
-                                <th>Dôvod Zamietnutia</th>
-                                <th>Licencia ID</th>
-                                <th>Stroj / Klient ID</th>
-                                <th>Používateľ / Relácia</th>
-                                <th>Kontext / Modul</th>
+                                <th style="width: 160px;" data-i18n="common.timestamp">Časová Pečiatka</th>
+                                <th data-i18n="reports.colDenialReason">Dôvod Zamietnutia</th>
+                                <th data-i18n="reports.colLicenseId">Licencia ID</th>
+                                <th data-i18n="reports.colClientMachine">Stroj / Klient ID</th>
+                                <th data-i18n="reports.colUserSession">Používateľ / Relácia</th>
+                                <th data-i18n="reports.colContextModule">Kontext / Modul</th>
                             </tr>
                         </thead>
                         <tbody id="denials-table-body">
@@ -2335,7 +2335,7 @@
                     <!-- Column 1: Registered Machine Activations -->
                     <div class="table-card" style="padding: 16px 20px;">
                         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
-                            <div class="table-title">🖥️ Evidované Stroje pre Licenciu</div>
+                            <div class="table-title" data-i18n="machines.title">🖥️ Evidované Stroje pre Licenciu</div>
                         </div>
                         <div style="margin-bottom: 14px;">
                             <label class="form-label" for="machines-license-select" style="font-size: 12px; margin-bottom: 4px;">Vyberte Licenciu:</label>
@@ -2346,11 +2346,11 @@
                         <table>
                             <thead>
                                 <tr>
-                                    <th>Machine ID</th>
-                                    <th>Fingerprint Hash</th>
-                                    <th>Stav</th>
-                                    <th>Prvýkrát videný</th>
-                                    <th>Akcia</th>
+                                    <th data-i18n="machines.colMachineId">Machine ID</th>
+                                <th data-i18n="machines.colFingerprint">Fingerprint Hash</th>
+                                <th data-i18n="common.status">Stav</th>
+                                <th data-i18n="machines.colFirstSeen">Prvýkrát videný</th>
+                                <th data-i18n="common.action">Akcia</th>
                                 </tr>
                             </thead>
                             <tbody id="machines-table-body">
@@ -2489,18 +2489,18 @@
                 <!-- Experiments Table -->
                 <div class="table-card" style="padding: 16px 20px;">
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px;">
-                        <div class="table-title">🔬 Konfigurované Experimenty &amp; Prevádzka</div>
+                        <div class="table-title" data-i18n="experiments.title">🔬 Konfigurované Experimenty & Prevádzka</div>
                     </div>
                     <table>
                         <thead>
                             <tr>
-                                <th>ID / Názov</th>
-                                <th>Stav</th>
-                                <th>Alokácia</th>
-                                <th>Varianty</th>
-                                <th>Salt</th>
-                                <th>Vytvorené / Spustené</th>
-                                <th>Akcie</th>
+                                <th data-i18n="common.name">ID / Názov</th>
+                                <th data-i18n="common.status">Stav</th>
+                                <th data-i18n="experiments.colAllocation">Alokácia</th>
+                                <th data-i18n="experiments.colVariants">Varianty</th>
+                                <th data-i18n="experiments.colSalt">Salt</th>
+                                <th data-i18n="experiments.colCreatedStarted">Vytvorené / Spustené</th>
+                                <th data-i18n="common.actions">Akcie</th>
                             </tr>
                         </thead>
                         <tbody id="experiments-table-body">
@@ -2582,18 +2582,18 @@
                 <!-- Table 1: Cryptographic Keys -->
                 <div class="table-card" style="padding: 16px 20px; margin-bottom: 24px;">
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px;">
-                        <div class="table-title">🔑 Inventár Kryptografických Kľúčov (Podpisy &amp; KEM)</div>
+                        <div class="table-title" data-i18n="pqc.keysTitle">🔑 Inventár Kryptografických Kľúčov (Podpisy & KEM)</div>
                     </div>
                     <table>
                         <thead>
                             <tr>
-                                <th>Key ID (KID)</th>
-                                <th>Algoritmus</th>
-                                <th>Kategória</th>
-                                <th>Účel</th>
-                                <th>Quantum-Safe?</th>
-                                <th>CNSA 2.0?</th>
-                                <th>Odporúčanie</th>
+                                <th data-i18n="keys.colKid">Key ID (KID)</th>
+                                <th data-i18n="keys.colAlgorithm">Algoritmus</th>
+                                <th data-i18n="pqc.colCategory">Kategória</th>
+                                <th data-i18n="pqc.colPurpose">Účel</th>
+                                <th data-i18n="pqc.colQuantumSafe">Quantum-Safe?</th>
+                                <th data-i18n="pqc.colCnsa">CNSA 2.0?</th>
+                                <th data-i18n="pqc.colRecommendation">Odporúčanie</th>
                             </tr>
                         </thead>
                         <tbody id="pqc-keys-table-body">
@@ -2607,18 +2607,18 @@
                 <!-- Table 2: License Documents Audit -->
                 <div class="table-card" style="padding: 16px 20px;">
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px;">
-                        <div class="table-title">📜 Inšpekcia Licenčných Dokumentov a HNDL Riziká</div>
+                        <div class="table-title" data-i18n="pqc.inventoryTitle">📜 Inšpekcia Licenčných Dokumentov a HNDL Riziká</div>
                     </div>
                     <table>
                         <thead>
                             <tr>
-                                <th>ID Licencie</th>
-                                <th>Zákazník</th>
-                                <th>Podpisový Algoritmus</th>
-                                <th>Quantum-Safe?</th>
-                                <th>Riziko (HNDL)</th>
-                                <th>Expirácia</th>
-                                <th>Odporúčanie</th>
+                                <th data-i18n="pqc.colLicenseId">ID Licencie</th>
+                                <th data-i18n="common.customer">Zákazník</th>
+                                <th data-i18n="pqc.colSigAlg">Podpisový Algoritmus</th>
+                                <th data-i18n="pqc.colQuantumSafe">Quantum-Safe?</th>
+                                <th data-i18n="pqc.colHndlRisk">Riziko (HNDL)</th>
+                                <th data-i18n="common.expires">Expirácia</th>
+                                <th data-i18n="pqc.colRecommendation">Odporúčanie</th>
                             </tr>
                         </thead>
                         <tbody id="pqc-licenses-table-body">
@@ -3043,10 +3043,10 @@
                 <table style="width: 100%;">
                     <thead>
                         <tr>
-                            <th>User ID</th>
-                            <th>Skupina</th>
-                            <th>Priradený</th>
-                            <th>Akcia</th>
+                            <th data-i18n="help.colUserId">User ID</th>
+                                        <th data-i18n="help.colGroup">Skupina</th>
+                                        <th data-i18n="help.colAssigned">Priradený</th>
+                                        <th data-i18n="common.action">Akcia</th>
                         </tr>
                     </thead>
                     <tbody id="license-users-table-body">
@@ -3070,10 +3070,10 @@
                 <table style="width: 100%;">
                     <thead>
                         <tr>
-                            <th>Entitlement</th>
-                            <th>Celkovo</th>
-                            <th>Vyčerpané</th>
-                            <th>Zostáva</th>
+                            <th data-i18n="help.colEntitlement">Entitlement</th>
+                                        <th data-i18n="help.colTotal">Celkovo</th>
+                                        <th data-i18n="help.colConsumed">Vyčerpané</th>
+                                        <th data-i18n="help.colRemaining">Zostáva</th>
                         </tr>
                     </thead>
                     <tbody id="license-quotas-table-body">
@@ -3092,11 +3092,11 @@
                 <table style="width: 100%;">
                     <thead>
                         <tr>
-                            <th>Machine ID</th>
-                            <th>Fingerprint Hash</th>
-                            <th>Stav</th>
-                            <th>Aktivovaný</th>
-                            <th>Akcia</th>
+                            <th data-i18n="machines.colMachineId">Machine ID</th>
+                                        <th data-i18n="machines.colFingerprint">Fingerprint Hash</th>
+                                        <th data-i18n="common.status">Stav</th>
+                                        <th data-i18n="machines.colActivated">Aktivovaný</th>
+                                        <th data-i18n="common.action">Akcia</th>
                         </tr>
                     </thead>
                     <tbody id="license-activations-table-body">
@@ -3177,11 +3177,11 @@
                 <table style="width: 100%;">
                     <thead>
                         <tr>
-                            <th>Udalosť</th>
-                            <th>Stav</th>
-                            <th>HTTP Kód</th>
-                            <th>Pokusy</th>
-                            <th>Čas / Chyba</th>
+                            <th data-i18n="webhooks.colEvent">Udalosť</th>
+                                        <th data-i18n="common.status">Stav</th>
+                                        <th data-i18n="webhooks.colHttpCode">HTTP Kód</th>
+                                        <th data-i18n="webhooks.colAttempts">Pokusy</th>
+                                        <th data-i18n="webhooks.colTimeError">Čas / Chyba</th>
                         </tr>
                     </thead>
                     <tbody id="deliveries-table-body">
